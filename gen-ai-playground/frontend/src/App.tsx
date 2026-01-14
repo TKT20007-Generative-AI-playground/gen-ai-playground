@@ -1,6 +1,6 @@
 
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { ImageGenerator } from './components/ImageGenerator';
+import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { ImageGenerator } from './components/ImageGenerator'
 import Header from "./components/Header"
 
 

@@ -1,15 +1,15 @@
-import { useRef } from "react";
+import { useRef } from "react"
 
 type PromptTextBoxProps = {
-  onSubmit: (prompt: string) => void;
-};
+  onSubmit: (prompt: string) => void
+}
 
 export function PromptTextBox({ onSubmit }: PromptTextBoxProps) {
 
-  const promptRef = useRef<HTMLTextAreaElement>(null);
+  const promptRef = useRef<HTMLTextAreaElement>(null)
   const handleSubmit = () => {
     if (promptRef.current) {
-      onSubmit(promptRef.current.value);
+      onSubmit(promptRef.current.value)
     }
   }
   return (
@@ -23,5 +23,5 @@ export function PromptTextBox({ onSubmit }: PromptTextBoxProps) {
       <button onClick={handleSubmit}>Create image</button>
     </>
 
-  );
+  )
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { PromptTextBox } from "./PromtTextBox"
-import PhotoArea from "./PhotoArea";
+import PhotoArea from "./PhotoArea"
 
 
 
@@ -9,8 +9,8 @@ import PhotoArea from "./PhotoArea";
  * contains a PromtTextBox component for user input and also display area component.
  */
 export function ImageGenerator() {
-  const [prompt, setPrompt] = useState("");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState("")
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
 
   useEffect(() => {
     if (prompt) {
@@ -19,16 +19,16 @@ export function ImageGenerator() {
         .then(response => response.json())
         .then(data => {
           if (data.image_url) {
-            setImageUrl(data.image_url);
+            setImageUrl(data.image_url)
           } else {
-            console.error("Image URL not found in response:", data);
+            console.error("Image URL not found in response:", data)
           }
         })
         .catch(error => {
-          console.error("Error fetching generated image:", error);
-        });
+          console.error("Error fetching generated image:", error)
+        })
     }
-  }, [prompt]);
+  }, [prompt])
   return (
     // styles are only for better visibility at this moment
     <>
@@ -43,5 +43,5 @@ export function ImageGenerator() {
         <PhotoArea src={imageUrl} alt="Generated image" />
       </div>
     </>
-  );
+  )
 }
