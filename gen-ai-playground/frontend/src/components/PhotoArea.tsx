@@ -4,7 +4,7 @@ type PhotoAreaProps = {
 }
 export default function PhotoArea({ src, alt }: PhotoAreaProps) {
     if (!src) {
-        return <div>No image to display</div>
+        return <div>Generating image..</div>
     }
     return (
         <div style={{

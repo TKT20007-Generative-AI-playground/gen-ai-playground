@@ -15,7 +15,7 @@ export function ImageGenerator() {
   useEffect(() => {
     if (prompt) {
       // hardcoded backend url for now
-      fetch(`http://127.0.0.1:5000/generate-image?prompt=${encodeURIComponent(prompt)}`)
+      fetch(`http://127.0.0.1:8000/generate-image?prompt=${encodeURIComponent(prompt)}`)
         .then(response => response.json())
         .then(data => {
           if (data.image_url) {

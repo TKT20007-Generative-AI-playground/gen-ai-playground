@@ -1,33 +1,37 @@
-from flask import Flask, send_file, request
-from flask_cors import CORS
+from fastapi import FastAPI, HTTPException, HTTPException
 import requests
-
+from fastapi.middleware.cors import CORSMiddleware
 
 '''
-    Simple Flask server to generate images based on prompts using Verda API (only FLUX.2 [dev] model is used).
+    Simple FastAPI server to generate images based on prompts using Verda API (only FLUX.2 [dev] model is used).
     contains now only two endpoints:
-        /generate-image - generates an image based on a prompt and returns the image URL
-        /test-image - returns a test image for development purposes (image creation takes time)
-    just add some img to the backend folder with name 'test_img.png' for testing
+        / - test endpoint to check if server is running
+        /generate-image - returns a generated image based on a prompt (from verda api)
+
 '''
 
+app = FastAPI()
 
-app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173"])
+"""
+    CORS middleware configuration
+    TODO: change allow_origins to the appropriate frontend url when needed
+    TODO: set allow_methods and allow_headers if/when needed
+"""
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-@app.route('/')
-def index():
-    return "Hello, World!"
+@app.get("/")
+def read_root():
+    return {"hello from gen-ai-playground backend"}
 
-@app.route('/test-image', methods=['GET'])
-def test_image():
-    prompt = request.args.get("prompt")
-    print("prompt received:", prompt)
-    return send_file("test_img.png")
-    
 
-@app.route('/generate-image', methods=['GET'])
-def generate_image():   
+
+@app.get('/generate-image')
+def generate_image(prompt: str):
     print("Generating image...")
     '''Generate an image based on a prompt and return it as a file response (from verda api)'''
      
@@ -39,7 +43,7 @@ def generate_image():
         "Content-Type": "application/json",
         "Authorization": bearer_token
     }
-    prompt = request.args.get("prompt")
+    
     data = {
         "input": {
             "prompt": prompt
@@ -51,17 +55,30 @@ def generate_image():
     
     try:
         resp.raise_for_status()
-    except requests.exceptions.HTTPError as e:
-        print(f"api err response: {resp.text}") 
-        return {"error": f"image generation failed: {resp.text}"}, resp.status_code
+    except requests.exceptions.HTTPError:
+        raise HTTPException(
+            status_code=resp.status_code,
+            detail=f"image generation failed: {resp.text}"
+        )
 
     resp_data = resp.json()
+
     if resp_data.get("status") == "COMPLETED" and resp_data.get("output", {}).get("outputs"):
         image_url = resp_data["output"]["outputs"][0]
         print(f"generated image url: {image_url}")
-        return {"image_url": image_url, "status": "success"}
-    else:
-        return {"error": "image generation incomplete", "data": resp_data}, 500
+        return {
+            "image_url": image_url,
+            "status": "success"
+        }
 
-if __name__ == '__main__':
-    app.run(debug=True)
+    raise HTTPException(
+        status_code=500,
+        detail={
+            "error": "problem generating image",
+            "data": resp_data
+        }
+    )
+
+
+
+    
