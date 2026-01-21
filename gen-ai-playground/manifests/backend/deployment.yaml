@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gen-ai-backend-dep
+  labels:
+    app: gen-ai-backend
+  annotations:
+    #This trigger restarts the pod when the ImageStream updates
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"backend:latest","namespace":"ohtuprojekti-staging"},"fieldPath":"spec.template.spec.containers[?(@.name==\"backend\")].image","pause":"false"}]
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gen-ai-backend
+  template:
+    metadata:
+      labels:
+        app: gen-ai-backend
+    spec:
+      containers:
+        - name: backend
+          image: backend:latest # Points to the ImageStream
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
