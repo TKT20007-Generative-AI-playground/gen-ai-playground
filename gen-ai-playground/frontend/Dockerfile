@@ -8,10 +8,8 @@ RUN npm install
 
 COPY . .
 
-RUN chmod -R 777 /app
-
 RUN npm run build
 
 EXPOSE 5173
 
-CMD ["npm", "run", "prod"]
+CMD ["npx", "serve", "-s", "dist", "-l", "5173"]
