@@ -23,3 +23,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        working-directory: ./gen-ai-playground/backend
+        run: |
+            docker build . --tag ghcr.io/${{ github.repository_owner }}/fastapi-backend:latest
+            docker run -d ghcr.io/${{ github.repository_owner }}/fastapi-backend:latest
+            docker push ghcr.io/${{ github.repository_owner }}/fastapi-backend:latest
