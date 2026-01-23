@@ -1,0 +1,18 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+    - name: latest
+      from:
+        kind: DockerImage
+        name: ghcr.io/tkt20007-generative-ai-playground/fastapi-backend:latest
+      importPolicy:
+        scheduled: true
+      referencePolicy:
+        type: Source

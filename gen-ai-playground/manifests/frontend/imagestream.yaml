@@ -1,0 +1,18 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+    - name: latest
+      from:
+        kind: DockerImage
+        name: ghcr.io/tkt20007-generative-ai-playground/vite-frontend:latest
+      importPolicy:
+        scheduled: true
+      referencePolicy:
+        type: Source

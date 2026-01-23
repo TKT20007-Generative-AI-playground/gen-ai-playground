@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gen-ai-frontend-svc
+spec:
+  selector:
+    app: gen-ai-frontend
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5173 # Docker file sets this port
+  type: ClusterIP

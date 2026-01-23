@@ -19,7 +19,10 @@ app = FastAPI()
 """
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173",
+        "https://gen-ai-frontend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi"
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )

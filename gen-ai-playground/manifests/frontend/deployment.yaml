@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gen-ai-frontend-dep
+  labels:
+    app: gen-ai-frontend
+  annotations:
+    image.openshift.io/triggers: >-
+      [{"from":{"kind":"ImageStreamTag","name":"frontend:latest","namespace":"ohtuprojekti-staging"},"fieldPath":"spec.template.spec.containers[?(@.name==\"frontend\")].image","pause":"false"}]
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gen-ai-frontend
+  template:
+    metadata:
+      labels:
+        app: gen-ai-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 5173  # Docker file sets this port

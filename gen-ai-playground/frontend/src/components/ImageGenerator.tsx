@@ -15,7 +15,7 @@ export function ImageGenerator() {
   useEffect(() => {
     if (prompt) {
       // hardcoded backend url for now
-      fetch(`http://127.0.0.1:8000/generate-image?prompt=${encodeURIComponent(prompt)}`)
+      fetch(`https://gen-ai-backend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi/generate-image?prompt=${encodeURIComponent(prompt)}`)
         .then(response => response.json())
         .then(data => {
           if (data.image_url) {
