@@ -1,9 +1,9 @@
-name: Build and Push Docker image (docker branch only)
+name: Build and Push Docker image (main branch only)
 
 on:
   push:
     branches:
-      - docker
+      - main
 
 permissions:
   contents: read
