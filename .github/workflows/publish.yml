@@ -44,11 +44,11 @@ jobs:
           docker ps -a
           docker logs backend || true
 
-      - name: Build and run Docker image for Frontend
+      - name: Build and run Frontend
         working-directory: ./gen-ai-playground/frontend
         run: |
           docker build . --tag ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
-          docker run -d -p 5173:80 --name frontend ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
+          docker run -d -p 5173:5173 --name frontend ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
           sleep 3
           docker ps -a
           docker logs frontend || true
@@ -57,8 +57,8 @@ jobs:
       - name: Wait for backend
         run: npx wait-on http://localhost:8000/docs
 
-      #- name: Wait for frontend
-      #  run: npx wait-on http://localhost:5173
+      - name: Wait for frontend
+        run: npx wait-on http://localhost:5173
 
       - name: Install dependencies
         run: npm ci
