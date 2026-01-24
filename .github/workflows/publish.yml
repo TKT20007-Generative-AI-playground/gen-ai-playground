@@ -70,6 +70,7 @@ jobs:
         run: npx playwright test
 
       - name: Run eslint
+        working-directory: ./gen-ai-playground/frontend
         run: npm run lint
 
       - name: Push Backend image
