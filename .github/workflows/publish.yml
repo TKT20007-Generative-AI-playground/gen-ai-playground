@@ -47,8 +47,11 @@ jobs:
       - name: Build and run Docker image for Frontend
         working-directory: ./gen-ai-playground/frontend
         run: |
-            docker build . --tag ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
-            docker run -d -p 5173:80 ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
+          docker build . --tag ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
+          docker run -d -p 5173:80 --name frontend ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
+          sleep 3
+          docker ps -a
+          docker logs frontend || true
 
 
       - name: Wait for backend
