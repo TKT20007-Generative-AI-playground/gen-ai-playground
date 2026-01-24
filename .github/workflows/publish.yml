@@ -3,7 +3,7 @@ name: Build and Push Docker image (main branch only)
 on:
   push:
     branches:
-      - playwright-ci
+      - main
 
 permissions:
   contents: read
