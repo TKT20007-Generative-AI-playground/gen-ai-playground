@@ -35,11 +35,14 @@ jobs:
         env:
           OWNER: '${{ github.repository_owner }}'
 
-      - name: Build and run Docker image for Backend
+      - name: Build and run Backend
         working-directory: ./gen-ai-playground/backend
         run: |
-            docker build . --tag ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
-            docker run -d -p 8000:8000 ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
+          docker build -t ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest .
+          docker run -d -p 8000:8000 --name backend ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
+          sleep 3
+          docker ps -a
+          docker logs backend || true
 
       - name: Build and run Docker image for Frontend
         working-directory: ./gen-ai-playground/frontend
