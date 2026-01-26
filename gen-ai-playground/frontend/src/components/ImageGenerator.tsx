@@ -20,6 +20,7 @@ export function ImageGenerator() {
   const [flux1KreaDevIsSelected, setFlux1KreaDevIsSelected] = useState(false)
   const backendUrl = import.meta.env.VITE_API_URL;
   const [isLoading, setIsLoading] = useState(false)
+  
 
   //TODO: change the structure so that models can be added without new states
 
