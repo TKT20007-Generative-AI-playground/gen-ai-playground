@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { PromptTextBox } from "./PromtTextBox"
 import PhotoArea from "./PhotoArea"
 import axios from "axios"
@@ -18,7 +18,6 @@ export function ImageGenerator() {
   const [imageUlr2, setImageUrl2] = useState<string | null>(null)
   const [flexKontextIsSelected, setFlexKontextIsSelected] = useState(false)
   const [flux1KreaDevIsSelected, setFlux1KreaDevIsSelected] = useState(false)
-  const backendTestUrl = "http://localhost:8000"
   const backendUrl = "https://gen-ai-backend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi/generate-image"
   const [isLoading, setIsLoading] = useState(false)
 
