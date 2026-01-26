@@ -1,0 +1,58 @@
+name: Test with Docker compose
+
+on:
+  pull_request:
+    branches-ignore:
+      - main
+  push:
+    branches:
+      - playwright-ci
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build and run Docker compose
+        working-directory: ./gen-ai-playground/
+        run: docker compose up --build
+
+      - name: Wait for backend
+        run: npx wait-on http://localhost:8000/docs
+
+      - name: Wait for frontend
+        run: npx wait-on http://localhost:5173
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright tests
+        run: npx playwright test
+
+      - name: Run eslint
+        working-directory: ./gen-ai-playground/frontend
+        run: |
+          npm ci
+          npm run lint
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
