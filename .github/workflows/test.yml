@@ -13,7 +13,7 @@ permissions:
   packages: write
 
 jobs:
-  build-and-push:
+  test-playwright-eslint:
     runs-on: ubuntu-latest
 
     steps:
