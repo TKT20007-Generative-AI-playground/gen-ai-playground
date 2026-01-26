@@ -1,10 +1,16 @@
 import base64
+import os
+from dotenv import load_dotenv
 import time
 from fastapi import FastAPI, HTTPException, HTTPException
 import requests
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from fastapi.responses import Response
+
+# Load environment variables from .env.local
+load_dotenv('.env.local')
+
 '''
     Simple FastAPI server to generate images based on prompts using Verda API (only FLUX.2 [dev] model is used).
     contains now only two endpoints:
@@ -29,10 +35,7 @@ app = FastAPI()
 """
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "https://gen-ai-frontend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi"
-    ],
+    allow_origins=[os.getenv("ALLOWED_ORIGINS")],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -50,7 +53,9 @@ async def generate_image(image_request: ImageRequestBody):
     print("Generating image...")
     '''Generate an image based on a prompt and return it as a file response (from verda api)'''
      
-    token = "api_key_goes_here"  
+    token = os.getenv("VERDA_API_KEY")
+    if not token:
+        raise HTTPException(status_code=500, detail="VERDA_API_KEY not set in environment.")
     bearer_token = f"Bearer {token}"
 
     if model == "flux_kontext":

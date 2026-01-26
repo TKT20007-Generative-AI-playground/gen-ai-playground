@@ -23,3 +23,6 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 5173  # Docker file sets this port
+          env:
+          - name: VITE_API_URL
+            value: "gen-ai-backend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi"
