@@ -27,7 +27,7 @@ jobs:
 
       - name: Build and run Docker compose
         working-directory: ./gen-ai-playground/
-        run: docker compose up --build
+        run: docker compose up -d --build
 
       - name: Wait for backend
         run: npx wait-on http://localhost:8000/docs
