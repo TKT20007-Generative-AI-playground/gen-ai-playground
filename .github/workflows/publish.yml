@@ -1,9 +1,9 @@
-name: Build and Push Docker image (main branch only)
+name: Build and Push Docker image
 
 on:
   push:
     branches:
-      - main
+      - '*'  # Build on all branches
 
 permissions:
   contents: read
@@ -30,16 +30,26 @@ jobs:
         env:
           OWNER: '${{ github.repository_owner }}'
 
+      - name: Set image tag based on branch
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "IMAGE_TAG=latest" >>${GITHUB_ENV}
+          else
+            # For other branches, use sanitized branch name as tag
+            BRANCH_NAME=$(echo "${{ github.ref_name }}" | sed 's/[^a-zA-Z0-9._-]/-/g')
+            echo "IMAGE_TAG=${BRANCH_NAME}" >>${GITHUB_ENV}
+          fi
+
       - name: Build and push Docker image for Backend
         working-directory: ./gen-ai-playground/backend
         run: |
-            docker build . --tag ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
-            docker run -d ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
-            docker push ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
+            docker build . --tag ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:${{ env.IMAGE_TAG }}
+            docker run -d ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:${{ env.IMAGE_TAG }}
+            docker push ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:${{ env.IMAGE_TAG }}
 
       - name: Build and push Docker image for Frontend
         working-directory: ./gen-ai-playground/frontend
         run: |
-            docker build . --tag ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
-            docker run -d ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
-            docker push ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
+            docker build . --tag ghcr.io/${{ env.OWNER_LC }}/vite-frontend:${{ env.IMAGE_TAG }}
+            docker run -d ghcr.io/${{ env.OWNER_LC }}/vite-frontend:${{ env.IMAGE_TAG }}
+            docker push ghcr.io/${{ env.OWNER_LC }}/vite-frontend:${{ env.IMAGE_TAG }}
