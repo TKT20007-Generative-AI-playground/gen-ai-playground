@@ -25,3 +25,10 @@ spec:
           ports:
             - containerPort: 8000
           env:
+            - name: ALLOWED_ORIGINS
+              value: "https://gen-ai-frontend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi"
+            - name: VERDA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: verda-api-secret
+                  key: VERDA_API_KEY

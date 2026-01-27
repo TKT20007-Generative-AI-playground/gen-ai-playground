@@ -32,3 +32,9 @@ frontend/.env
 backend/__pycache__/
 backend/*.pyc
 backend/.env
+
+# Node / Playwright
+node_modules/
+test-results/
+playwright-report/
+blob-report/

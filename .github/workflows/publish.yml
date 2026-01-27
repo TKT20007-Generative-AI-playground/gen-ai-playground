@@ -40,6 +40,6 @@ jobs:
       - name: Build and push Docker image for Frontend
         working-directory: ./gen-ai-playground/frontend
         run: |
-            docker build . --tag ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
+            docker build --no-cache --build-arg VITE_API_URL=https://gen-ai-backend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi . --tag ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
             docker run -d ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
             docker push ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest

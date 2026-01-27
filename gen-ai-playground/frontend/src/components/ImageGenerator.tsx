@@ -18,8 +18,9 @@ export function ImageGenerator() {
   const [imageUlr2, setImageUrl2] = useState<string | null>(null)
   const [flexKontextIsSelected, setFlexKontextIsSelected] = useState(false)
   const [flux1KreaDevIsSelected, setFlux1KreaDevIsSelected] = useState(false)
-  const backendUrl = "https://gen-ai-backend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi/generate-image"
+  const backendUrl = import.meta.env.VITE_API_URL;
   const [isLoading, setIsLoading] = useState(false)
+  
 
   //TODO: change the structure so that models can be added without new states
 
