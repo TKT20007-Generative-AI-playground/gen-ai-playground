@@ -33,15 +33,13 @@ jobs:
       - name: Build and push Docker image for Backend
         working-directory: ./gen-ai-playground/backend
         run: |
-            docker build . --tag ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:${{ env.IMAGE_TAG }}
-            docker run -d ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:${{ env.IMAGE_TAG }}
-            docker push ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:${{ env.IMAGE_TAG }}
+            docker build . --tag ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
+            docker run -d ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
+            docker push ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
 
       - name: Build and push Docker image for Frontend
         working-directory: ./gen-ai-playground/frontend
         run: |
             docker build --no-cache --build-arg VITE_API_URL=https://gen-ai-backend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi . --tag ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
             docker run -d ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
-            docker push ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latestlatest
-            docker run -d ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
-            docker push ghcr.io/${{ env.OWNER_LC }}/fastapi-backend:latest
+            docker push ghcr.io/${{ env.OWNER_LC }}/vite-frontend:latest
