@@ -37,3 +37,13 @@ spec:
                 secretKeyRef:
                   name: mongo-secret
                   key: MONGO_DB_URL
+            - name: INVITATION_CODE
+              valueFrom:
+                secretKeyRef:
+                  name: invitation-code
+                  key: INVITATION_CODE
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: jwt-secret
+                  key: JWT_SECRET_KEY
