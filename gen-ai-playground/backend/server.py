@@ -7,9 +7,29 @@ import requests
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from fastapi.responses import Response
+from pymongo import MongoClient
+from datetime import datetime
 
 # Load environment variables from .env.local
 load_dotenv('.env.local')
+
+# MongoDB connection
+mongo_url = os.getenv("MONGO_DB_URL")
+mongo_client = None
+db = None
+
+if mongo_url:
+    try:
+        mongo_client = MongoClient(mongo_url)
+        db = mongo_client["gen_ai_playground"]
+        # Test connection
+        mongo_client.admin.command('ping')
+        print("Successfully connected to MongoDB!")
+    except Exception as e:
+        print(f"Failed to connect to MongoDB: {e}")
+        print("Continuing without database support...")
+else:
+    print("MONGO_DB_URL not set, continuing without database support...")
 
 '''
     Simple FastAPI server to generate images based on prompts using Verda API (only FLUX.2 [dev] model is used).
@@ -43,6 +63,23 @@ app.add_middleware(
 @app.get("/")
 def read_root():
     return {"hello from gen-ai-playground backend"}
+
+@app.get("/history")
+def get_history():
+    """Get image generation history from MongoDB"""
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    try:
+        # Get last 50 image generations, sorted by newest first
+        history = list(db.images.find(
+            {},
+            {"_id": 0, "prompt": 1, "model": 1, "timestamp": 1, "image_size": 1}
+        ).sort("timestamp", -1).limit(50))
+        
+        return {"history": history}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
 
 @app.post('/generate-image')
 async def generate_image(image_request: ImageRequestBody):
@@ -107,6 +144,20 @@ async def generate_image(image_request: ImageRequestBody):
         image_bytes = base64.b64decode(image_base64)
         
         print("image gen endpoint finished at time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
+        
+        # Save to MongoDB if available
+        if db is not None:
+            try:
+                image_record = {
+                    "prompt": prompt,
+                    "model": model,
+                    "timestamp": datetime.utcnow(),
+                    "image_size": len(image_bytes)
+                }
+                db.images.insert_one(image_record)
+                print(f"Saved image metadata to MongoDB")
+            except Exception as e:
+                print(f"Failed to save to MongoDB: {e}")
         
         return Response(
             content=image_bytes,

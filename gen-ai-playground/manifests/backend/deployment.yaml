@@ -32,3 +32,8 @@ spec:
                 secretKeyRef:
                   name: verda-api-secret
                   key: VERDA_API_KEY
+            - name: MONGO_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-secret
+                  key: MONGO_DB_URL
