@@ -1,0 +1,10 @@
+fastapi[standard]
+python-dotenv
+requests
+pymongo
+bcrypt
+PyJWT
+pytest
+pytest-mock
+mongomock
+httpx
