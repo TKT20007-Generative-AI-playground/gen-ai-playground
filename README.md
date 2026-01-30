@@ -9,5 +9,9 @@ Run the following command in folder **gen-ai-playground** to start the applicati
 
 ```docker compose up```
 
+To run the backend unit tests:
+```docker compose build backend-tests```
+```docker compose run --rm backend-tests```
+
 ## Links
 [Backlog](https://github.com/orgs/TKT20007-Generative-AI-playground/projects/4)
