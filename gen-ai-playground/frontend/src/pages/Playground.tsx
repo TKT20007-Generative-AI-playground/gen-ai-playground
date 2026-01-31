@@ -1,6 +1,6 @@
 import { useState } from "react"
-import ImageGenerator from "../src/components/ImageGenerator"
-import ImageEditor from "../src/components/ImageEditor"
+import ImageGenerator from "../components/ImageGenerator"
+import ImageEditor from "../components/ImageEditor"
 
 /**
  * 

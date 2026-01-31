@@ -2,7 +2,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import ImageGenerator  from './components/ImageGenerator'
 import Header from "./components/Header"
-import Playground from "../pages/Playground"
+import Playground from "./pages/Playground"
 
 function App() {
   return (
