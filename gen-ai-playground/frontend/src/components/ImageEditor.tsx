@@ -11,27 +11,27 @@ import axios from "axios"
 
 export default function ImageEditor() {
     const [prompt, setPrompt] = useState("")
-    const backendUrl = import.meta.env.VITE_API_URL;
+    const backendUrl = import.meta.env.VITE_API_URL
     const [userImage, setUserImage] = useState<File | null>(null)
     const [userImageBase64, setUserImageBase64] = useState<string | null>(null)
     const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null)
     const [selectedModel, setSelectedModel] = useState<string>("")
-    const models = ["FLUX.1_Kontext_dev", ]
+    const models = ["FLUX.1_Kontext_dev",]
     async function EditUserImage(prompt: string) {
 
         if (!userImage || !prompt || selectedModel === "") {
             alert("Please provide an image, a prompt, and select a model")
         } else {
-            imageToBase64(userImage);
+            imageToBase64(userImage)
         }
         if (!userImageBase64) {
             alert("Error converting image to base64")
             return
         }
         try {
-            const formData = new FormData();
-            formData.append("image", userImageBase64);
-            formData.append("prompt", prompt);
+            const formData = new FormData()
+            formData.append("image", userImageBase64)
+            formData.append("prompt", prompt)
             let promises = []
             if (selectedModel) {
                 promises.push(
@@ -45,19 +45,19 @@ export default function ImageEditor() {
                 )
             }
             // maybe later add more models here
-            const responses = await Promise.all(promises);
-            
+            const responses = await Promise.all(promises)
+
             if (responses.length > 0) {
-                const editedImageBlob = responses[0].data;
+                const editedImageBlob = responses[0].data
                 const editedImageObjectUrl = URL.createObjectURL(editedImageBlob);
-                setEditedImageUrl(editedImageObjectUrl);
-            }else{
+                setEditedImageUrl(editedImageObjectUrl)
+            } else {
                 console.error(" No responses received from the server")
             }
 
 
         } catch (error) {
-            console.error("Error editing image:", error);
+            console.error("Error editing image:", error)
         }
 
     }

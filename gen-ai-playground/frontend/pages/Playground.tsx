@@ -1,5 +1,5 @@
 import { useState } from "react"
-import ImageGenerator  from "../src/components/ImageGenerator"
+import ImageGenerator from "../src/components/ImageGenerator"
 import ImageEditor from "../src/components/ImageEditor"
 
 /**
@@ -8,15 +8,15 @@ import ImageEditor from "../src/components/ImageEditor"
  */
 export default function Playground() {
 
-    const tabs = ["ImageGenerator", "ImageEditor"];
-    const [selectedComponent, setSelectedComponent] = useState<string | null>(null);
+    const tabs = ["ImageGenerator", "ImageEditor"]
+    const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
     const selectPlayingComponent = (componentName: string) => {
-        setSelectedComponent(componentName);
-    };
+        setSelectedComponent(componentName)
+    }
     const componentsMap: Record<string, React.ReactNode> = {
         ImageGenerator: <ImageGenerator />,
-        ImageEditor: <ImageEditor/>,
-    };
+        ImageEditor: <ImageEditor />,
+    }
 
 
     return (
