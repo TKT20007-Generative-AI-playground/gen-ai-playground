@@ -44,6 +44,7 @@ else:
 class ImageRequestBody(BaseModel):
     prompt: str
     model: str
+    image: str = None  # for edit-image endpoint
 
 class RegisterRequest(BaseModel):
     username: str
@@ -177,7 +178,20 @@ def get_history():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch history: {str(e)}")
 
-@app.post('/generate-image')
+
+@app.post("/edit-image")
+async def edit_image(image_request: ImageRequestBody):
+    """
+    Edit an image based on a prompt and return it as a file response
+    Args:
+        image_request (ImageRequestBody): _description_
+    """
+    prompt = image_request.prompt  # prompt from request body
+    model = image_request.model    # model from req body
+    image_base64 = image_request.image  # base64 image from req body
+    print("editing image...")
+
+@app.post("/generate-image")
 async def generate_image(image_request: ImageRequestBody):
     print("image gen endpoint called at time: " + time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime()))
     

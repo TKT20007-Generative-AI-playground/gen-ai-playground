@@ -4,9 +4,10 @@ type PromptTextBoxProps = {
   onSubmit: (prompt: string) => void
   value: string
   onChange: (value: string) => void
+  usage?: string
 }
 
-export function PromptTextBox({ onSubmit, value, onChange }: PromptTextBoxProps) {
+export function PromptTextBox({ onSubmit, value, onChange, usage }: PromptTextBoxProps) {
   const promptRef = useRef<HTMLTextAreaElement>(null)
   const handleSubmit = () => {
     if (promptRef.current) {
@@ -23,7 +24,7 @@ export function PromptTextBox({ onSubmit, value, onChange }: PromptTextBoxProps)
         rows={5}
         cols={50}
       />
-      <button onClick={handleSubmit}>Create image</button>
+      <button onClick={handleSubmit}>{usage}</button>
     </>
 
   )

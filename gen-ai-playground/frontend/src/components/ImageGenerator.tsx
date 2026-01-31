@@ -12,7 +12,7 @@ import axios from "axios"
 
 
 // TODO: add model names above the pictures 
-export function ImageGenerator() {
+export default function ImageGenerator() {
   const [prompt, setPrompt] = useState("")
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageUlr2, setImageUrl2] = useState<string | null>(null)
@@ -116,7 +116,8 @@ export function ImageGenerator() {
         </label>
         <PromptTextBox onSubmit={fetchTwoGeneratedImages}
           value={prompt}
-          onChange={setPrompt} />
+          onChange={setPrompt}
+          usage ="Create image" />
         <p>prompt: {prompt}</p>
       </div >
       <div style={{
