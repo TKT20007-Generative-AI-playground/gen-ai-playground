@@ -38,3 +38,5 @@ node_modules/
 test-results/
 playwright-report/
 blob-report/
+
+__pycache__/

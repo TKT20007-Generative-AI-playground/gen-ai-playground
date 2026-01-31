@@ -47,7 +47,7 @@ export function ImageGenerator() {
 
       if (flexKontextIsSelected) {
         promises.push(
-          axios.post(`${backendUrl}/generate-image`, {
+          axios.post(`${backendUrl}/images/generate`, {
             prompt: prompt,
             model: "flux_kontext"
           }, {
@@ -58,7 +58,7 @@ export function ImageGenerator() {
 
       if (flux1KreaDevIsSelected) {
         promises.push(
-          axios.post(`${backendUrl}/generate-image`, {
+          axios.post(`${backendUrl}/images/generate`, {
             prompt: prompt,
             model: "flux1_krea_dev"
           }, {
