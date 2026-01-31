@@ -26,7 +26,7 @@ def register(
     Register a new user
     
     Args:
-        user_data: Registration details including username, email, password, and invitation code
+        user_data: Registration details including username, password, and invitation code
         db: Database instance
         
     Returns:
@@ -44,15 +44,12 @@ def register(
             )
         
         # Check if user already exists
-        existing_user = db.users.find_one({"$or": [
-            {"username": user_data.username},
-            {"email": user_data.email}
-        ]})
+        existing_user = db.users.find_one({"username": user_data.username})
         
         if existing_user:
             raise HTTPException(
                 status_code=400,
-                detail="Username or email already exists"
+                detail="Username already exists"
             )
         
         # Hash the password
@@ -64,7 +61,6 @@ def register(
         # Create user document
         user_doc = {
             "username": user_data.username,
-            "email": user_data.email,
             "password": hashed_password,
             "created_at": datetime.utcnow()
         }
@@ -128,7 +124,6 @@ def login(
         
         token_payload = {
             "username": user["username"],
-            "email": user["email"],
             "exp": token_expiry
         }
         
@@ -141,8 +136,7 @@ def login(
         return LoginResponse(
             message="Login successful",
             token=token,
-            username=user["username"],
-            email=user["email"]
+            username=user["username"]
         )
     except HTTPException:
         raise

@@ -43,7 +43,6 @@ def get_current_user(
             algorithms=["HS256"]
         )
         username = payload.get("username")
-        email = payload.get("email")
         
         if not username:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -53,7 +52,7 @@ def get_current_user(
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         
-        return UserInfo(username=username, email=email)
+        return UserInfo(username=username)
     
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")

@@ -33,7 +33,6 @@ def test_user_data():
     """Sample user data for testing"""
     return {
         "username": "testuser",
-        "email": "test@example.com",
         "password": "SecurePassword123!",
         "invitation_code": os.getenv("INVITATION_CODE")
     }
@@ -48,7 +47,6 @@ def registered_user(mock_db, test_user_data):
     )
     user_doc = {
         "username": test_user_data["username"],
-        "email": test_user_data["email"],
         "password": hashed_password,
         "created_at": datetime.utcnow()
     }
@@ -60,7 +58,7 @@ class TestRegisterEndpoint:
     """Tests for /register endpoint"""
     
     def test_successful_registration(self, client, test_user_data):
-        """Test successful user rauth/egistration"""
+        """Test successful user registration"""
         response = client.post("/register", json=test_user_data)
         
         # Debug output
@@ -78,7 +76,6 @@ class TestRegisterEndpoint:
         """Test registration with duplicate username"""
         duplicate_user = {
             "username": registered_user["username"],
-            "email": "different@example.com",
             "password": "AnotherPassword123!",
             "invitation_code": os.getenv("INVITATION_CODE")
         }
@@ -88,19 +85,6 @@ class TestRegisterEndpoint:
         assert response.status_code == 400
         assert "already exists" in response.json()["detail"]
     
-    def test_duplicate_email(self, client, registered_user):
-        """Test registration with duplicate email"""
-        duplicate_user = {
-            "username": "differentuser",
-            "email": registered_user["email"],
-            "password": "AnotherPassword123!",
-            "invitation_code": os.getenv("INVITATION_CODE")
-        }
-        
-        response = client.post("/register", json=duplicate_user)
-        
-        assert response.status_code == 400
-        assert "already exists" in response.json()["detail"]
     
     def test_password_is_hashed(self, client, mock_db, test_user_data):
         """Test that password is hashed and not stored in plaintext"""
@@ -140,7 +124,7 @@ class TestRegisterEndpoint:
         """Test registration with missing required fields"""
         incomplete_data = {
             "username": "testuser"
-            # Missing email, password, and invitation_code
+            # Missing password and invitation_code
         }
         
         response = client.post("/register", json=incomplete_data)
@@ -160,7 +144,6 @@ class TestRegisterEndpoint:
         """Test registration without invitation code"""
         data_without_code = {
             "username": "testuser",
-            "email": "test@example.com",
             "password": "SecurePassword123!"
         }
         
@@ -184,7 +167,6 @@ class TestLoginEndpoint:
         data = response.json()
         assert data["message"] == "Login successful"
         assert data["username"] == registered_user["username"]
-        assert data["email"] == registered_user["email"]
         assert "token" in data
         assert data["token"] != ""
     
@@ -204,7 +186,6 @@ class TestLoginEndpoint:
         decoded = jwt.decode(token, "dev-secret-key-for-local-development", algorithms=["HS256"])
         
         assert decoded["username"] == registered_user["username"]
-        assert decoded["email"] == registered_user["email"]
         assert "exp" in decoded
         
         # Verify expiration is ~24 hours from now

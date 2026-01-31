@@ -33,7 +33,6 @@ def test_user_data():
     """Sample user data for testing"""
     return {
         "username": "testuser",
-        "email": "test@example.com",
         "password": "SecurePassword123!"
     }
 
@@ -43,7 +42,6 @@ def test_user2_data():
     """Second user data for testing user isolation"""
     return {
         "username": "testuser2",
-        "email": "test2@example.com",
         "password": "SecurePassword456!"
     }
 
@@ -57,7 +55,6 @@ def registered_user(mock_db, test_user_data):
     )
     user_doc = {
         "username": test_user_data["username"],
-        "email": test_user_data["email"],
         "password": hashed_password,
         "created_at": datetime.utcnow()
     }
@@ -74,7 +71,6 @@ def registered_user2(mock_db, test_user2_data):
     )
     user_doc = {
         "username": test_user2_data["username"],
-        "email": test_user2_data["email"],
         "password": hashed_password,
         "created_at": datetime.utcnow()
     }
@@ -90,7 +86,6 @@ def auth_token(test_user_data):
     
     token_payload = {
         "username": test_user_data["username"],
-        "email": test_user_data["email"],
         "exp": token_expiry
     }
     
@@ -106,7 +101,6 @@ def auth_token2(test_user2_data):
     
     token_payload = {
         "username": test_user2_data["username"],
-        "email": test_user2_data["email"],
         "exp": token_expiry
     }
     
@@ -183,7 +177,6 @@ class TestHistoryEndpoint:
         
         token_payload = {
             "username": registered_user["username"],
-            "email": registered_user["email"],
             "exp": token_expiry
         }
         

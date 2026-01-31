@@ -1,7 +1,7 @@
 """
 Pydantic models for request and response validation
 """
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
 
@@ -15,7 +15,6 @@ class ImageRequestBody(BaseModel):
 class RegisterRequest(BaseModel):
     """Request model for user registration"""
     username: str
-    email: str
     password: str
     invitation_code: str
 
@@ -31,7 +30,6 @@ class LoginResponse(BaseModel):
     message: str
     token: str
     username: str
-    email: str
 
 
 class RegisterResponse(BaseModel):
@@ -57,4 +55,3 @@ class HistoryResponse(BaseModel):
 class UserInfo(BaseModel):
     """Model for authenticated user information"""
     username: str
-    email: str
