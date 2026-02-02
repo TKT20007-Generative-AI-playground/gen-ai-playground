@@ -2,11 +2,8 @@ name: Test with Docker compose
 
 on:
   pull_request:
-    branches-ignore:
-      - main
-  push:
     branches:
-      - playwright-ci
+      - main
 
 permissions:
   contents: read
