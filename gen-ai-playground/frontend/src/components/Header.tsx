@@ -6,6 +6,7 @@ export default function Header() {
         <div style={{ padding: "10px", borderBottom: "1px solid #ccc", marginBottom: "20px" }}>
             <nav>
                 <Link to="/">Image Generator</Link>
+                <Link to="/register" style={{ marginLeft: "10px" }}>Register</Link>
             </nav>
         </div>
 
