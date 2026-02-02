@@ -10,6 +10,7 @@ class ImageRequestBody(BaseModel):
     """Request model for image generation"""
     prompt: str
     model: str
+    image: Optional[str] = None  
 
 
 class RegisterRequest(BaseModel):

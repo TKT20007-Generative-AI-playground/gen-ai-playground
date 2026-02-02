@@ -1,6 +1,7 @@
 """
 Image generation and history routes
 """
+import traceback
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from pymongo.database import Database
@@ -144,7 +145,7 @@ async def generate_image(
             image_record = {
                 "prompt": prompt,
                 "model": model,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.now(datetime.timezone.utc),
                 "image_size": len(image_bytes),
                 "image_data": image_base64,
                 "username": current_user.username
@@ -167,3 +168,99 @@ async def generate_image(
             "data": resp_data
         }
     )
+@router.post("/edit-image")
+async def edit_image(
+    image_request: ImageRequestBody,
+    # current_user: UserInfo = Depends(get_current_user),
+    # db: Database = Depends(get_database)
+                     ):
+    """
+    Edit an image based on a prompt and return it as a file response
+    Args:
+        image_request (ImageRequestBody): _description_
+    """
+    prompt = image_request.prompt  # prompt from request body
+    model = image_request.model    # model from req body
+    image_base64 = image_request.image # base64 image from req body
+    
+    if "," in image_base64:
+        image_base64 = image_base64.split(",",1)[1]
+    print("editing image...")
+    
+    if model == "FLUX.1_Kontext_dev":
+        url = url = settings.FLUX_KONTEXT_URL
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported model: {model}"
+        )
+     # Prepare request
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {settings.VERDA_API_KEY}"
+    }
+    
+    data = {
+        "input": {
+            "prompt": prompt,
+            "image": image_base64,
+            "enable_base64_output": True,
+        }
+    }
+    # call Verda API
+    resp = requests.post(url, headers=headers, json=data)
+    try:
+        resp.raise_for_status()
+        print(f"Response status: {resp.status_code}")
+
+        # Process response
+        resp_data = resp.json()
+
+        if resp_data.get("status") == "COMPLETED" and resp_data.get("output", {}).get("outputs"):
+            return_image_base64 = resp_data["output"]["outputs"][0]
+            print(f"Received base64 image (length: {len(return_image_base64)})")
+
+            # Remove data URL prefix if exists
+            if "," in return_image_base64:
+                return_image_base64 = return_image_base64.split(",", 1)[1]
+
+            # Decode base64 to bytes
+            image_bytes = base64.b64decode(return_image_base64)
+            # # Save to MongoDB
+            # try:
+            #     image_record = {
+            #         "prompt": prompt,
+            #         "model": model,
+            #         "timestamp": datetime.now(datetime.timezone.utc),
+            #         "image_size": len(image_bytes),
+            #         "image_data": image_base64,
+            #         "username": current_user.username
+            #     }
+            #     db.images.insert_one(image_record)
+            #     print(f"Saved image data to MongoDB for user: {current_user.username}")
+            # except Exception as e:
+            #     print(f"Failed to save to MongoDB: {e}")
+            return Response(
+                content=image_bytes,
+                media_type="image/png",
+                headers={"Content-Disposition": "inline"}
+            )
+        else:
+            print(f"Condition failed, status: {resp_data.get('status')}, outputs: {resp_data.get('output')}")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Image not ready or missing outputs. status: {resp_data.get('status')}"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("Full error traceback:\n", traceback.format_exc())
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Problem with image editing",
+                "exception": str(e),
+                "resp_data": resp.json() if 'resp' in locals() else None
+            }
+        )

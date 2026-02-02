@@ -112,7 +112,7 @@ export default function ImageGenerator() {
             onChange={(e) => setFlux1KreaDevIsSelected(e.target.checked)}
             className="w-4 h-4"
           />
-          <span>Flux1 Dev</span>
+          <span>Flux1 Krea Dev</span>
         </label>
         <PromptTextBox onSubmit={fetchTwoGeneratedImages}
           value={prompt}
