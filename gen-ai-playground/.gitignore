@@ -40,3 +40,4 @@ playwright-report/
 blob-report/
 
 __pycache__/
+blob-report/backend/.env.local
