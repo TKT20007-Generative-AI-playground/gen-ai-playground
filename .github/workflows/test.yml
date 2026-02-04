@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - tests
 
 permissions:
   contents: read
@@ -33,12 +36,15 @@ jobs:
         run: npx wait-on http://localhost:5173
 
       - name: Install dependencies
+        working-directory: ./gen-ai-playground/
         run: npm ci
 
       - name: Install Playwright Browsers
+        working-directory: ./gen-ai-playground/
         run: npx playwright install --with-deps
 
       - name: Run Playwright tests
+        working-directory: ./gen-ai-playground/
         run: npx playwright test
 
       - name: Run eslint
