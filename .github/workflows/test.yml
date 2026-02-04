@@ -49,7 +49,12 @@ jobs:
 
       - name: Run pytest for backend
         working-directory: ./gen-ai-playground/
-        run: docker compose exec backend pytest
+        run: docker compose exec -T backend pytest -v
+
+      - name: Show backend logs on pytest failure
+        if: failure()
+        working-directory: ./gen-ai-playground/
+        run: docker compose logs backend
 
       - name: Run eslint
         working-directory: ./gen-ai-playground/frontend
@@ -63,3 +68,8 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+
+      - name: Cleanup
+        if: always()
+        working-directory: ./gen-ai-playground/
+        run: docker compose down -v
