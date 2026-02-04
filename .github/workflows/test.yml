@@ -49,7 +49,7 @@ jobs:
 
       - name: Run pytest for backend
         working-directory: ./gen-ai-playground/
-        run: docker compose exec -T backend pytest -v
+        run: docker compose --profile test run --rm backend-tests
 
       - name: Show backend logs on pytest failure
         if: failure()
