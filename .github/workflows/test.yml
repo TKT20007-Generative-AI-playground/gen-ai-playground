@@ -47,6 +47,10 @@ jobs:
         working-directory: ./gen-ai-playground/
         run: npx playwright test
 
+      - name: Run pytest for backend
+        working-directory: ./gen-ai-playground/
+        run: docker compose exec backend pytest
+
       - name: Run eslint
         working-directory: ./gen-ai-playground/frontend
         run: |
