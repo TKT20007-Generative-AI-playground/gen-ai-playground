@@ -2,7 +2,7 @@ import base64
 import os
 from dotenv import load_dotenv
 import time
-from fastapi import FastAPI, HTTPException, HTTPException
+from fastapi import FastAPI, HTTPException
 import requests
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -170,7 +170,7 @@ def get_history():
         # Get last 50 image generations, sorted by newest first
         history = list(db.images.find(
             {},
-            {"_id": 0, "prompt": 1, "model": 1, "timestamp": 1, "image_size": 1}
+            {"_id": 0, "prompt": 1, "model": 1, "timestamp": 1, "image_base64": 1}
         ).sort("timestamp", -1).limit(50))
         
         return {"history": history}
@@ -248,7 +248,8 @@ async def generate_image(image_request: ImageRequestBody):
                     "prompt": prompt,
                     "model": model,
                     "timestamp": datetime.utcnow(),
-                    "image_size": len(image_bytes)
+                    "image_size": len(image_bytes),
+                    "image_base64": image_base64
                 }
                 db.images.insert_one(image_record)
                 print(f"Saved image metadata to MongoDB")
