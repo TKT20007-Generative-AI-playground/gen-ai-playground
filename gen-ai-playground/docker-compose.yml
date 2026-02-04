@@ -22,6 +22,7 @@ services:
       - MONGO_DB_URL=mongodb://mongodb:27017
       - JWT_SECRET_KEY=dev-secret-key-for-local-development
       - INVITATION_CODE=local-invitation-code
+      - VERDA_API_KEY=test-api-key
     volumes:
       - ./backend:/app
     depends_on:
