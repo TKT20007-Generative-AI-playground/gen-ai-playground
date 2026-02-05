@@ -2,7 +2,6 @@ import { useState } from "react";
 
 export default function Register() {
   const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -27,7 +26,6 @@ export default function Register() {
         },
         body: JSON.stringify({
           username,
-          email,
           password,
           invitation_code: inviteCode,
         }),
@@ -42,7 +40,6 @@ export default function Register() {
 
       setSuccess("User registered successfully!");
       setUsername("");
-      setEmail("");
       setPassword("");
       setConfirmPassword("");
       setInviteCode("");
@@ -61,14 +58,6 @@ export default function Register() {
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          required
-        />
-
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
           required
         />
 
