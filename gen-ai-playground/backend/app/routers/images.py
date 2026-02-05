@@ -171,9 +171,10 @@ async def generate_image(
 @router.post("/edit-image")
 async def edit_image(
     image_request: ImageRequestBody,
-    # current_user: UserInfo = Depends(get_current_user),
-    # db: Database = Depends(get_database)
-                     ):
+    current_user: UserInfo = Depends(get_current_user),
+    db: Database = Depends(get_database)
+    ):
+    
     """
     Edit an image based on a prompt and return it as a file response
     Args:

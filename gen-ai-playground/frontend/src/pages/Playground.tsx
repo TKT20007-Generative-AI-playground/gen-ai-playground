@@ -1,7 +1,7 @@
 import { useState } from "react"
 import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
-
+import { Select, Text, Group } from '@mantine/core';
 /**
  * 
  * @returns playground page where you can choose whether to create or edit an image using AI models
@@ -9,7 +9,7 @@ import ImageEditor from "../components/ImageEditor"
 export default function Playground() {
 
     const tabs = ["ImageGenerator", "ImageEditor"]
-    const [selectedComponent, setSelectedComponent] = useState<string | null>(null)
+    const [selectedComponent, setSelectedComponent] = useState<string | null>("ImageGenerator")
     const selectPlayingComponent = (componentName: string) => {
         setSelectedComponent(componentName)
     }
@@ -19,23 +19,33 @@ export default function Playground() {
     }
 
 
+
     return (
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", alignItems: "center" }}>
-            <h2>Welcome to the Gen AI Playground!</h2>
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: "10px" }}>
-                {tabs.map((tab) => (
-                    <button
-                        key={tab}
-                        onClick={() => selectPlayingComponent(tab)}
-                        style={{ margin: "10px", display: "flex", padding: "10px", backgroundColor: selectedComponent === tab ? "#007bff" : "#f8f9fa", color: selectedComponent === tab ? "white" : "black", border: "1px solid #dee2e6", borderRadius: "5px" }}
-                    >
-                        {tab}
-                    </button>
-                ))}
-            </div>
-            <div>
-                {selectedComponent && componentsMap[selectedComponent]}
-            </div>
-        </div>
+        <>
+            {/* <div style={{ display: "flex", flexDirection: "row", justifyContent: "center", width: "100%", alignItems: "center" }}> */}
+            <Group
+                justify="center"
+            >
+                <Select
+                    label="Select playground component"
+                    data={tabs.map(tab => ({ value: tab, label: tab }))}
+                    value={selectedComponent}
+                    onChange={(value: string | null) => selectPlayingComponent(value || "")}
+                />
+                {/* <h2>Welcome to the Gen AI Playground!</h2> */}
+                <Text
+                    fw={500}
+
+                > Welcome to the Gen AI Playground!
+                </Text>
+            </Group>
+            {/* </div> */}
+            < div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", alignItems: "center" }
+            }>
+                <div>
+                    {selectedComponent && componentsMap[selectedComponent]}
+                </div>
+            </div >
+        </>
     )
 }
