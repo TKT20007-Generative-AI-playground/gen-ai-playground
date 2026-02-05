@@ -1,8 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 
-/* new tests coming for ui change
- test('test main page visibility', async ({ page }) => {
+test.fixme('test main page visibility', async ({ page }) => {
   await page.goto('http://localhost:5173/');
   await expect(page.getByRole('link', { name: 'Image Generator' })).toBeVisible();
   await expect(page.getByText('Flux Kontext')).toBeVisible();
@@ -10,14 +9,14 @@ import { test, expect } from '@playwright/test';
   await expect(page.getByRole('button', { name: 'Create image' })).toBeVisible();
 });
 
-test('test text box writing and visibility', async ({ page }) => {
+test.fixme('test text box writing and visibility', async ({ page }) => {
   await page.goto('http://localhost:5173/');
   await page.getByRole('textbox', { name: 'Prompt here' }).click();
   await page.getByRole('textbox', { name: 'Prompt here' }).fill('cat in a spacesuit');
   await expect(page.getByText('prompt: cat in a spacesuit')).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Prompt here' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Prompt here' })).toHaveValue('cat in a spacesuit');
-}); */
+}); 
 
 test('main page has no console errors on load', async ({ page }) => {
   const consoleErrors: string[] = [];
