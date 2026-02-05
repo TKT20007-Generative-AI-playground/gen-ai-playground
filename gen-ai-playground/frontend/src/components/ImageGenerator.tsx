@@ -2,7 +2,7 @@ import { useState } from "react"
 import { PromptTextBox } from "./PromtTextBox"
 import PhotoArea from "./PhotoArea"
 import axios from "axios"
-
+import { useAuth } from "../context/AuthContext"
 
 
 /**
@@ -12,7 +12,8 @@ import axios from "axios"
 
 
 // TODO: add model names above the pictures 
-export default function ImageGenerator() {
+export function ImageGenerator() {
+  const { isLoggedIn } = useAuth()
   const [prompt, setPrompt] = useState("")
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageUlr2, setImageUrl2] = useState<string | null>(null)
@@ -23,6 +24,22 @@ export default function ImageGenerator() {
 
 
   //TODO: change the structure so that models can be added without new states
+
+  if (!isLoggedIn) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          textAlign: "center",
+          padding: 40,
+        }}
+      >
+        <p>You must be logged in to generate images.</p>
+      </div>
+    )
+  }
 
   //function to fetch generated images from backend
   async function fetchTwoGeneratedImages() {

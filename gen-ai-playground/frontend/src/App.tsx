@@ -2,7 +2,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import ImageGenerator  from './components/ImageGenerator'
 import Header from "./components/Header"
-import Playground from "./pages/Playground"
+import Register from "./components/Register" 
+
 
 function App() {
   return (
@@ -11,7 +12,7 @@ function App() {
         <Header />
         <Routes>
           <Route path="/" element={<ImageGenerator />} />
-          <Route path ="/playground" element ={<Playground/>} />
+          <Route path="/register" element={<Register />} />
         </Routes>
       </BrowserRouter>
     </>
