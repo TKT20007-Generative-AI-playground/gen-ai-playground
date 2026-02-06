@@ -14,7 +14,7 @@ import {
     Stack,
     Tooltip,
     SimpleGrid
-} from '@mantine/core';
+} from '@mantine/core'
 
 /**
  * 
@@ -84,7 +84,7 @@ export default function ImageEditor() {
 
             if (responses.length > 0) {
                 const editedImageBlob = responses[0].data
-                const editedImageObjectUrl = URL.createObjectURL(editedImageBlob);
+                const editedImageObjectUrl = URL.createObjectURL(editedImageBlob)
                 setEditedImageUrl(editedImageObjectUrl)
                 console.log(editedImageObjectUrl)
             } else {

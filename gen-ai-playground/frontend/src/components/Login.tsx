@@ -6,27 +6,27 @@ import {
   Stack,
   Text,
   Anchor,
-} from '@mantine/core';
-import { useForm } from '@mantine/form';
-import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+} from '@mantine/core'
+import { useForm } from '@mantine/form'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 interface LoginModalProps {
-  opened: boolean;
-  onClose: () => void;
+  opened: boolean
+  onClose: () => void
 }
 
 export default function LoginModal({ opened, onClose }: LoginModalProps) {
-  const { login } = useAuth();
+  const { login } = useAuth()
 
-  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
   const form = useForm({
     initialValues: {
       username: '',
       password: '',
     },
-  });
+  })
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
@@ -34,21 +34,21 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
-      });
+      })
 
-      const data = await res.json();
+      const data = await res.json()
 
       if (!res.ok) {
-        alert(data.detail || 'Login failed');
-        return;
+        alert(data.detail || 'Login failed')
+        return
       }
 
-      login(data.token, data.username);
-      onClose();
+      login(data.token, data.username)
+      onClose()
     } catch {
-      alert('Server unreachable');
+      alert('Server unreachable')
     }
-  };
+  }
 
   return (
     <Modal opened={opened} onClose={onClose} title="Login" centered>
@@ -85,6 +85,6 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
         </Stack>
       </form>
     </Modal>
-  );
+  )
 }
 

@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom"
-import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import LoginModal from './Login';
-import { Group, Divider, Text } from "@mantine/core";
+import { useState } from 'react'
+import { useAuth } from '../context/AuthContext'
+import LoginModal from './Login'
+import { Group, Divider, Text } from "@mantine/core"
 
 export default function Header() {
-  const [loginOpened, setLoginOpened] = useState(false);
-  const { isLoggedIn, logout } = useAuth();
+  const [loginOpened, setLoginOpened] = useState(false)
+  const { isLoggedIn, logout } = useAuth()
 
   return (
     <>
@@ -21,8 +21,8 @@ export default function Header() {
           <a
             href="#"
             onClick={(e) => {
-              e.preventDefault();
-              logout();
+              e.preventDefault()
+              logout()
             }}
           >
             Logout
@@ -31,8 +31,8 @@ export default function Header() {
           <a
             href="#"
             onClick={(e) => {
-              e.preventDefault();
-              setLoginOpened(true);
+              e.preventDefault()
+              setLoginOpened(true)
             }}
           >
             Login
@@ -42,5 +42,5 @@ export default function Header() {
       </Group>
       <Divider />
     </>
-  );
+  )
 }

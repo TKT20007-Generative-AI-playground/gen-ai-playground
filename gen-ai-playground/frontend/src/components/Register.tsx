@@ -1,21 +1,21 @@
-import { useState } from "react";
+import { useState } from "react"
 
 export default function Register() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [inviteCode, setInviteCode] = useState("")
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
+    e.preventDefault()
+    setError("")
+    setSuccess("")
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
+      setError("Passwords do not match")
+      return
     }
 
     try {
@@ -29,24 +29,24 @@ export default function Register() {
           password,
           invitation_code: inviteCode,
         }),
-      });
+      })
 
-      const data = await res.json();
+      const data = await res.json()
 
       if (!res.ok) {
-        setError(data.detail || "Registration failed");
-        return;
+        setError(data.detail || "Registration failed")
+        return
       }
 
-      setSuccess("User registered successfully!");
-      setUsername("");
-      setPassword("");
-      setConfirmPassword("");
-      setInviteCode("");
+      setSuccess("User registered successfully!")
+      setUsername("")
+      setPassword("")
+      setConfirmPassword("")
+      setInviteCode("")
     } catch (err) {
-      setError("Server unreachable");
+      setError("Server unreachable")
     }
-  };
+  }
 
   return (
     <div>
@@ -90,5 +90,5 @@ export default function Register() {
       {error && <p style={{ color: "red" }}>{error}</p>}
       {success && <p style={{ color: "green" }}>{success}</p>}
     </div>
-  );
+  )
 }

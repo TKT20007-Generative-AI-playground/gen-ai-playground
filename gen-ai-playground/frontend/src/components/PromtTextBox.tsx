@@ -1,5 +1,5 @@
 import { useRef } from "react"
-import { Textarea, Button, Box } from '@mantine/core';
+import { Textarea, Button, Box } from '@mantine/core'
 
 type PromptTextBoxProps = {
   onSubmit: (prompt: string) => void

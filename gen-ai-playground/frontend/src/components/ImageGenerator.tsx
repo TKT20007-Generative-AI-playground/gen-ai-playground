@@ -2,7 +2,14 @@ import { useState } from "react"
 import { PromptTextBox } from "./PromtTextBox"
 import axios from "axios"
 import { useAuth } from "../context/AuthContext"
-import { Loader, Card, Text, Image, Grid, MultiSelect, SimpleGrid } from '@mantine/core';
+import {
+  Loader,
+  Card,
+  Text,
+  Image,
+  MultiSelect,
+  SimpleGrid
+} from '@mantine/core'
 
 
 /**
@@ -115,8 +122,6 @@ export default function ImageGenerator() {
       setIsLoading(false)
     }
   }
-
-  console.log("Selected models:", selectedModels);
   return (
     // styles are only for better visibility at this moment
     <>

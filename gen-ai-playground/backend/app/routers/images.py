@@ -293,8 +293,7 @@ def build_request_data(model: str,  prompt: str, image_base64: Optional[str] = N
             base_data["image"] = image_base64
     if "KLEIN" not in model:
         base_data = {"input":base_data}
-        
-    print(base_data)
+    
     return base_data
         
         

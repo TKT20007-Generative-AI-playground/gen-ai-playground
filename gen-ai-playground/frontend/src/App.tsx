@@ -2,8 +2,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import Header from "./components/Header"
 import Register from "./components/Register"
-import Playground from "./pages/Playground";
-import { useAuth } from "./context/AuthContext";
+import Playground from "./pages/Playground"
+import { useAuth } from "./context/AuthContext"
 
 
 function App() {
@@ -29,6 +29,6 @@ function App() {
         </Routes>
       </BrowserRouter>
     </>
-  );
+  )
 }
 export default App

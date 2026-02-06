@@ -1,7 +1,7 @@
 import { useState } from "react"
 import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
-import { Select, Text, Group } from '@mantine/core';
+import { Select, Group } from '@mantine/core'
 /**
  * 
  * @returns playground page where you can choose whether to create or edit an image using AI models
