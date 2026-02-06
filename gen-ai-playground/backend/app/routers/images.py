@@ -258,7 +258,17 @@ async def edit_image(
             }
         )
 def save_image_to_db(db: Database, prompt: str, model: str, image_base64: str, current_user: UserInfo, user_base64_image: Optional[str] = None ):
-     # # Save to MongoDB
+    """ Saves the image(s) to mongoDB.
+        If the user has provided the original image, it is also saved to the database,
+        and the edited image is referenced by the original record ID.
+    Args:
+        db (Database): db
+        prompt (str): user prompt
+        model (str): model used to generate/edit the image
+        image_base64 (str): generated image in base64 format
+        current_user (UserInfo): logged-in user
+        user_base64_image (Optional[str], optional): image added by user in base64 format. Defaults to None.
+    """
     try:
         original_id = None
         if user_base64_image:
@@ -292,6 +302,7 @@ def save_image_to_db(db: Database, prompt: str, model: str, image_base64: str, c
         print(f"Failed to save to MongoDB: {e}")
         
 def choose_model_url(model: str)-> str:
+    """ return the correct model URL """
     try:
         return settings.MODEL_URLS[model]
     except KeyError:
@@ -300,6 +311,7 @@ def choose_model_url(model: str)-> str:
             detail=f"Unsupported model: {model}"
         )
 def build_request_data(model: str,  prompt: str, image_base64: Optional[str] = None) -> dict:
+    """ build the right type of data dictionary """
     base_data = {
             "prompt": prompt,
             "enable_base64_output": True
