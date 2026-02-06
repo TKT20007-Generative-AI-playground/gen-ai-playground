@@ -28,8 +28,12 @@ class Settings:
     INVITATION_CODE: str = os.getenv("INVITATION_CODE")
     
     # API URLs
-    FLUX_KONTEXT_URL: str = "https://inference.datacrunch.io/flux-kontext-dev/predict"
-    FLUX1_KREA_DEV_URL: str = "https://inference.datacrunch.io/flux-krea-dev/runsync"
+    MODEL_URLS ={
+        "FLUX1_KONTEXT_DEV": "https://inference.datacrunch.io/flux-kontext-dev/predict",
+        "FLUX1_KREA_DEV": "https://inference.datacrunch.io/flux-krea-dev/runsync",
+        "FLUX2_KLEIN_9B": "https://inference.datacrunch.io/flux2-klein-9b/generate",
+        "FLUX2_KLEIN_4B": "https://inference.datacrunch.io/flux2-klein-4b/generate"
+    }
 
 
 settings = Settings()

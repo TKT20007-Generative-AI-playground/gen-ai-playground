@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LoginModal from './Login';
-import { Group, Divider } from "@mantine/core";
+import { Group, Divider, Text } from "@mantine/core";
 
 export default function Header() {
   const [loginOpened, setLoginOpened] = useState(false);
@@ -14,8 +14,9 @@ export default function Header() {
         <Group gap="md">
           <Link to="/">Image Generator</Link>
           <Link to="/playground">Playground</Link>
+          <Text fw={500}> Welcome to the Gen AI Playground! </Text>
         </Group>
-
+        
         {isLoggedIn ? (
           <a
             href="#"
@@ -37,8 +38,6 @@ export default function Header() {
             Login
           </a>
         )}
-        {/* </div> */}
-
         <LoginModal opened={loginOpened} onClose={() => setLoginOpened(false)} />
       </Group>
       <Divider />

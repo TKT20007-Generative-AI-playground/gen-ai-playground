@@ -24,7 +24,10 @@ export default function Playground() {
         <>
             {/* <div style={{ display: "flex", flexDirection: "row", justifyContent: "center", width: "100%", alignItems: "center" }}> */}
             <Group
-                justify="center"
+                flex direction="row"
+                margin="md"
+                gap= "md"
+                p= "md"
             >
                 <Select
                     label="Select playground component"
@@ -32,12 +35,6 @@ export default function Playground() {
                     value={selectedComponent}
                     onChange={(value: string | null) => selectPlayingComponent(value || "")}
                 />
-                {/* <h2>Welcome to the Gen AI Playground!</h2> */}
-                <Text
-                    fw={500}
-
-                > Welcome to the Gen AI Playground!
-                </Text>
             </Group>
             {/* </div> */}
             < div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", alignItems: "center" }

@@ -13,7 +13,7 @@ import {
     Button,
     Stack,
     Tooltip,
-    Grid
+    SimpleGrid
 } from '@mantine/core';
 
 /**
@@ -29,8 +29,12 @@ export default function ImageEditor() {
     const [userImage, setUserImage] = useState<File | null>(null)
     const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null)
     const [selectedModels, setSelectedModels] = useState<string[]>([])
-    const models = ["FLUX.1_Kontext_dev",]
     const [isLoading, setIsLoading] = useState(false)
+    const models = [
+        "FLUX1_KONTEXT_DEV",
+        "FLUX2_KLEIN_9B",
+        "FLUX2_KLEIN_4B"
+    ]
 
     if (!isLoggedIn) {
         return (
@@ -109,9 +113,6 @@ export default function ImageEditor() {
             reader.readAsDataURL(file)
         })
     }
-
-
-
     return (
         <>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", alignItems: "center", margin: "10px" }}>
@@ -152,33 +153,37 @@ export default function ImageEditor() {
 
             }}>
                 {isLoading && <><p>Editing image...</p><Loader /></>}
-                {editedImageUrl === null && !isLoading && <p>Edited image will appear here</p>}
-                <Grid justify="center">
-                    <Grid.Col span={6}>
-                        {editedImageUrl &&
-                            <Card shadow="sm" padding="lg" radius="md" withBorder>
-                                <Text weight={500} size="lg" mb="md">Model used: {selectedModels[0]}</Text>
-                                <Image
-                                    src={editedImageUrl}
-                                    alt="Edited image"
-                                    height={400}
-                                />
-                            </Card>
-                        }
-                    </Grid.Col>
-                    <Grid.Col span={6}>
-                        {editedImageUrl &&
-                            <Card shadow="sm" padding="lg" radius="md" withBorder>
-                                <Text weight={500} size="lg" mb="md">Model used: {selectedModels[0]}</Text>
-                                <Image
-                                    src={editedImageUrl}
-                                    alt="Edited image"
-                                    height={400}
-                                />
-                            </Card>
-                        }
-                    </Grid.Col>
-                </Grid>
+                {editedImageUrl === null && !isLoading && <Text >Edited image will appear here</Text>}
+                <SimpleGrid
+                    cols={editedImageUrl && userImage ? 2 : 1}
+                    spacing="md"
+                    breakpoints={[
+                        { maxWidth: 'md', cols: 1 }
+                    ]}
+                >
+                    {editedImageUrl && (
+                        <Card shadow="sm" padding="lg" radius="md" withBorder style={{ maxWidth: 500 }}>
+                            <Text weight={500} size="lg" mb="md">Model used: {selectedModels[0]}</Text>
+                            <Image
+                                src={editedImageUrl}
+                                alt="Generated image"
+                                fit="contain"
+
+                            />
+                        </Card>
+                    )}
+
+                    {userImage && (
+                        <Card shadow="sm" padding="lg" radius="md" withBorder style={{ maxWidth: 500 }}>
+                            <Text weight={500} size="lg" mb="md">Original image</Text>
+                            <Image
+                                src={URL.createObjectURL(userImage)}
+                                alt="Original image"
+                                fit="contain"
+                            />
+                        </Card>
+                    )}
+                </SimpleGrid>
             </div>
         </>
     )

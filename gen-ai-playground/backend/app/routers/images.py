@@ -5,7 +5,7 @@ import traceback
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from pymongo.database import Database
-from datetime import datetime
+from datetime import datetime, timezone
 import base64
 import time
 import requests
@@ -96,23 +96,25 @@ async def generate_image(
         )
     
     # Select API URL based on model
-    if model == "flux_kontext":
-        url = settings.FLUX_KONTEXT_URL
-    else:
-        url = settings.FLUX1_KREA_DEV_URL
+    url = choose_model_url(model)
     
     # Prepare request
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {settings.VERDA_API_KEY}"
     }
-    
-    data = {
-        "input": {
+    if model == "FLUX2_KLEIN_9B" or model == "FLUX2_KLEIN_4B":
+        data = {
             "prompt": prompt,
             "enable_base64_output": True
         }
-    }
+    else:
+        data = {
+            "input": {
+                "prompt": prompt,
+                "enable_base64_output": True
+            }
+        }
     
     # Call Verda API
     resp = requests.post(url, headers=headers, json=data)
@@ -127,39 +129,46 @@ async def generate_image(
     
     # Process response
     resp_data = resp.json()
-    if resp_data.get("status") == "COMPLETED" and resp_data.get("output", {}).get("outputs"):
-        image_base64 = resp_data["output"]["outputs"][0]
-        print(f"Received base64 image (length: {len(image_base64)})")
-        
-        # Remove data URL prefix if exists
-        if "," in image_base64:
-            image_base64 = image_base64.split(",", 1)[1]
-        
-        # Decode base64 to bytes
-        image_bytes = base64.b64decode(image_base64)
-        
-        print(f"Image generation finished at: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}")
-        
-        # Save to MongoDB
-        try:
-            image_record = {
-                "prompt": prompt,
-                "model": model,
-                "timestamp": datetime.now(datetime.timezone.utc),
-                "image_size": len(image_bytes),
-                "image_data": image_base64,
-                "username": current_user.username
-            }
-            db.images.insert_one(image_record)
-            print(f"Saved image data to MongoDB for user: {current_user.username}")
-        except Exception as e:
-            print(f"Failed to save to MongoDB: {e}")
-        
-        return Response(
-            content=image_bytes,
-            media_type="image/png",
-            headers={"Content-Disposition": "inline"}
-        )
+    if model == "FLUX2_KLEIN_9B" or model == "FLUX2_KLEIN_4B":
+        if "image" in resp_data:
+                return_image_base64 = resp_data["image"]
+                print(f"Received base64 image (length: {len(return_image_base64)})")
+
+                # Remove data URL prefix if exists
+                if "," in return_image_base64:
+                    return_image_base64 = return_image_base64.split(",", 1)[1]
+
+                # Decode base64 to bytes
+                image_bytes = base64.b64decode(return_image_base64)
+                save_image_to_db(db, prompt, model, return_image_base64, current_user)
+                
+                return Response(
+                    content=image_bytes,
+                    media_type="image/png",
+                    headers={"Content-Disposition": "inline"}
+                )
+    else:   
+        if resp_data.get("status") == "COMPLETED" and resp_data.get("output", {}).get("outputs"):
+            image_base64 = resp_data["output"]["outputs"][0]
+            print(f"Received base64 image (length: {len(image_base64)})")
+
+            # Remove data URL prefix if exists
+            if "," in image_base64:
+                image_base64 = image_base64.split(",", 1)[1]
+
+            # Decode base64 to bytes
+            image_bytes = base64.b64decode(image_base64)
+
+            print(f"Image generation finished at: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}")
+
+            # Save to MongoDB
+            save_image_to_db(db, prompt, model, image_base64, current_user)
+
+            return Response(
+                content=image_bytes,
+                media_type="image/png",
+                headers={"Content-Disposition": "inline"}
+            )
     
     raise HTTPException(
         status_code=500,
@@ -178,6 +187,8 @@ async def edit_image(
     """
     Edit an image based on a prompt and return it as a file response
     Args:
+        current_user: UserInfo = Depends(get_current_user), _description_ (user info from )
+        db: Database = Depends(get_database), _description_
         image_request (ImageRequestBody): _description_
     """
     prompt = image_request.prompt  # prompt from request body
@@ -187,27 +198,26 @@ async def edit_image(
     if "," in image_base64:
         image_base64 = image_base64.split(",",1)[1]
     print("editing image...")
-    
-    if model == "FLUX.1_Kontext_dev":
-        url = url = settings.FLUX_KONTEXT_URL
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported model: {model}"
-        )
+    url = choose_model_url(model)
      # Prepare request
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {settings.VERDA_API_KEY}"
     }
-    
-    data = {
-        "input": {
+    if model == "FLUX2_KLEIN_9B" or model == "FLUX2_KLEIN_4B":
+        data = {
             "prompt": prompt,
-            "image": image_base64,
-            "enable_base64_output": True,
+            "input_images": [image_base64],
+            "enable_base64_output": True
         }
-    }
+    else:
+        data = {
+            "input": {
+                "prompt": prompt,
+                "image": image_base64,
+                "enable_base64_output": True,
+            }
+        }
     # call Verda API
     resp = requests.post(url, headers=headers, json=data)
     try:
@@ -216,42 +226,46 @@ async def edit_image(
 
         # Process response
         resp_data = resp.json()
+        if model == "FLUX2_KLEIN_9B" or model == "FLUX2_KLEIN_4B":
+            if "image" in resp_data:
+                return_image_base64 = resp_data["image"]
+                print(f"Received base64 image (length: {len(return_image_base64)})")
 
-        if resp_data.get("status") == "COMPLETED" and resp_data.get("output", {}).get("outputs"):
-            return_image_base64 = resp_data["output"]["outputs"][0]
-            print(f"Received base64 image (length: {len(return_image_base64)})")
+                # Remove data URL prefix if exists
+                if "," in return_image_base64:
+                    return_image_base64 = return_image_base64.split(",", 1)[1]
 
-            # Remove data URL prefix if exists
-            if "," in return_image_base64:
-                return_image_base64 = return_image_base64.split(",", 1)[1]
-
-            # Decode base64 to bytes
-            image_bytes = base64.b64decode(return_image_base64)
-            # # Save to MongoDB
-            # try:
-            #     image_record = {
-            #         "prompt": prompt,
-            #         "model": model,
-            #         "timestamp": datetime.now(datetime.timezone.utc),
-            #         "image_size": len(image_bytes),
-            #         "image_data": image_base64,
-            #         "username": current_user.username
-            #     }
-            #     db.images.insert_one(image_record)
-            #     print(f"Saved image data to MongoDB for user: {current_user.username}")
-            # except Exception as e:
-            #     print(f"Failed to save to MongoDB: {e}")
-            return Response(
-                content=image_bytes,
-                media_type="image/png",
-                headers={"Content-Disposition": "inline"}
-            )
+                # Decode base64 to bytes
+                image_bytes = base64.b64decode(return_image_base64)
+                save_image_to_db(db, prompt, model, return_image_base64, current_user)
+                return Response(
+                    content=image_bytes,
+                    media_type="image/png",
+                    headers={"Content-Disposition": "inline"}
+                )
         else:
-            print(f"Condition failed, status: {resp_data.get('status')}, outputs: {resp_data.get('output')}")
-            raise HTTPException(
-                status_code=500, 
-                detail=f"Image not ready or missing outputs. status: {resp_data.get('status')}"
-            )
+            if resp_data.get("status") == "COMPLETED" and resp_data.get("output", {}).get("outputs"):
+                return_image_base64 = resp_data["output"]["outputs"][0]
+                print(f"Received base64 image (length: {len(return_image_base64)})")
+
+                # Remove data URL prefix if exists
+                if "," in return_image_base64:
+                    return_image_base64 = return_image_base64.split(",", 1)[1]
+
+                # Decode base64 to bytes
+                image_bytes = base64.b64decode(return_image_base64)
+                save_image_to_db(db, prompt, model, return_image_base64, current_user)
+                return Response(
+                    content=image_bytes,
+                    media_type="image/png",
+                    headers={"Content-Disposition": "inline"}
+                )
+            else:
+                print(f"Condition failed, status: {resp_data.get('status')}, outputs: {resp_data.get('output')}")
+                raise HTTPException(
+                    status_code=500, 
+                    detail=f"Image not ready or missing outputs. status: {resp_data.get('status')}"
+                )
         
     except HTTPException:
         raise
@@ -264,4 +278,28 @@ async def edit_image(
                 "exception": str(e),
                 "resp_data": resp.json() if 'resp' in locals() else None
             }
+        )
+def save_image_to_db(db: Database, prompt: str, model: str, image_base64: str, current_user: UserInfo):
+     # # Save to MongoDB
+    try:
+        image_record = {
+            "prompt": prompt,
+            "model": model,
+            "timestamp": datetime.now(timezone.utc),
+            "image_size": len(base64.b64decode(image_base64)),
+            "image_data": image_base64,
+            "username": current_user.username
+        }
+        db.images.insert_one(image_record)
+        print(f"Saved image data to MongoDB for user: {current_user.username}")
+    except Exception as e:
+        print(f"Failed to save to MongoDB: {e}")
+        
+def choose_model_url(model: str)-> str:
+    try:
+        return settings.MODEL_URLS[model]
+    except KeyError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported model: {model}"
         )
