@@ -2,6 +2,7 @@
 Image generation and history routes
 """
 import traceback
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from pymongo.database import Database
@@ -103,18 +104,7 @@ async def generate_image(
         "Content-Type": "application/json",
         "Authorization": f"Bearer {settings.VERDA_API_KEY}"
     }
-    if model == "FLUX2_KLEIN_9B" or model == "FLUX2_KLEIN_4B":
-        data = {
-            "prompt": prompt,
-            "enable_base64_output": True
-        }
-    else:
-        data = {
-            "input": {
-                "prompt": prompt,
-                "enable_base64_output": True
-            }
-        }
+    data = build_request_data(model, prompt)
     
     # Call Verda API
     resp = requests.post(url, headers=headers, json=data)
@@ -204,20 +194,8 @@ async def edit_image(
         "Content-Type": "application/json",
         "Authorization": f"Bearer {settings.VERDA_API_KEY}"
     }
-    if model == "FLUX2_KLEIN_9B" or model == "FLUX2_KLEIN_4B":
-        data = {
-            "prompt": prompt,
-            "input_images": [image_base64],
-            "enable_base64_output": True
-        }
-    else:
-        data = {
-            "input": {
-                "prompt": prompt,
-                "image": image_base64,
-                "enable_base64_output": True,
-            }
-        }
+
+    data = build_request_data(model, prompt, image_base64)
     # call Verda API
     resp = requests.post(url, headers=headers, json=data)
     try:
@@ -303,3 +281,23 @@ def choose_model_url(model: str)-> str:
             status_code=400,
             detail=f"Unsupported model: {model}"
         )
+def build_request_data(model: str,  prompt: str, image_base64: Optional[str] = None) -> dict:
+    base_data = {
+            "prompt": prompt,
+            "enable_base64_output": True
+        }
+    if image_base64:
+        if "KLEIN" in model:
+            base_data["input_images"] = [image_base64]
+        else:
+            base_data["image"] = image_base64
+    if "KLEIN" not in model:
+        base_data = {"input":base_data}
+        
+    print(base_data)
+    return base_data
+        
+        
+        
+    
+    
