@@ -232,7 +232,7 @@ async def edit_image(
 
                 # Decode base64 to bytes
                 image_bytes = base64.b64decode(return_image_base64)
-                save_image_to_db(db, prompt, model, return_image_base64, current_user)
+                save_image_to_db(db, prompt, model, return_image_base64, current_user, image_base64)
                 return Response(
                     content=image_bytes,
                     media_type="image/png",
@@ -257,17 +257,35 @@ async def edit_image(
                 "resp_data": resp.json() if 'resp' in locals() else None
             }
         )
-def save_image_to_db(db: Database, prompt: str, model: str, image_base64: str, current_user: UserInfo):
+def save_image_to_db(db: Database, prompt: str, model: str, image_base64: str, current_user: UserInfo, user_base64_image: Optional[str] = None ):
      # # Save to MongoDB
     try:
+        original_id = None
+        if user_base64_image:
+            user_input_image_record = {
+                "prompt": prompt,
+                "model": model,
+                "timestamp": datetime.now(timezone.utc),
+                "image_size": len(base64.b64decode(user_base64_image)),
+                "image_data": user_base64_image,
+                "username": current_user.username,
+                "type": "original"
+            }
+            res = db.images.insert_one(user_input_image_record)
+            original_id = res.inserted_id
+        
         image_record = {
             "prompt": prompt,
             "model": model,
             "timestamp": datetime.now(timezone.utc),
             "image_size": len(base64.b64decode(image_base64)),
             "image_data": image_base64,
-            "username": current_user.username
+            "username": current_user.username,
         }
+        
+        if original_id != None:
+            image_record["parent_image_id"] = original_id
+                
         db.images.insert_one(image_record)
         print(f"Saved image data to MongoDB for user: {current_user.username}")
     except Exception as e:
