@@ -88,6 +88,7 @@ async def generate_image(
     
     prompt = image_request.prompt
     model = image_request.model
+    image_type = "generated"
     
     # Validate API key
     if not settings.VERDA_API_KEY:
@@ -130,7 +131,7 @@ async def generate_image(
 
                 # Decode base64 to bytes
                 image_bytes = base64.b64decode(return_image_base64)
-                save_image_to_db(db, prompt, model, return_image_base64, current_user)
+                save_image_to_db(db, prompt, model, return_image_base64, current_user, image_type)
                 
                 return Response(
                     content=image_bytes,
@@ -152,7 +153,7 @@ async def generate_image(
             print(f"Image generation finished at: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}")
 
             # Save to MongoDB
-            save_image_to_db(db, prompt, model, image_base64, current_user)
+            save_image_to_db(db, prompt, model, image_base64, current_user, image_type)
 
             return Response(
                 content=image_bytes,
@@ -184,6 +185,7 @@ async def edit_image(
     prompt = image_request.prompt  # prompt from request body
     model = image_request.model    # model from req body
     image_base64 = image_request.image # base64 image from req body
+    image_type = "edited"
     
     if "," in image_base64:
         image_base64 = image_base64.split(",",1)[1]
@@ -215,7 +217,7 @@ async def edit_image(
 
                 # Decode base64 to bytes
                 image_bytes = base64.b64decode(return_image_base64)
-                save_image_to_db(db, prompt, model, return_image_base64, current_user)
+                save_image_to_db(db, prompt, model, return_image_base64, current_user, image_type, image_base64)
                 return Response(
                     content=image_bytes,
                     media_type="image/png",
@@ -232,7 +234,7 @@ async def edit_image(
 
                 # Decode base64 to bytes
                 image_bytes = base64.b64decode(return_image_base64)
-                save_image_to_db(db, prompt, model, return_image_base64, current_user, image_base64)
+                save_image_to_db(db, prompt, model, return_image_base64, current_user, image_type, image_base64)
                 return Response(
                     content=image_bytes,
                     media_type="image/png",
@@ -257,7 +259,9 @@ async def edit_image(
                 "resp_data": resp.json() if 'resp' in locals() else None
             }
         )
-def save_image_to_db(db: Database, prompt: str, model: str, image_base64: str, current_user: UserInfo, user_base64_image: Optional[str] = None ):
+def save_image_to_db(db: Database, prompt: str, model:
+                    str, image_base64: str, current_user:UserInfo,
+                    image_type:str, user_base64_image: Optional[str] = None ):
     """ Saves the image(s) to mongoDB.
         If the user has provided the original image, it is also saved to the database,
         and the edited image is referenced by the original record ID.
@@ -268,6 +272,7 @@ def save_image_to_db(db: Database, prompt: str, model: str, image_base64: str, c
         image_base64 (str): generated image in base64 format
         current_user (UserInfo): logged-in user
         user_base64_image (Optional[str], optional): image added by user in base64 format. Defaults to None.
+        type (str): is the image returned by the AI edited or completely generated?
     """
     try:
         original_id = None
@@ -291,6 +296,7 @@ def save_image_to_db(db: Database, prompt: str, model: str, image_base64: str, c
             "image_size": len(base64.b64decode(image_base64)),
             "image_data": image_base64,
             "username": current_user.username,
+            "type": image_type
         }
         
         if original_id != None:
