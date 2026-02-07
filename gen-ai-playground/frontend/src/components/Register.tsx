@@ -59,6 +59,7 @@ export default function Register() {
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
+          data-testid="register-username"
         />
 
         <input
@@ -67,6 +68,7 @@ export default function Register() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
+          data-testid="register-password"
         />
 
         <input
