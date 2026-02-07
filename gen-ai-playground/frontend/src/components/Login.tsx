@@ -58,6 +58,7 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
             label="Username"
             placeholder="Your username"
             required
+            data-testid="login-username"
             {...form.getInputProps('username')}
           />
 
@@ -65,6 +66,7 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
             label="Password"
             placeholder="Your password"
             required
+            data-testid="login-password"
             {...form.getInputProps('password')}
           />
 
