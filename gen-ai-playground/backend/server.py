@@ -8,13 +8,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, images
+from app.routers import auth, images, text
 
 
 # Initialize FastAPI app
 app = FastAPI(
     title="Gen AI Playground API",
-    description="Image generation API using Verda AI models",
+    description="Image and text generation API using Verda AI models",
     version="1.0.0"
 )
 
@@ -30,6 +30,7 @@ app.add_middleware(
 # Register routers
 app.include_router(auth.router)
 app.include_router(images.router)
+app.include_router(text.router)
 
 
 @app.get("/")
