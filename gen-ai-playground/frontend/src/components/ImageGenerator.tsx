@@ -68,6 +68,10 @@ export function ImageGenerator() {
             prompt: prompt,
             model: "flux_kontext"
           }, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "Content-Type": "application/json"
+            },
             responseType: 'blob'
           })
         )
@@ -79,6 +83,10 @@ export function ImageGenerator() {
             prompt: prompt,
             model: "flux1_krea_dev"
           }, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "Content-Type": "application/json"
+            },
             responseType: 'blob'
           })
         )
