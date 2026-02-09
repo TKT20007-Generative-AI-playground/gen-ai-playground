@@ -24,10 +24,8 @@ export default function Playground() {
         <>
             {/* <div style={{ display: "flex", flexDirection: "row", justifyContent: "center", width: "100%", alignItems: "center" }}> */}
             <Group
-                flex direction="row"
-                margin="md"
-                gap= "md"
-                p= "md"
+                gap="md"
+                p="md"
             >
                 <Select
                     label="Select playground component"

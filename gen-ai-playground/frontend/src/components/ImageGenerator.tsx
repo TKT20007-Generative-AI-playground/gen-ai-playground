@@ -148,15 +148,12 @@ export default function ImageGenerator() {
         }
         {imageUrl === null && imageUrl2 === null && !isLoading && <p>Generated images will appear here</p>}
         <SimpleGrid
-          cols={imageUrl && imageUrl2 ? 2 : 1}
+          cols={{ base: 1, md: imageUrl && imageUrl2 ? 2 : 1 }}
           spacing="md"
-          breakpoints={[
-            { maxWidth: 'md', cols: 1 }
-          ]}
         >
           {imageUrl && (
             <Card shadow="sm" padding="lg" radius="md" withBorder style={{ maxWidth: 500 }}>
-              <Text weight={500} size="lg" mb="md">Model used: {selectedModels[0]}</Text>
+              <Text fw={500} size="lg" mb="md">Model used: {selectedModels[0]}</Text>
               <Image
                 src={imageUrl}
                 alt="Generated image"
@@ -168,7 +165,7 @@ export default function ImageGenerator() {
 
           {imageUrl2 && (
             <Card shadow="sm" padding="lg" radius="md" withBorder style={{ maxWidth: 500 }}>
-              <Text weight={500} size="lg" mb="md">Model used: {selectedModels[1]}</Text>
+              <Text fw={500} size="lg" mb="md">Model used: {selectedModels[1]}</Text>
               <Image
                 src={imageUrl2}
                 alt="Generated image 2"

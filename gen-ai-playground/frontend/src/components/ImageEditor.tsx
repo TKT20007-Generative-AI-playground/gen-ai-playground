@@ -61,7 +61,7 @@ export default function ImageEditor() {
         try {
             const base64Image = await imageToBase64(userImage)
             console.log(base64Image)
-            let promises = []
+            const promises = []
             if (selectedModels[0]) {
                 promises.push(
                     axios.post(`${backendUrl}/images/edit-image`, {
@@ -116,7 +116,7 @@ export default function ImageEditor() {
     return (
         <>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", alignItems: "center", margin: "10px" }}>
-                <Stack spacing="md">
+                <Stack gap="md">
                     <MultiSelect
                         label="Select model to edit image with"
                         placeholder="Select model"
@@ -127,12 +127,10 @@ export default function ImageEditor() {
                     <FileButton
                         onChange={setUserImage}
                         accept="image/png,image/jpeg"
-                        value={userImage}
-                        label="Upload image"
                     >
-                        {(props: File) =>
+                        {(props) =>
                             <Tooltip label="Select an image to edit">
-                                <Button {...props}>{userImage ? "Change image" : "Upload image"}</Button>
+                                <Button onClick={props.onClick}>{userImage ? "Change image" : "Upload image"}</Button>
                             </Tooltip>
                         }
                     </FileButton>
@@ -157,13 +155,10 @@ export default function ImageEditor() {
                 <SimpleGrid
                     cols={editedImageUrl && userImage ? 2 : 1}
                     spacing="md"
-                    breakpoints={[
-                        { maxWidth: 'md', cols: 1 }
-                    ]}
                 >
                     {editedImageUrl && (
                         <Card shadow="sm" padding="lg" radius="md" withBorder style={{ maxWidth: 500 }}>
-                            <Text weight={500} size="lg" mb="md">Model used: {selectedModels[0]}</Text>
+                            <Text fw={500} size="lg" mb="md">Model used: {selectedModels[0]}</Text>
                             <Image
                                 src={editedImageUrl}
                                 alt="Generated image"
@@ -175,7 +170,7 @@ export default function ImageEditor() {
 
                     {userImage && (
                         <Card shadow="sm" padding="lg" radius="md" withBorder style={{ maxWidth: 500 }}>
-                            <Text weight={500} size="lg" mb="md">Original image</Text>
+                            <Text fw={500} size="lg" mb="md">Original image</Text>
                             <Image
                                 src={URL.createObjectURL(userImage)}
                                 alt="Original image"
