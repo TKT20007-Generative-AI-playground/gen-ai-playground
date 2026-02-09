@@ -6,5 +6,5 @@ test("Backend is running and returns hello message", async ({ request }) => {
 
   const json = await response.json();
 
-  expect(json).toEqual(["hello from gen-ai-playground backend"]);
+  expect(json["message"]).toEqual("Gen AI Playground Backend API");
 }, 30000);

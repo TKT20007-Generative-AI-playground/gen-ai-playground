@@ -4,7 +4,7 @@ test('register form shows correctly', async ({ page }) => {
   await page.goto('http://localhost:5173/');
   await page.getByRole('link', { name: 'Login' }).click();
   await page.getByRole('link', { name: 'Register' }).click();
-  await expect(page.getByRole('heading', { name: 'Register' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Create an account' })).toBeVisible();
   await expect(page.getByTestId('register-username')).toBeVisible();
   await expect(page.getByTestId('register-password')).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Confirm Password' })).toBeVisible();
