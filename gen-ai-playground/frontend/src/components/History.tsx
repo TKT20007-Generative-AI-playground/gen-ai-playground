@@ -2,16 +2,16 @@ import { useEffect, useState } from "react";
 
 
 interface ImageRecord {
-  prompt: string;
-  model: string;
-  timestamp: string;
-  image_data: string;
+  prompt: string
+  model: string
+  timestamp: string
+  image_data: string
   image_type: string | null | undefined
 }
 
 interface PromtGroup {
-  prompt: string;
-  images: ImageRecord[];
+  prompt: string
+  images: ImageRecord[]
 }
 const backendUrl = import.meta.env.VITE_API_URL
 
@@ -28,11 +28,11 @@ export default function History() {
     })
       .then(res => res.json())
       .then(data => {
-        console.log("Full response:", data);
+        console.log("Full response:", data)
         const groups: { [prompt: string]: ImageRecord[] } = {};
         (data.history || []).forEach((item: ImageRecord) => {
-          if (!groups[item.prompt]) groups[item.prompt] = [];
-          groups[item.prompt].push(item);
+          if (!groups[item.prompt]) groups[item.prompt] = []
+          groups[item.prompt].push(item)
         });
         const grouped = Object.keys(groups).map(prompt => ({
           prompt,
@@ -42,14 +42,14 @@ export default function History() {
         setLoading(false);
       })
       .catch(err => {
-        console.error("Failed to fetch history:", err);
+        console.error("Failed to fetch history:", err)
         setLoading(false);
       });
   }, []);
 
 
-  if (loading) return <p>Loading history...</p>;
-  if (history.length === 0) return <p>No history to show.</p>;
+  if (loading) return <p>Loading history...</p>
+  if (history.length === 0) return <p>No history to show.</p>
 
   return (
     
