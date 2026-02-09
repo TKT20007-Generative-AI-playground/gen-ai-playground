@@ -28,7 +28,6 @@ export default function History() {
     })
       .then(res => res.json())
       .then(data => {
-        console.log("Full response:", data)
         const groups: { [prompt: string]: ImageRecord[] } = {};
         (data.history || []).forEach((item: ImageRecord) => {
           if (!groups[item.prompt]) groups[item.prompt] = []
@@ -52,7 +51,6 @@ export default function History() {
   if (history.length === 0) return <p>No history to show.</p>
 
   return (
-    
     <div>
       <h2>History</h2>
       {history.map((group, idx) => (
