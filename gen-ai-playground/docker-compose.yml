@@ -39,6 +39,19 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
+  frontend-tests:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8000
+    command: npm run lint
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    profiles:
+      - test
       
   redis:
     image: "redis:alpine"
