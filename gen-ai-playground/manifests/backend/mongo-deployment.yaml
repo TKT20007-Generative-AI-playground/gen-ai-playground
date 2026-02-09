@@ -4,6 +4,8 @@ metadata:
   name: gen-ai-mongo-deployment
 spec:
   replicas: 1
+  strategy: 
+    type: Recreate
   selector:
     matchLabels:
       app: gen-ai-mongo
@@ -32,6 +34,13 @@ spec:
           volumeMounts:
             - mountPath: /data/db
               name: gen-ai-volume
+          resources:
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+            requests:
+              memory: "256Mi"
+              cpu: "50m"
       volumes:
         - name: gen-ai-volume
           persistentVolumeClaim:

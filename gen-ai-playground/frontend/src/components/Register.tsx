@@ -19,6 +19,12 @@ export default function Register() {
   const [success, setSuccess] = useState("");
   const [passwordError, setPasswordError] = useState("");
 
+  const backendUrl = import.meta.env.VITE_API_URL;
+
+  if (!backendUrl) {
+    throw new Error("VITE_API_URL is not defined");
+  }
+
   const validatePassword = (password: string): string | null => {
     if (password.length < 8) {
       return "Password must be at least 8 characters long";
@@ -29,7 +35,7 @@ export default function Register() {
     if (!/[0-9]/.test(password)) {
       return "Password must contain at least one number";
     }
-    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    if (!/[!@#$%^&*(),.?\":{}|<>]/.test(password)) {
       return "Password must contain at least one special character";
     }
     return null;
@@ -45,14 +51,14 @@ export default function Register() {
       return
     }
 
-    const passwordError = validatePassword(password);
-    if (passwordError) {
-      setError(passwordError);
+    const validationError = validatePassword(password);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     try {
-      const res = await fetch("http://localhost:8000/register", {
+      const res = await fetch(`${backendUrl}/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -76,6 +82,7 @@ export default function Register() {
       setPassword("");
       setConfirmPassword("");
       setInviteCode("");
+      setPasswordError("");
     } catch {
       setError("Server unreachable");
     }
@@ -107,8 +114,8 @@ export default function Register() {
                 const value = e.target.value;
                 setPassword(value);
 
-                const error = validatePassword(value);
-                setPasswordError(error || "");
+                const err = validatePassword(value);
+                setPasswordError(err || "");
               }}
               error={passwordError}
               required
@@ -139,13 +146,13 @@ export default function Register() {
 
         {error && (
           <Alert color="red" mt="md">
-          {error}
+            {error}
           </Alert>
         )}
 
         {success && (
           <Alert color="green" mt="md">
-          {success}
+            {success}
           </Alert>
         )}
       </Paper>
