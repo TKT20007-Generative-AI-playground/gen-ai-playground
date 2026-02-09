@@ -42,13 +42,13 @@ export default function Register() {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
+    e.preventDefault()
+    setError("")
+    setSuccess("")
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
+      setError("Passwords do not match")
+      return
     }
 
     const validationError = validatePassword(password);
@@ -68,13 +68,13 @@ export default function Register() {
           password,
           invitation_code: inviteCode,
         }),
-      });
+      })
 
-      const data = await res.json();
+      const data = await res.json()
 
       if (!res.ok) {
-        setError(data.detail || "Registration failed");
-        return;
+        setError(data.detail || "Registration failed")
+        return
       }
 
       setSuccess("User registered successfully!");
@@ -86,7 +86,7 @@ export default function Register() {
     } catch {
       setError("Server unreachable");
     }
-  };
+  }
 
   return (
     <Container size={420} my="xl">

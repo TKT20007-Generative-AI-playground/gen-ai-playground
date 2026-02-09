@@ -10,6 +10,7 @@ class ImageRequestBody(BaseModel):
     """Request model for image generation"""
     prompt: str
     model: str
+    image: Optional[str] = None  
 
 
 class RegisterRequest(BaseModel):
@@ -45,6 +46,7 @@ class HistoryItem(BaseModel):
     timestamp: datetime
     image_size: int
     image_data: str
+    image_type: str
 
 
 class HistoryResponse(BaseModel):
