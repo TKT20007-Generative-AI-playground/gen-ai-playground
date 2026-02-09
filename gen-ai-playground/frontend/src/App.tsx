@@ -4,6 +4,8 @@ import Header from "./components/Header"
 import Register from "./components/Register"
 import Playground from "./pages/Playground"
 import { useAuth } from "./context/AuthContext"
+import History from "./components/History";
+
 
 
 function App() {
@@ -26,6 +28,7 @@ function App() {
           </div>} />
           <Route path="/register" element={<Register />} />
           <Route path="/playground" element={<Playground />} />
+          <Route path="/history" element={<History />} /> 
         </Routes>
       </BrowserRouter>
     </>

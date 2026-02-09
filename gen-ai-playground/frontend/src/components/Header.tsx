@@ -13,6 +13,7 @@ export default function Header() {
       <Group justify="space-between" p="md">
         <Group gap="md">
           <Link to="/">Image Generator</Link>
+          <Link to="/history"> History</Link> {/* muutin pathin */}
           <Link to="/playground">Playground</Link>
           <Text fw={500}> Welcome to the Gen AI Playground! </Text>
         </Group>
