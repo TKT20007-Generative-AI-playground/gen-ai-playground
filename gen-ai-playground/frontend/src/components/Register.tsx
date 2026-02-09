@@ -51,12 +51,6 @@ export default function Register() {
       return;
     }
 
-    const passwordError = validatePassword(password);
-    if (passwordError) {
-      setError(passwordError);
-      return;
-    }
-
     try {
       const res = await fetch("http://localhost:8000/register", {
         method: "POST",
