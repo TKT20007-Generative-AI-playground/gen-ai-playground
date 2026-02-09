@@ -5,19 +5,8 @@ import LoginModal from './Login'
 import { Group, Divider, Text } from "@mantine/core"
 
 export default function Header() {
-<<<<<<< HEAD
   const [loginOpened, setLoginOpened] = useState(false);
   const { isLoggedIn, logout } = useAuth();
-
-  return (
-    <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px', borderBottom: '1px solid #ccc', marginBottom: '20px' }}>
-        <Link to="/">Image Generator</Link>
-                <Link to="/history"> History</Link> {/* muutin pathin */}
-
-=======
-  const [loginOpened, setLoginOpened] = useState(false)
-  const { isLoggedIn, logout } = useAuth()
 
   return (
     <>
@@ -28,7 +17,6 @@ export default function Header() {
           <Text fw={500}> Welcome to the Gen AI Playground! </Text>
         </Group>
         
->>>>>>> origin/edit-image
         {isLoggedIn ? (
           <a
             href="#"
@@ -50,8 +38,10 @@ export default function Header() {
             Login
           </a>
         )}
+	</Group>
+
         <LoginModal opened={loginOpened} onClose={() => setLoginOpened(false)} />
-      </Group>
+
       <Divider />
     </>
   )
