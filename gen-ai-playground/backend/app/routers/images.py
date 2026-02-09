@@ -51,7 +51,8 @@ def get_history(
                 "model": 1,
                 "timestamp": 1,
                 "image_size": 1,
-                "image_data": 1
+                "image_data": 1,
+                "image_type": 1
             }
         ).sort("timestamp", -1).limit(50))
         
@@ -284,7 +285,7 @@ def save_image_to_db(db: Database, prompt: str, model:
                 "image_size": len(base64.b64decode(user_base64_image)),
                 "image_data": user_base64_image,
                 "username": current_user.username,
-                "type": "original"
+                "image_type": "original"
             }
             res = db.images.insert_one(user_input_image_record)
             original_id = res.inserted_id
@@ -296,7 +297,7 @@ def save_image_to_db(db: Database, prompt: str, model:
             "image_size": len(base64.b64decode(image_base64)),
             "image_data": image_base64,
             "username": current_user.username,
-            "type": image_type
+            "image_type": image_type
         }
         
         if original_id != None:

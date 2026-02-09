@@ -46,6 +46,7 @@ class HistoryItem(BaseModel):
     timestamp: datetime
     image_size: int
     image_data: str
+    image_type: str
 
 
 class HistoryResponse(BaseModel):
