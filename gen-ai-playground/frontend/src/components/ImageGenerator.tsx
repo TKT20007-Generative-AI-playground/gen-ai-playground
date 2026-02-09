@@ -1,8 +1,15 @@
 import { useState } from "react"
 import { PromptTextBox } from "./PromtTextBox"
-import PhotoArea from "./PhotoArea"
 import axios from "axios"
 import { useAuth } from "../context/AuthContext"
+import {
+  Loader,
+  Card,
+  Text,
+  Image,
+  MultiSelect,
+  SimpleGrid
+} from '@mantine/core'
 
 
 /**
@@ -11,19 +18,20 @@ import { useAuth } from "../context/AuthContext"
  */
 
 
-// TODO: add model names above the pictures 
-export function ImageGenerator() {
+export default function ImageGenerator() {
   const { isLoggedIn } = useAuth()
   const [prompt, setPrompt] = useState("")
   const [imageUrl, setImageUrl] = useState<string | null>(null)
-  const [imageUlr2, setImageUrl2] = useState<string | null>(null)
-  const [flexKontextIsSelected, setFlexKontextIsSelected] = useState(false)
-  const [flux1KreaDevIsSelected, setFlux1KreaDevIsSelected] = useState(false)
-  const backendUrl = import.meta.env.VITE_API_URL;
+  const [imageUrl2, setImageUrl2] = useState<string | null>(null)
+  const [selectedModels, setSelectedModels] = useState<string[]>([])
+  const backendUrl = import.meta.env.VITE_API_URL
   const [isLoading, setIsLoading] = useState(false)
-  
-
-  //TODO: change the structure so that models can be added without new states
+  const models = [
+    "FLUX1_KONTEXT_DEV",
+    "FLUX1_KREA_DEV",
+    "FLUX2_KLEIN_9B",
+    "FLUX2_KLEIN_4B"
+  ] //TODO: Add more models
 
   if (!isLoggedIn) {
     return (
@@ -47,38 +55,48 @@ export function ImageGenerator() {
     if (imageUrl) {
       setImageUrl(null)
     }
-    if (imageUlr2) {
+    if (imageUrl2) {
       setImageUrl2(null)
     }
     //set loading state true
     setIsLoading(true)
 
-    //check that at least one model is selected
-    if (!flexKontextIsSelected && !flux1KreaDevIsSelected) {
+    if (selectedModels.length === 0) {
       alert("please select at least one model!")
+      setIsLoading(false)
+      return
     }
+
     try {
       console.log("Fetching generated images for prompt:", prompt)
 
       const promises = []
 
-      if (flexKontextIsSelected) {
+      if (selectedModels[0]) {
         promises.push(
-          axios.post(`${backendUrl}/generate-image`, {
+          axios.post(`${backendUrl}/images/generate`, {
             prompt: prompt,
-            model: "flux_kontext"
+            model: selectedModels[0]
           }, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "Content-Type": "application/json"
+            },
             responseType: 'blob'
           })
         )
       }
 
-      if (flux1KreaDevIsSelected) {
+      if (selectedModels[1]) {
         promises.push(
-          axios.post(`${backendUrl}/generate-image`, {
+          axios.post(`${backendUrl}/images/generate`, {
             prompt: prompt,
-            model: "flux1_krea_dev"
+            model: selectedModels[1]
           }, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "Content-Type": "application/json"
+            },
             responseType: 'blob'
           })
         )
@@ -87,17 +105,15 @@ export function ImageGenerator() {
       const results = await Promise.all(promises)
 
       let resultIndex = 0
-      if (flexKontextIsSelected) {
-        console.log("FluxKontext image generation result received")
+      if (selectedModels[0]) {
         const image = URL.createObjectURL(results[resultIndex].data)
-        setImageUrl2(image)
+        setImageUrl(image)
         resultIndex++
       }
 
-      if (flux1KreaDevIsSelected) {
-        console.log("Flux1_krea_dev image generation result received")
+      if (selectedModels[1]) {
         const image = URL.createObjectURL(results[resultIndex].data)
-        setImageUrl(image)
+        setImageUrl2(image)
       }
 
     } catch (error) {
@@ -106,44 +122,61 @@ export function ImageGenerator() {
       setIsLoading(false)
     }
   }
-
-
   return (
     // styles are only for better visibility at this moment
     <>
       <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", alignItems: "center" }}>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={flexKontextIsSelected}
-            onChange={(e) => setFlexKontextIsSelected(e.target.checked)}
-            className="w-4 h-4"
-          />
-          <span>Flux Kontext</span>
-        </label>
-
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={flux1KreaDevIsSelected}
-            onChange={(e) => setFlux1KreaDevIsSelected(e.target.checked)}
-            className="w-4 h-4"
-          />
-          <span>Flux1 Dev</span>
-        </label>
+        <MultiSelect
+          label="Select models to generate images with, max 2"
+          placeholder={selectedModels.length > 0 ? `${selectedModels.length} model(s) selected` : "Select model(s)"}
+          data={models}
+          maxValues={2}
+          onChange={setSelectedModels}
+        />
         <PromptTextBox onSubmit={fetchTwoGeneratedImages}
           value={prompt}
-          onChange={setPrompt} />
+          onChange={setPrompt}
+          usage="Create image" />
         <p>prompt: {prompt}</p>
       </div >
       <div style={{
         display: "flex",
         justifyContent: "center",
       }}>
-        {isLoading && <p>Generating images...</p>}
-        {imageUrl === null && imageUlr2 === null && !isLoading && <p>Generated images will appear here</p>}
-        <PhotoArea src={imageUrl} alt="Generated image" />
-        <PhotoArea src={imageUlr2} alt="Generated image 2" />
+        {isLoading &&
+          <><p>Generating images...</p><Loader /></>
+        }
+        {imageUrl === null && imageUrl2 === null && !isLoading && <p>Generated images will appear here</p>}
+        <SimpleGrid
+          cols={imageUrl && imageUrl2 ? 2 : 1}
+          spacing="md"
+          breakpoints={[
+            { maxWidth: 'md', cols: 1 }
+          ]}
+        >
+          {imageUrl && (
+            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ maxWidth: 500 }}>
+              <Text weight={500} size="lg" mb="md">Model used: {selectedModels[0]}</Text>
+              <Image
+                src={imageUrl}
+                alt="Generated image"
+                fit="contain"
+
+              />
+            </Card>
+          )}
+
+          {imageUrl2 && (
+            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ maxWidth: 500 }}>
+              <Text weight={500} size="lg" mb="md">Model used: {selectedModels[1]}</Text>
+              <Image
+                src={imageUrl2}
+                alt="Generated image 2"
+                fit="contain"
+              />
+            </Card>
+          )}
+        </SimpleGrid>
       </div>
     </>
   )

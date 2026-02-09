@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -33,13 +36,25 @@ jobs:
         run: npx wait-on http://localhost:5173
 
       - name: Install dependencies
+        working-directory: ./gen-ai-playground/
         run: npm ci
 
       - name: Install Playwright Browsers
+        working-directory: ./gen-ai-playground/
         run: npx playwright install --with-deps
 
       - name: Run Playwright tests
+        working-directory: ./gen-ai-playground/
         run: npx playwright test
+
+      - name: Run pytest for backend
+        working-directory: ./gen-ai-playground/
+        run: docker compose --profile test run --rm backend-tests
+
+      - name: Show backend logs on pytest failure
+        if: failure()
+        working-directory: ./gen-ai-playground/
+        run: docker compose logs backend
 
       - name: Run eslint
         working-directory: ./gen-ai-playground/frontend
@@ -53,3 +68,8 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 30
+
+      - name: Cleanup
+        if: always()
+        working-directory: ./gen-ai-playground/
+        run: docker compose down -v
