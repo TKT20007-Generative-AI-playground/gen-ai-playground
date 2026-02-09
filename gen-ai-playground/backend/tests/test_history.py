@@ -122,11 +122,12 @@ def populated_history(mock_db, test_user_data, test_user2_data, sample_image_dat
     for i in range(3):
         image_record = {
             "prompt": f"Test prompt {i} for user 1",
-            "model": "flux_kontext",
+            "model": "FLUX1_KONTEXT_DEV",
             "timestamp": datetime.utcnow() - timedelta(minutes=i),
             "image_size": 1024 * (i + 1),
             "image_data": sample_image_data,
-            "username": test_user_data["username"]
+            "username": test_user_data["username"],
+            "image_type": "generated"
         }
         mock_db.images.insert_one(image_record)
     
@@ -134,11 +135,12 @@ def populated_history(mock_db, test_user_data, test_user2_data, sample_image_dat
     for i in range(2):
         image_record = {
             "prompt": f"Test prompt {i} for user 2",
-            "model": "flux1_krea_dev",
+            "model": "FLUX1_KREA_DEV",
             "timestamp": datetime.utcnow() - timedelta(minutes=i + 10),
             "image_size": 2048 * (i + 1),
             "image_data": sample_image_data,
-            "username": test_user2_data["username"]
+            "username": test_user2_data["username"],
+            "image_type": "generated"
         }
         mock_db.images.insert_one(image_record)
 
@@ -284,11 +286,12 @@ class TestHistoryEndpoint:
         for i in range(60):
             image_record = {
                 "prompt": f"Test prompt {i}",
-                "model": "flux_kontext",
+                "model": "FLUX1_KONTEXT_DEV",
                 "timestamp": datetime.utcnow() - timedelta(minutes=i),
                 "image_size": 1024,
                 "image_data": sample_image_data,
-                "username": registered_user["username"]
+                "username": registered_user["username"],
+                "image_type": "generated"
             }
             mock_db.images.insert_one(image_record)
         
@@ -307,7 +310,7 @@ class TestGenerateImageWithAuth:
         """Test generating image without authentication token"""
         image_request = {
             "prompt": "A beautiful sunset",
-            "model": "flux_kontext"
+            "model": "FLUX1_KONTEXT_DEV"
         }
         
         response = client.post("/images/generate", json=image_request)
@@ -318,7 +321,7 @@ class TestGenerateImageWithAuth:
         """Test generating image with invalid token"""
         image_request = {
             "prompt": "A beautiful sunset",
-            "model": "flux_kontext"
+            "model": "FLUX1_KONTEXT_DEV"
         }
         headers = {"Authorization": "Bearer invalid_token"}
         
@@ -344,11 +347,11 @@ class TestGenerateImageWithAuth:
         
         image_request = {
             "prompt": "A beautiful sunset",
-            "model": "flux_kontext"
+            "model": "FLUX1_KONTEXT_DEV"
         }
         headers = {"Authorization": f"Bearer {auth_token}"}
         
-        with patch.dict(os.environ, {"VERDA_API_KEY": "test-api-key"}):
+        with patch('app.config.settings.VERDA_API_KEY', "test-api-key"):
             response = client.post("/images/generate", json=image_request, headers=headers)
         
         assert response.status_code == 200
@@ -357,7 +360,7 @@ class TestGenerateImageWithAuth:
         stored_image = mock_db.images.find_one({"prompt": "A beautiful sunset"})
         assert stored_image is not None
         assert stored_image["username"] == registered_user["username"]
-        assert stored_image["model"] == "flux_kontext"
+        assert stored_image["model"] == "FLUX1_KONTEXT_DEV"
         assert stored_image["image_data"] == sample_image_data
         assert "timestamp" in stored_image
         assert "image_size" in stored_image
@@ -379,18 +382,18 @@ class TestGenerateImageWithAuth:
         }
         mock_post.return_value = mock_response
         
-        with patch.dict(os.environ, {"VERDA_API_KEY": "test-api-key"}):
+        with patch('app.config.settings.VERDA_API_KEY', "test-api-key"):
             # Generate image for user 1
             headers1 = {"Authorization": f"Bearer {auth_token}"}
             response1 = client.post("/images/generate", 
-                                   json={"prompt": "User 1 prompt", "model": "flux_kontext"}, 
+                                   json={"prompt": "User 1 prompt", "model": "FLUX1_KONTEXT_DEV"}, 
                                    headers=headers1)
             assert response1.status_code == 200
             
             # Generate image for user 2
             headers2 = {"Authorization": f"Bearer {auth_token2}"}
             response2 = client.post("/images/generate", 
-                                   json={"prompt": "User 2 prompt", "model": "flux_kontext"}, 
+                                   json={"prompt": "User 2 prompt", "model": "FLUX1_KONTEXT_DEV"}, 
                                    headers=headers2)
             assert response2.status_code == 200
         

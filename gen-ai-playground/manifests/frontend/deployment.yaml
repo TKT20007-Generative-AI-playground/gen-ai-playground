@@ -23,3 +23,10 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 5173  # Docker file sets this port
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
