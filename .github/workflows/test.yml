@@ -45,10 +45,8 @@ jobs:
         run: docker compose logs backend
 
       - name: Run eslint
-        working-directory: ./gen-ai-playground/frontend
-        run: |
-          npm ci
-          npm run lint
+        working-directory: ./gen-ai-playground/
+        run: docker compose --profile test run --rm frontend-tests
 
       - name: Install dependencies
         working-directory: ./gen-ai-playground/

@@ -39,6 +39,13 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
+  frontend-tests:
+    build:
+      context: ./frontend
+    command: npm run lint
+    profiles:
+      - test
       
   redis:
     image: "redis:alpine"
