@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Container,
   Paper,
@@ -18,6 +19,7 @@ export default function Register() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const navigate = useNavigate()
 
   const backendUrl = import.meta.env.VITE_API_URL;
 
@@ -83,6 +85,10 @@ export default function Register() {
       setConfirmPassword("");
       setInviteCode("");
       setPasswordError("");
+      setTimeout(() => {
+        navigate("/", { state: { openLoginModal: true } })
+      }, 1500) // timeout so that the user can see that registration was successful
+
     } catch {
       setError("Server unreachable");
     }
