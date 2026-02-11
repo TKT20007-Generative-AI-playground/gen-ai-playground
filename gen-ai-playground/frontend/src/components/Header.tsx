@@ -6,16 +6,15 @@ import { Group, Divider, Text } from "@mantine/core"
 
 
 export default function Header() {
-  const [loginOpened, setLoginOpened] = useState(false)
   const { isLoggedIn, logout } = useAuth()
   const location = useLocation()
+  const [loginOpened, setLoginOpened] = useState(false)
 
   useEffect(() => {
     if (location.state?.openLoginModal) {
-      setLoginOpened(true)
+      queueMicrotask(() => setLoginOpened(true))
       window.history.replaceState({}, document.title)
     }
-
   }, [location])
 
 
