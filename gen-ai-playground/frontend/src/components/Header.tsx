@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import LoginModal from './Login'
-import { Group, Divider, Text } from "@mantine/core"
+import { Group, Divider, Text, Button } from "@mantine/core"
 
 export default function Header() {
   const [loginOpened, setLoginOpened] = useState(false)
@@ -10,33 +10,33 @@ export default function Header() {
 
   return (
     <>
-      <Group justify="space-between" p="md">
+      <Group justify="space-between" p="md" bg="#2C4E87">
         <Group gap="md">
-          <Link to="/history"> History</Link> {/* muutin pathin */}
-          <Link to="/playground">Playground</Link>
-          <Text fw={500}> Welcome to the Gen AI Playground! </Text>
+          <Text fw={500} c="white">Generative AI Playground </Text>
+          <Button component={Link} to="/history" variant="white" color="dark">
+            History
+          </Button>
+          <Button component={Link} to="/playground" variant="white" color="dark">
+            Playground
+          </Button>
         </Group>
         
         {isLoggedIn ? (
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault()
-              logout()
-            }}
+           <Button
+            variant="white"
+            color="dark"
+            onClick={logout}
           >
             Logout
-          </a>
+          </Button>
         ) : (
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault()
-              setLoginOpened(true)
-            }}
+          <Button
+            variant="white"
+            color="dark"
+            onClick={() => setLoginOpened(true)}
           >
             Login
-          </a>
+          </Button>
         )}
         <LoginModal opened={loginOpened} onClose={() => setLoginOpened(false)} />
       </Group>
