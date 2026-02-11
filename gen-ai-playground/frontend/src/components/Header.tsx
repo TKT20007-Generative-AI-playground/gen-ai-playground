@@ -5,8 +5,8 @@ import LoginModal from './Login'
 import { Group, Divider, Text } from "@mantine/core"
 
 export default function Header() {
-  const [loginOpened, setLoginOpened] = useState(false)
-  const { isLoggedIn, logout } = useAuth()
+  const [loginOpened, setLoginOpened] = useState(false);
+  const { isLoggedIn, logout } = useAuth();
 
   return (
     <>
@@ -38,8 +38,10 @@ export default function Header() {
             Login
           </a>
         )}
+	</Group>
+
         <LoginModal opened={loginOpened} onClose={() => setLoginOpened(false)} />
-      </Group>
+
       <Divider />
     </>
   )
