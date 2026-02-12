@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom"
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LoginModal from './Login';
@@ -6,11 +6,20 @@ import { Group, Divider, Text, Button, Drawer } from "@mantine/core";
 import History from "./History";
 
 export default function Header() {
+  const { isLoggedIn, logout } = useAuth()
+  const location = useLocation()
+
   const [loginOpened, setLoginOpened] = useState(false);
-  const { isLoggedIn, logout } = useAuth();
   const [historyOpened, setHistoryOpened] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(420);
   const [resizing, setResizing] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.openLoginModal) {
+      queueMicrotask(() => setLoginOpened(true))
+      window.history.replaceState({}, document.title)
+    }
+  }, [location])
 
   const onMouseMove = useCallback((e: MouseEvent) => {
   if (!resizing) return;
