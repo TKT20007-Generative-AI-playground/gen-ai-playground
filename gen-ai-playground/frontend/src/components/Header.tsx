@@ -1,12 +1,23 @@
-import { Link } from "react-router-dom"
-import { useState } from 'react'
+import { Link, useLocation } from "react-router-dom"
+import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import LoginModal from './Login'
 import { Group, Divider, Text } from "@mantine/core"
 
+
 export default function Header() {
-  const [loginOpened, setLoginOpened] = useState(false)
   const { isLoggedIn, logout } = useAuth()
+  const location = useLocation()
+  const [loginOpened, setLoginOpened] = useState(false)
+
+  useEffect(() => {
+    if (location.state?.openLoginModal) {
+      queueMicrotask(() => setLoginOpened(true))
+      window.history.replaceState({}, document.title)
+    }
+  }, [location])
+
+
 
   return (
     <>
@@ -16,7 +27,7 @@ export default function Header() {
           <Link to="/playground">Playground</Link>
           <Text fw={500}> Welcome to the Gen AI Playground! </Text>
         </Group>
-        
+
         {isLoggedIn ? (
           <a
             href="#"
