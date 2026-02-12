@@ -1,19 +1,29 @@
 import { useEffect, useState } from "react";
-
+import {
+  Stack,
+  Title,
+  Text,
+  Badge,
+  SimpleGrid,
+  ScrollArea,
+  Loader,
+  Center
+} from "@mantine/core";
 
 interface ImageRecord {
-  prompt: string
-  model: string
-  timestamp: string
-  image_data: string
-  image_type: string | null | undefined
+  prompt: string;
+  model: string;
+  timestamp: string;
+  image_data: string;
+  image_type: string | null | undefined;
 }
 
 interface PromtGroup {
-  prompt: string
-  images: ImageRecord[]
+  prompt: string;
+  images: ImageRecord[];
 }
-const backendUrl = import.meta.env.VITE_API_URL
+
+const backendUrl = import.meta.env.VITE_API_URL;
 
 export default function History() {
   const [history, setHistory] = useState<PromtGroup[]>([]);
@@ -23,55 +33,85 @@ export default function History() {
     fetch(`${backendUrl}/images/history`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json"
-      }
+        "Content-Type": "application/json",
+      },
     })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         const groups: { [prompt: string]: ImageRecord[] } = {};
+
         (data.history || []).forEach((item: ImageRecord) => {
-          if (!groups[item.prompt]) groups[item.prompt] = []
-          groups[item.prompt].push(item)
+          if (!groups[item.prompt]) groups[item.prompt] = [];
+          groups[item.prompt].push(item);
         });
-        const grouped = Object.keys(groups).map(prompt => ({
+
+        const grouped = Object.keys(groups).map((prompt) => ({
           prompt,
           images: groups[prompt],
         }));
+
         setHistory(grouped);
         setLoading(false);
       })
-      .catch(err => {
-        console.error("Failed to fetch history:", err)
+      .catch((err) => {
+        console.error("Failed to fetch history:", err);
         setLoading(false);
       });
   }, []);
 
+  if (loading)
+    return (
+      <Center mt="md">
+        <Loader />
+      </Center>
+    );
 
-  if (loading) return <p>Loading history...</p>
-  if (history.length === 0) return <p>No history to show.</p>
+  if (history.length === 0)
+    return (
+      <Center mt="md">
+        <Text c="dimmed">No history to show.</Text>
+      </Center>
+    );
 
   return (
-    <div>
-      <h2>History</h2>
-      {history.map((group, idx) => (
-        <div key={idx} style={{ marginBottom: "2rem" }}>
-          <h3>{group.prompt}</h3>
-          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-            {group.images.map((item, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <img
-                  src={`data:image/png;base64,${item.image_data}`}
-                  alt={item.prompt}
-                  style={{ maxWidth: "200px", maxHeight: "200px", objectFit: "contain" }}
-                />
-                <p>Model: {item.model}</p>
-                <p>Time: {new Date(item.timestamp).toLocaleString()}</p>
-                <p>Type: {item.image_type} </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
+<ScrollArea h="100%">
+  <Stack gap="xl">
+
+    {history.map((group, idx) => (
+      <Stack key={idx} gap="md">
+
+        <Title order={4}>{group.prompt}</Title>
+
+        <SimpleGrid cols={2} spacing="md">
+          {group.images.map((item, i) => (
+            <Stack key={i} gap="xs" align="center">
+              <img
+                src={`data:image/${item.image_type || "png"};base64,${item.image_data}`}
+                alt={item.prompt}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: 180,
+                  objectFit: "contain",
+                }}
+              />
+
+              <Badge variant="light">{item.model}</Badge>
+
+              <Text size="xs" c="dimmed">
+                {new Date(item.timestamp).toLocaleString()}
+              </Text>
+
+              <Text size="xs">
+                Type: {item.image_type || "generated"}
+              </Text>
+            </Stack>
+          ))}
+        </SimpleGrid>
+
+      </Stack>
+    ))}
+
+  </Stack>
+</ScrollArea>
   );
 }
