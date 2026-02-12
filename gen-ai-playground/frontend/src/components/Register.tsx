@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import {
   Container,
   Paper,
@@ -19,12 +20,17 @@ export default function Register() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const { isLoggedIn } = useAuth()
   const navigate = useNavigate()
 
   const backendUrl = import.meta.env.VITE_API_URL;
 
   if (!backendUrl) {
     throw new Error("VITE_API_URL is not defined");
+  }
+
+  if (isLoggedIn) {
+    return <Navigate to="/playground" replace />
   }
 
   const validatePassword = (password: string): string | null => {
