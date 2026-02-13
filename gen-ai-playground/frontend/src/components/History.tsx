@@ -6,7 +6,8 @@ import {
   Badge,
   ScrollArea,
   Loader,
-  Center
+  Center,
+  Modal
 } from "@mantine/core";
 
 interface ImageRecord {
@@ -27,6 +28,7 @@ const backendUrl = import.meta.env.VITE_API_URL;
 export default function History() {
   const [history, setHistory] = useState<PromtGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
 
   useEffect(() => {
     fetch(`${backendUrl}/images/history`, {
@@ -73,6 +75,7 @@ export default function History() {
     );
 
   return (
+    <>
 <ScrollArea h="100%">
   <Stack gap="xl">
 
@@ -97,7 +100,9 @@ export default function History() {
                 width: "100%",
                 aspectRatio: "1 / 1",
                 objectFit: "cover",
+                cursor: "pointer",
                 }}
+                onClick={() => setSelectedImage(item)}
               />
 
               <Badge variant="light">{item.model}</Badge>
@@ -119,5 +124,25 @@ export default function History() {
 
   </Stack>
 </ScrollArea>
+<Modal
+  opened={!!selectedImage}
+  onClose={() => setSelectedImage(null)}
+  centered
+  size="lg"
+>
+  {selectedImage && (
+    <img
+      src={`data:image/${selectedImage.image_type || "png"};base64,${selectedImage.image_data}`}
+      alt={selectedImage.prompt}
+      style={{
+        width: "100%",
+        height: "auto",
+        maxHeight: "80vh",
+        objectFit: "contain",
+      }}
+    />
+  )}
+</Modal>
+</>
   );
 }
