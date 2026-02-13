@@ -4,7 +4,6 @@ import {
   Title,
   Text,
   Badge,
-  SimpleGrid,
   ScrollArea,
   Loader,
   Center
@@ -82,16 +81,22 @@ export default function History() {
 
         <Title order={4}>{group.prompt}</Title>
 
-        <SimpleGrid cols={2} spacing="md">
+        <div
+          style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "16px",
+          }}
+        >
           {group.images.map((item, i) => (
             <Stack key={i} gap="xs" align="center">
               <img
                 src={`data:image/${item.image_type || "png"};base64,${item.image_data}`}
                 alt={item.prompt}
                 style={{
-                  maxWidth: "100%",
-                  maxHeight: 180,
-                  objectFit: "contain",
+                width: "100%",
+                aspectRatio: "1 / 1",
+                objectFit: "cover",
                 }}
               />
 
@@ -106,7 +111,8 @@ export default function History() {
               </Text>
             </Stack>
           ))}
-        </SimpleGrid>
+        </div>
+
 
       </Stack>
     ))}
