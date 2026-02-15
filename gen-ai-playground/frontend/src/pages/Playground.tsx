@@ -2,13 +2,14 @@ import { useState } from "react"
 import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
 import { Select, Group } from '@mantine/core'
+import TextGenerator from "../components/TextGenerator"
 /**
  * 
  * @returns playground page where you can choose whether to create or edit an image using AI models
  */
 export default function Playground() {
 
-    const tabs = ["ImageGenerator", "ImageEditor"]
+    const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"]
     const [selectedComponent, setSelectedComponent] = useState<string | null>("ImageGenerator")
     const selectPlayingComponent = (componentName: string) => {
         setSelectedComponent(componentName)
@@ -16,6 +17,7 @@ export default function Playground() {
     const componentsMap: Record<string, React.ReactNode> = {
         ImageGenerator: <ImageGenerator />,
         ImageEditor: <ImageEditor />,
+        TextGenerator: <TextGenerator />
     }
 
 
