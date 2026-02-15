@@ -28,9 +28,9 @@ frontend/node_modules/
 frontend/dist/
 frontend/.env
 
-
-backend/__pycache__/
-backend/*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
 backend/.env
 
 # Node / Playwright
@@ -38,6 +38,8 @@ node_modules/
 test-results/
 playwright-report/
 blob-report/
+/playwright/.cache/
+/playwright/.auth/
 
 __pycache__/
 blob-report/backend/.env.local
