@@ -5,6 +5,7 @@ Uses the Verda Python SDK to deploy SGLang-based LLM containers
 and run inference against them.
 """
 import time
+import json
 from datetime import datetime
 from typing import Optional
 
@@ -348,7 +349,21 @@ class VerdaService:
             self._initialized = False
             print(f"Deleted deployment: {name}")
             return {"status": "deleted", "name": name}
+        except json.JSONDecodeError as e:
+            print(f"JSONDecodeError when deleting {name}: {str(e)}")
+            self._deployment = None
+            self._deployment_name = None
+            self._initialized = False
+            return {
+                "status": "deleted", 
+                "name": name,
+                "message": "Deployment not found on Verda (may have been already deleted)"
+            }
         except APIException as e:
+            print(f"APIException when deleting {name}: {str(e)}")
+            return {"status": "error", "name": name, "message": str(e)}
+        except Exception as e:
+            print(f"Unexpected error when deleting {name}: {str(e)}")
             return {"status": "error", "name": name, "message": str(e)}
 
     def list_deployments(self) -> list[dict]:

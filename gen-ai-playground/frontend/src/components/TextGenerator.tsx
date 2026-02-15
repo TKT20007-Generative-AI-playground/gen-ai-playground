@@ -1,40 +1,13 @@
-import { useState } from "react"
-import { PromptTextBox } from "./PromtTextBox"
 import axios from "axios"
 import { useAuth } from "../context/AuthContext"
 
 import {
-    MultiSelect,
-    Loader,
-    Card,
-    Image,
-    Text,
-    FileButton,
-    Button,
-    Stack,
-    Tooltip,
-    SimpleGrid
+    Button
 } from '@mantine/core'
-
-/**
- * 
- * @returns tab where you can enter an image and prompt and use an AI model to edit the image
- */
-
 
 export default function TextGenerator() {
     const { isLoggedIn } = useAuth()
-    const [prompt, setPrompt] = useState("")
     const backendUrl = import.meta.env.VITE_API_URL
-    const [userImage, setUserImage] = useState<File | null>(null)
-    const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null)
-    const [selectedModels, setSelectedModels] = useState<string[]>([])
-    const [isLoading, setIsLoading] = useState(false)
-    const models = [
-        "FLUX1_KONTEXT_DEV",
-        "FLUX2_KLEIN_9B",
-        "FLUX2_KLEIN_4B"
-    ]
 
     if (!isLoggedIn) {
         return (
@@ -51,7 +24,74 @@ export default function TextGenerator() {
             </div>
         )
     }
-    async function EditUserImage(prompt: string) {
+
+    async function DeployContainer() {
+        try {
+            const token = localStorage.getItem("token");
+
+            if (!token) {
+                throw new Error("Token puuttuu");
+            }
+
+            const getStatusResponse = await axios.get(`${backendUrl}/text/status`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                }
+            });
+
+            const containerStatus = getStatusResponse.data.status;
+
+            if (containerStatus !== "no_deployment") {
+                console.log("Already connected to deployment with status:", containerStatus);
+                return getStatusResponse.data;
+            }
+
+            const getDeployments = await axios.get(`${backendUrl}/text/deployments`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                }
+            });
+
+            if (getDeployments.data && getDeployments.data.length > 0) {
+                const existingContainer = getDeployments.data[0];
+                console.log("Found existing container:", existingContainer.name);
+                
+                const connectResponse = await axios.post(`${backendUrl}/text/connect`, 
+                    {
+                        deployment_name: existingContainer.name,
+                        model_path: "deepseek-ai/deepseek-llm-7b-chat"
+                    },
+                    {
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            "Content-Type": "application/json"
+                        }
+                    }
+                );
+                
+                console.log("Connected to existing container:", connectResponse.data);
+                return connectResponse.data;
+            }
+
+            // No existing deployments anywhere, create a new one
+            console.log("No existing deployments found, creating new one...");
+            const response = await axios.post(`${backendUrl}/text/deploy`, {}, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                }
+            });
+            console.log("Created new deployment:", response.data);
+            return response.data;
+
+        } catch (error) {
+            console.error("Virhe:", error);
+        }
+    }
+
+    async function DeleteContainer() {
 
         try {
             const token = localStorage.getItem("token");
@@ -60,9 +100,7 @@ export default function TextGenerator() {
                 throw new Error("Token puuttuu");
             }
 
-            const response = await axios.post(`${backendUrl}/text/deploy`, {
-                model_path: "deepseek-ai/deepseek-llm-7b-chat"
-            }, {
+            const response = await axios.delete(`${backendUrl}/text/deploy`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     "Content-Type": "application/json"
@@ -77,16 +115,40 @@ export default function TextGenerator() {
         }
 
     }
+
+    async function CheckContainerStatus() {
+
+        try {
+            const token = localStorage.getItem("token");
+
+            if (!token) {
+                throw new Error("Token puuttuu");
+            }
+
+            const response = await axios.get(`${backendUrl}/text/status`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                }
+            });
+
+            console.log(response.data);
+            return response.data;
+
+        } catch (error) {
+            console.error("Virhe:", error);
+        }
+
+    }
+
     return (
         <>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", alignItems: "center", margin: "10px" }}>
-                
-                <PromptTextBox onSubmit={EditUserImage}
-                    value={prompt}
-                    onChange={setPrompt}
-                    usage="Edit image" />
-                <p>prompt: {prompt}</p>
+                <Button variant="filled" onClick={DeployContainer}>Deploy Container</Button>
+                <Button variant="filled" onClick={CheckContainerStatus}>Check Container Status</Button>
+                <Button variant="filled" onClick={DeleteContainer} color="red">Delete Container</Button>
             </div>
+
             
         </>
     )
