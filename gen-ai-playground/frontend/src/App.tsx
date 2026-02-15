@@ -1,12 +1,11 @@
 
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Header from "./components/Header"
 import Register from "./components/Register"
 import Playground from "./pages/Playground"
 import History from "./components/History";
 import { useAuth } from './context/AuthContext'
 import { ProtectedRoute } from "./components/ProtectedRoute"
-import { Navigate } from 'react-router-dom'
 
 function App() {
   const { isLoggedIn } = useAuth()
@@ -18,7 +17,7 @@ function App() {
         <Routes>
           <Route path="/" element={
             isLoggedIn ? (<Navigate to="/playground" replace />) : (
-              <div>
+              <div style={{ width: "100%", textAlign: "center", paddingTop: 16 }}>
                 <p>You must be logged in to generate images.</p>
               </div>
             )
