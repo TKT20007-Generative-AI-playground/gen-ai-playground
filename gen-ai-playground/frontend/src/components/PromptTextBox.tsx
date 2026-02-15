@@ -1,5 +1,5 @@
 import { useRef } from "react"
-import { Textarea, Button, Box } from '@mantine/core'
+import { Textarea, Button, Stack, Group } from "@mantine/core"
 
 type PromptTextBoxProps = {
   onSubmit: (prompt: string) => void
@@ -15,21 +15,26 @@ export function PromptTextBox({ onSubmit, value, onChange, usage }: PromptTextBo
       onSubmit(promptRef.current.value)
     }
   }
+
   return (
-    <Box style={{  overflow: 'auto', minWidth: '400px', minHeight: '150px' }}>
+    <Stack gap="sm" w="100%">
       <Textarea
         value={value}
-        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.target.value)}
         ref={promptRef}
         placeholder="Prompt here"
         autosize
         minRows={3}
-        style={{ resize: 'both', overflow: 'auto' }}
+        maxRows={12}
         w="100%"
+        styles={{
+          input: { resize: "vertical" },
+        }}
       />
-      <Button onClick={handleSubmit} mt="sm" >
-        {usage}
-      </Button>
-    </Box>
+
+      <Group justify="center">
+        <Button onClick={handleSubmit}>{usage}</Button>
+      </Group>
+    </Stack>
   )
 }
