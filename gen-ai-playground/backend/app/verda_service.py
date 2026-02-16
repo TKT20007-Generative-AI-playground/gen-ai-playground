@@ -32,6 +32,7 @@ from app.config import settings
 
 # Default model configuration
 DEFAULT_MODEL = "deepseek-ai/deepseek-llm-7b-chat"
+SECOND_MODEL = "Qwen/Qwen3-8B"
 SGLANG_IMAGE = "docker.io/lmsysorg/sglang:v0.4.1.post6-cu124"
 HF_SECRET_NAME = "huggingface-token"
 APP_PORT = 30000
@@ -86,6 +87,9 @@ class VerdaService:
                 print(f"HuggingFace secret '{HF_SECRET_NAME}' already exists")
         except APIException as e:
             raise RuntimeError(f"Failed to manage HuggingFace secret: {e}")
+    def deploy_model_from_template(self, model_template: json, deployment_name ) -> dict:
+        #TODO: function will create model from verda's model templates
+        return None
 
     def deploy_model(
         self,
@@ -108,7 +112,8 @@ class VerdaService:
         # Generate a unique deployment name if not provided
         if deployment_name is None:
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S").lower()
-            deployment_name = f"genai-playground-{timestamp}"
+            #deployment_name = f"genai-playground-{timestamp}"
+            deployment_name = f'{model_path.split("/")[-1].lower()}-{timestamp}'
         self._deployment_name = deployment_name
 
         # Ensure HF secret exists
@@ -186,28 +191,136 @@ class VerdaService:
             "model": model_path,
             "message": "Deployment created. Model download and server startup may take several minutes.",
         }
+        
+    def deploy_second_model(
+        self,
+        model_path: str = SECOND_MODEL,
+        deployment_name: Optional[str] = None,
+    ) -> dict:
+        """
+        Deploy an SGLang container with the specified LLM model on Verda.
+        
+        Args:
+            model_path: HuggingFace model identifier (e.g. 'Qwen/Qwen3-8B')
+            deployment_name: Custom deployment name. Auto-generated if not provided.
+            
+        Returns:
+            dict with deployment info (name, status, model)
+        """
+        client = self._get_client()
+        self._model_path = model_path
+
+        # Generate a unique deployment name if not provided
+        if deployment_name is None:
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S").lower()
+            #deployment_name = f"genai-playground-{timestamp}"
+            deployment_name = f'{model_path.split("/")[-1].lower()}-{timestamp}'
+        self._deployment_name = deployment_name
+
+        # Ensure HF secret exists
+        self._ensure_hf_secret()
+
+        # Create container configuration
+        container = Container(
+            image=SGLANG_IMAGE,
+            exposed_port=APP_PORT,
+            healthcheck=HealthcheckSettings(
+                enabled=True, port=APP_PORT, path="/health"
+            ),
+            entrypoint_overrides=EntrypointOverridesSettings(
+                enabled=True,
+                cmd=[
+                    "python3",
+                    "-m",
+                    "sglang.launch_server",
+                    "--model-path",
+                    model_path,
+                    "--host",
+                    "0.0.0.0",
+                    "--port",
+                    str(APP_PORT),
+                ],
+            ),
+            env=[
+                EnvVar(
+                    name="HF_TOKEN",
+                    value_or_reference_to_secret=HF_SECRET_NAME,
+                    type=EnvVarType.SECRET,
+                )
+            ],
+        )
+
+        # Create scaling configuration (minimal for dev/playground use)
+        scaling_options = ScalingOptions(
+            min_replica_count=1,
+            max_replica_count=3,
+            scale_down_policy=ScalingPolicy(delay_seconds=300),
+            scale_up_policy=ScalingPolicy(delay_seconds=0),
+            queue_message_ttl_seconds=500,
+            concurrent_requests_per_replica=32,
+            scaling_triggers=ScalingTriggers(
+                queue_load=QueueLoadScalingTrigger(threshold=1),
+                cpu_utilization=UtilizationScalingTrigger(
+                    enabled=True, threshold=90
+                ),
+                gpu_utilization=UtilizationScalingTrigger(
+                    enabled=True, threshold=90
+                ),
+            ),
+        )
+
+        # General Compute = 24GB VRAM, sufficient for 7B models
+        compute = ComputeResource(name=DEFAULT_COMPUTE, size=1)
+
+        # Create deployment
+        deployment = Deployment(
+            name=deployment_name,
+            containers=[container],
+            compute=compute,
+            scaling=scaling_options,
+            is_spot=False,
+        )
+        
+        created = client.containers.create_deployment(deployment)
+        self._deployment = created
+        self._initialized = True
+        print(f"Created deployment: {created.name}")
+        return {
+            "name": created.name,
+            "status": "deploying",
+            "model": model_path,
+            "message": "Deployment created. Model download and server startup may take several minutes.",
+        }
+
 
     def get_deployment_status(self) -> dict:
-        """
-        Check the current status of the active deployment.
-        
-        Returns:
-            dict with deployment name and status
-        """
         if not self._deployment_name:
             return {"status": "no_deployment", "message": "No active deployment"}
 
         client = self._get_client()
+
         try:
             status = client.containers.get_deployment_status(self._deployment_name)
+
             return {
                 "name": self._deployment_name,
                 "status": status.value,
                 "model": self._model_path,
                 "healthy": status == ContainerDeploymentStatus.HEALTHY,
             }
+
         except APIException as e:
             print(f"Error checking deployment status for '{self._deployment_name}': {e}")
+
+            if "not_found" in str(e).lower():
+                self._deployment_name = None
+                self._model_path = None
+
+                return {
+                    "status": "no_deployment",
+                    "message": "Deployment no longer exists"
+                }
+
             return {
                 "name": self._deployment_name,
                 "status": "error",
@@ -239,10 +352,15 @@ class VerdaService:
 
         client = self._get_client()
 
-        # Refresh the deployment object to get the inference client
+        # Refresh the deployment object and attach inference client
+        print("Running inference on deployment:", self._deployment_name)
         self._deployment = client.containers.get_deployment_by_name(
             self._deployment_name
         )
+        if settings.VERDA_INFERENCE_KEY:
+            self._deployment.set_inference_client(settings.VERDA_INFERENCE_KEY)
+        else:
+            print("No VERDA_INFERENCE_KEY set.")
 
         # Use OpenAI-compatible completions API (SGLang serves this)
         completions_data = {
@@ -300,6 +418,8 @@ class VerdaService:
         self._deployment = client.containers.get_deployment_by_name(
             self._deployment_name
         )
+        if settings.VERDA_INFERENCE_KEY:
+            self._deployment.set_inference_client(settings.VERDA_INFERENCE_KEY)
 
         chat_data = {
             "model": self._model_path,

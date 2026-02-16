@@ -63,14 +63,14 @@ class UserInfo(BaseModel):
 
 class DeployModelRequest(BaseModel):
     """Request model for deploying a text model on Verda"""
-    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
+    model_path: str
     deployment_name: Optional[str] = None
 
 
 class ConnectDeploymentRequest(BaseModel):
     """Request model for connecting to an existing deployment"""
     deployment_name: str
-    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
+    model_path: str
 
 
 class DeploymentStatusResponse(BaseModel):
