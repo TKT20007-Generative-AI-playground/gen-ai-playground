@@ -18,7 +18,7 @@ interface ImageRecord {
   image_type: string | null | undefined;
 }
 
-interface PromtGroup {
+interface PromptGroup {
   prompt: string;
   images: ImageRecord[];
 }
@@ -26,7 +26,7 @@ interface PromtGroup {
 const backendUrl = import.meta.env.VITE_API_URL;
 
 export default function History() {
-  const [history, setHistory] = useState<PromtGroup[]>([]);
+  const [history, setHistory] = useState<PromptGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
 
