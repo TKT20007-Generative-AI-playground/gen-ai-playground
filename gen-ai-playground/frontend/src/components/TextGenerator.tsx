@@ -22,7 +22,7 @@ const modelOptions: ModelOption[] = [
     {
         value: "Qwen3-8B",
         label: "Qwen 3 8B",
-        slug: "qwen-3-8b"
+        slug: "qwen3-8b"
     },
     {
         value: "Llama-3.1-8B", // Visit https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct to ask for access.

@@ -34,6 +34,7 @@ from app.config import settings
 DEFAULT_MODEL = "deepseek-ai/deepseek-llm-7b-chat"
 SECOND_MODEL = "Qwen/Qwen3-8B"
 SGLANG_IMAGE = "docker.io/lmsysorg/sglang:v0.4.1.post6-cu124"
+SGLANG_IMAGE_QWEN = "docker.io/lmsysorg/sglang:v0.5.8.post1-cu129-amd64-runtime"
 HF_SECRET_NAME = "huggingface-token"
 APP_PORT = 30000
 DEFAULT_COMPUTE = "L40S"  # 48GB VRAM, good for 7B models
@@ -221,8 +222,9 @@ class VerdaService:
         self._ensure_hf_secret()
 
         # Create container configuration
+        # Use v0.5.8 image which natively supports Qwen3
         container = Container(
-            image=SGLANG_IMAGE,
+            image=SGLANG_IMAGE_QWEN,
             exposed_port=APP_PORT,
             healthcheck=HealthcheckSettings(
                 enabled=True, port=APP_PORT, path="/health"
@@ -239,6 +241,7 @@ class VerdaService:
                     "0.0.0.0",
                     "--port",
                     str(APP_PORT),
+                    "--trust-remote-code",
                 ],
             ),
             env=[
