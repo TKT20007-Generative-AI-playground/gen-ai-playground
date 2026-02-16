@@ -5,6 +5,8 @@ from pymongo import MongoClient
 from pymongo.database import Database
 from typing import Optional
 from app.config import settings
+import bcrypt
+from datetime import datetime
 
 
 class DatabaseManager:
@@ -14,6 +16,7 @@ class DatabaseManager:
         self.client: Optional[MongoClient] = None
         self.db: Optional[Database] = None
         self._connect()
+        self._seed_admin()
     
     def _connect(self):
         """Establish MongoDB connection"""
@@ -32,6 +35,39 @@ class DatabaseManager:
             print("Continuing without database support...")
             self.client = None
             self.db = None
+    
+    def _seed_admin(self):
+        """Create admin user from env vars if not already present"""
+        if self.db is None:
+            return
+        if not settings.ADMIN_USERNAME or not settings.ADMIN_PASSWORD:
+            print("ADMIN_USERNAME/ADMIN_PASSWORD not set, skipping admin seed.")
+            return
+        
+        existing = self.db.users.find_one({"username": settings.ADMIN_USERNAME})
+        if existing:
+            # Ensure existing user has admin flag
+            if not existing.get("is_admin"):
+                self.db.users.update_one(
+                    {"username": settings.ADMIN_USERNAME},
+                    {"$set": {"is_admin": True}}
+                )
+                print(f"Updated existing user '{settings.ADMIN_USERNAME}' to admin.")
+            else:
+                print(f"Admin user '{settings.ADMIN_USERNAME}' already exists.")
+            return
+        
+        hashed = bcrypt.hashpw(
+            settings.ADMIN_PASSWORD.encode("utf-8"),
+            bcrypt.gensalt()
+        )
+        self.db.users.insert_one({
+            "username": settings.ADMIN_USERNAME,
+            "password": hashed,
+            "is_admin": True,
+            "created_at": datetime.utcnow()
+        })
+        print(f"Admin user '{settings.ADMIN_USERNAME}' created from environment.")
     
     def get_db(self) -> Optional[Database]:
         """Get database instance"""

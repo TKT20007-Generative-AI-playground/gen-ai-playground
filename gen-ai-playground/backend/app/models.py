@@ -31,6 +31,7 @@ class LoginResponse(BaseModel):
     message: str
     token: str
     username: str
+    is_admin: bool = False
 
 
 class RegisterResponse(BaseModel):
@@ -57,6 +58,7 @@ class HistoryResponse(BaseModel):
 class UserInfo(BaseModel):
     """Model for authenticated user information"""
     username: str
+    is_admin: bool = False
 
 
 # ---- Text generation models ----
@@ -117,3 +119,20 @@ class ChatResponse(BaseModel):
     reply: str
     model: str
     usage: Dict[str, Any] = {}
+
+
+# ---- Dashboard models ----
+
+class ContainerInfo(BaseModel):
+    """Model for Verda deployment status information"""
+    name: str
+    status: str
+    image: str  # endpoint URL
+    container_id: str  # deployment name
+
+
+class ContainerActionResponse(BaseModel):
+    """Response for deployment delete action"""
+    message: str
+    container: str
+    action: str

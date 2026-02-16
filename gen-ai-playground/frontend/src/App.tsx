@@ -3,9 +3,11 @@ import { BrowserRouter, Routes, Route } from "react-router-dom"
 import Header from "./components/Header"
 import Register from "./components/Register"
 import Playground from "./pages/Playground"
+import Dashboard from "./pages/Dashboard"
 import History from "./components/History";
 import { useAuth } from './context/AuthContext'
 import { ProtectedRoute } from "./components/ProtectedRoute"
+import { AdminRoute } from "./components/AdminRoute"
 import { Navigate } from 'react-router-dom'
 
 function App() {
@@ -33,6 +35,11 @@ function App() {
             <ProtectedRoute>
               <History />
             </ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={
+            <AdminRoute>
+              <Dashboard />
+            </AdminRoute>
           } />
 
         </Routes>

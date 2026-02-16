@@ -32,6 +32,10 @@ class Settings:
     # Authentication
     INVITATION_CODE: str = os.getenv("INVITATION_CODE")
     
+    # Admin
+    ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME")
+    ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD")
+    
     # API URLs
     MODEL_URLS ={
         "FLUX1_KONTEXT_DEV": "https://inference.datacrunch.io/flux-kontext-dev/predict",

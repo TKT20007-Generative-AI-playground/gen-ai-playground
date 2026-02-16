@@ -6,7 +6,7 @@ import { Group, Divider, Text } from "@mantine/core"
 
 
 export default function Header() {
-  const { isLoggedIn, logout } = useAuth()
+  const { isLoggedIn, isAdmin, logout } = useAuth()
   const location = useLocation()
   const [loginOpened, setLoginOpened] = useState(false)
 
@@ -25,6 +25,7 @@ export default function Header() {
         <Group gap="md">
           <Link to="/history"> History</Link> {/* muutin pathin */}
           <Link to="/playground">Playground</Link>
+          {isAdmin && <Link to="/dashboard">Dashboard</Link>}
           <Text fw={500}> Welcome to the Gen AI Playground! </Text>
         </Group>
 
