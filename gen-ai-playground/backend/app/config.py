@@ -20,7 +20,6 @@ class Settings:
     # Verda SDK credentials (for container deployments)
     VERDA_CLIENT_ID: str = os.getenv("VERDA_CLIENT_ID")
     VERDA_CLIENT_SECRET: str = os.getenv("VERDA_CLIENT_SECRET")
-    VERDA_INFERENCE_KEY: str = os.getenv("VERDA_INFERENCE_KEY")
     HF_TOKEN: str = os.getenv("HF_TOKEN")
     
     # JWT

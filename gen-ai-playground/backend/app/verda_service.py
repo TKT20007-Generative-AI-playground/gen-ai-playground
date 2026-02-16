@@ -62,7 +62,7 @@ class VerdaService:
             self._client = VerdaClient(
                 client_id=settings.VERDA_CLIENT_ID,
                 client_secret=settings.VERDA_CLIENT_SECRET,
-                inference_key=settings.VERDA_INFERENCE_KEY,
+                inference_key=settings.VERDA_API_KEY,
             )
         return self._client
 
