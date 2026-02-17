@@ -1,7 +1,7 @@
 """
 Pydantic models for request and response validation
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
@@ -95,7 +95,7 @@ class TextGenerateResponse(BaseModel):
     generated_text: str
     model: str
     prompt: str
-    usage: Dict[str, Any] = {}
+    usage: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ChatMessage(BaseModel):
@@ -118,4 +118,4 @@ class ChatResponse(BaseModel):
     """Response model for chat completions"""
     reply: str
     model: str
-    usage: Dict[str, Any] = {}
+    usage: Dict[str, Any] = Field(default_factory=dict)
