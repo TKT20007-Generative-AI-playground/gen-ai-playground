@@ -1,0 +1,14 @@
+{
+  "engine": "sglang",
+  "model": "Qwen/Qwen3-8B",
+  "explanation": "Qwen3 8B model optimized for single GPU deployment. This configuration runs efficiently on modern GPUs without requiring tensor parallelism.",
+  "short_explanation": "Qwen3 8B single GPU deployment",
+  "gpu_types": ["b200", "h100", "h200", "a100", "l40s"],
+  "model_loader_extra_config": {
+    "enable_multithread_load": true,
+    "num_threads": 4
+  },
+  "sglang": {
+    "tp": 1
+  }
+}

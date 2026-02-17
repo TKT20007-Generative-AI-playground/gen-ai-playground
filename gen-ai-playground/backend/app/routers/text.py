@@ -63,10 +63,12 @@ def deploy_model(
             )
         elif model_path == "Qwen/Qwen3-8B":
             print("Deploying Qwen3-8B with optimized settings for 8B models")
-            result = verda_service.deploy_second_model(
-                model_path=model_path,
-                deployment_name=request.deployment_name,
-            )
+            result = verda_service.deploy_from_template(
+                template_json="qwen3-sglang.json")
+            # result = verda_service.deploy_second_model(
+            #     model_path=model_path,
+            #     deployment_name=request.deployment_name,
+            # )
         return DeploymentStatusResponse(**result)
     except RuntimeError as e:
         print(f"Deploy RuntimeError: {e}")
