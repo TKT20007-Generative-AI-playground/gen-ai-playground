@@ -65,6 +65,10 @@ class VerdaService:
                 raise RuntimeError(
                     "VERDA_CLIENT_ID and VERDA_CLIENT_SECRET must be set in environment"
                 )
+            if not settings.VERDA_API_KEY:
+                raise RuntimeError(
+                    "VERDA_API_KEY must be set in environment for inference requests"
+                )
             self._client = VerdaClient(
                 client_id=settings.VERDA_CLIENT_ID,
                 client_secret=settings.VERDA_CLIENT_SECRET,
