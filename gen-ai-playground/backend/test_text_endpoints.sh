@@ -54,6 +54,7 @@ fi
 echo -e "${GREEN}Got token: ${TOKEN:0:20}...${NC}"
 
 AUTH="Authorization: Bearer ${TOKEN}"
+MODEL_PATH="deepseek-ai/deepseek-llm-7b-chat"
 
 # ── 3. List existing deployments ────────────────────────
 echo ""
@@ -63,13 +64,21 @@ curl -s "${BASE_URL}/text/deployments" -H "${AUTH}" | python3 -m json.tool 2>/de
 ask_continue
 
 # ── 4. Deploy a model ──────────────────────────────────
-echo -e "${GREEN}[4/8] Deploying deepseek-ai/deepseek-llm-7b-chat on Verda...${NC}"
+echo -e "${GREEN}[4/8] Deploying ${MODEL_PATH} on Verda...${NC}"
 echo -e "${YELLOW}  (This creates a real serverless container — it will cost credits!)${NC}"
 DEPLOY_RESP=$(curl -s -X POST "${BASE_URL}/text/deploy" \
   -H "${AUTH}" \
   -H "Content-Type: application/json" \
-  -d '{"model_path":"deepseek-ai/deepseek-llm-7b-chat"}')
+  -d "{\"model_path\":\"${MODEL_PATH}\"}")
 echo "$DEPLOY_RESP" | python3 -m json.tool 2>/dev/null || echo "$DEPLOY_RESP"
+
+# Capture the deployment name returned by the API
+DEPLOYMENT_NAME=$(echo "$DEPLOY_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['name'])" 2>/dev/null)
+if [ -z "$DEPLOYMENT_NAME" ]; then
+    echo -e "${RED}ERROR: Could not extract deployment name from response. Exiting.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}Deployment name: ${DEPLOYMENT_NAME}${NC}"
 
 # ── 5. Poll status until healthy ───────────────────────
 echo ""
@@ -82,7 +91,7 @@ HEALTHY=false
 
 while [ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]; do
     ATTEMPT=$((ATTEMPT + 1))
-    STATUS_RESP=$(curl -s "${BASE_URL}/text/status" -H "${AUTH}")
+    STATUS_RESP=$(curl -s "${BASE_URL}/text/status?deployment_name=${DEPLOYMENT_NAME}&model_path=${MODEL_PATH}" -H "${AUTH}")
     STATUS=$(echo "$STATUS_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))" 2>/dev/null)
     IS_HEALTHY=$(echo "$STATUS_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('healthy', False))" 2>/dev/null)
 
@@ -100,12 +109,12 @@ done
 if [ "$HEALTHY" = false ]; then
     echo -e "${RED}  Deployment did not become healthy in time.${NC}"
     echo -e "${YELLOW}  You can keep polling manually:${NC}"
-    echo "    curl -s ${BASE_URL}/text/status -H \"${AUTH}\""
+    echo "    curl -s '${BASE_URL}/text/status?deployment_name=${DEPLOYMENT_NAME}' -H \"${AUTH}\""
     echo ""
     echo -e "${YELLOW}  Or skip ahead and delete the deployment:${NC}"
     read -rp "  Delete deployment and exit? (y/N): " DELETE_CHOICE
     if [ "$DELETE_CHOICE" = "y" ] || [ "$DELETE_CHOICE" = "Y" ]; then
-        curl -s -X DELETE "${BASE_URL}/text/deploy" -H "${AUTH}" | python3 -m json.tool 2>/dev/null || true
+        curl -s -X DELETE "${BASE_URL}/text/deploy?deployment_name=${DEPLOYMENT_NAME}" -H "${AUTH}" | python3 -m json.tool 2>/dev/null || true
     fi
     exit 1
 fi
@@ -117,7 +126,7 @@ echo -e "${GREEN}[6/8] Generating text completion...${NC}"
 GEN_RESP=$(curl -s -X POST "${BASE_URL}/text/generate" \
   -H "${AUTH}" \
   -H "Content-Type: application/json" \
-  -d '{"prompt":"Explain what artificial intelligence is in 2 sentences.","max_tokens":128,"temperature":0.7}')
+  -d "{\"deployment_name\":\"${DEPLOYMENT_NAME}\",\"model_path\":\"${MODEL_PATH}\",\"prompt\":\"Explain what artificial intelligence is in 2 sentences.\",\"max_tokens\":128,\"temperature\":0.7}")
 echo "$GEN_RESP" | python3 -m json.tool 2>/dev/null || echo "$GEN_RESP"
 
 ask_continue
@@ -127,7 +136,7 @@ echo -e "${GREEN}[7/8] Chatting with the model...${NC}"
 CHAT_RESP=$(curl -s -X POST "${BASE_URL}/text/chat" \
   -H "${AUTH}" \
   -H "Content-Type: application/json" \
-  -d '{"messages":[{"role":"system","content":"You are a helpful assistant."},{"role":"user","content":"Tell me a short joke about programming."}],"max_tokens":128}')
+  -d "{\"deployment_name\":\"${DEPLOYMENT_NAME}\",\"model_path\":\"${MODEL_PATH}\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a helpful assistant.\"},{\"role\":\"user\",\"content\":\"Tell me a short joke about programming.\"}],\"max_tokens\":128}")
 echo "$CHAT_RESP" | python3 -m json.tool 2>/dev/null || echo "$CHAT_RESP"
 
 ask_continue
@@ -137,12 +146,12 @@ echo -e "${GREEN}[8/8] Cleaning up — deleting deployment...${NC}"
 echo -e "${YELLOW}  (Important to avoid unnecessary charges!)${NC}"
 read -rp "  Delete the deployment now? (Y/n): " DELETE_CHOICE
 if [ "$DELETE_CHOICE" != "n" ] && [ "$DELETE_CHOICE" != "N" ]; then
-    DEL_RESP=$(curl -s -X DELETE "${BASE_URL}/text/deploy" -H "${AUTH}")
+    DEL_RESP=$(curl -s -X DELETE "${BASE_URL}/text/deploy?deployment_name=${DEPLOYMENT_NAME}" -H "${AUTH}")
     echo "$DEL_RESP" | python3 -m json.tool 2>/dev/null || echo "$DEL_RESP"
     echo -e "${GREEN}  ✓ Deployment deleted.${NC}"
 else
     echo -e "${YELLOW}  Skipped. Remember to delete it later!${NC}"
-    echo "    curl -X DELETE ${BASE_URL}/text/deploy -H \"${AUTH}\""
+    echo "    curl -X DELETE '${BASE_URL}/text/deploy?deployment_name=${DEPLOYMENT_NAME}' -H \"${AUTH}\""
 fi
 
 echo ""

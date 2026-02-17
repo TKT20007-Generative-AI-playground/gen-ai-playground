@@ -82,6 +82,8 @@ class DeploymentStatusResponse(BaseModel):
 
 class TextGenerateRequest(BaseModel):
     """Request model for text generation"""
+    deployment_name: str
+    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
     prompt: str
     max_tokens: int = 256
     temperature: float = 0.7
@@ -104,6 +106,8 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     """Request model for chat completions"""
+    deployment_name: str
+    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
     messages: List[ChatMessage]
     max_tokens: int = 256
     temperature: float = 0.7
