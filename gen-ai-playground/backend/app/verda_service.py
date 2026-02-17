@@ -135,6 +135,7 @@ class VerdaService:
         SGLANG_DEFAULT_TAG = "v0.5.6.post2-cu129-amd64"
         VLLM_DEFAULT_TAG = "latest"
 
+        
         if cfg.engine == "sglang":
             tag = cfg.image_tag or SGLANG_DEFAULT_TAG
             return f"{SGLANG_DEFAULT_IMAGE}:{tag}"
