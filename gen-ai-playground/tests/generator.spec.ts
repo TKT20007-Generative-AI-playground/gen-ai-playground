@@ -4,6 +4,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173/';
 
 test.use({ storageState: 'playwright/.auth/user.json' });
 
+// Helper functions for test flows
 async function selectModels(page: Page, model1?: string, model2?: string) {
   if (model1) {
     await page.getByTestId('model-1-selector').click();
@@ -43,12 +44,14 @@ async function expectImagesVisible(page: Page, expectFirst = true, expectSecond 
   }
 }
 
+// Helper to create a dummy image
 function getDummyImageBuffer() {
   const base64 =
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=';
   return Buffer.from(base64, 'base64');
 }
 
+// Main test suite for generator page flows
 test.describe('Generator page flows', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/images/generate', async (route) => {
@@ -65,6 +68,7 @@ test.describe('Generator page flows', () => {
 
   });
 
+  // Tests
   test('generate image with Model 1 only', async ({ page }) => {
     await selectModels(page, 'FLUX.2 [klein] 9B');
     await enterPromptAndGenerate(page, 'A futuristic cityscape at sunset');
