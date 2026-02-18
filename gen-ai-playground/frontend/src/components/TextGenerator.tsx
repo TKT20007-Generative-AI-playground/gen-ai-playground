@@ -21,6 +21,9 @@ type Message = {
     role: "user" | "assistant" | "system"
     content: string
 }
+type Deployment = {
+    name: string
+}
 
 const modelOptions: ModelOption[] = [
     {
@@ -45,17 +48,17 @@ function parseModelReply(rawReply: string): {
     actualReply: string;
 } {
     const thinkingMatch = rawReply.match(/<think>([\s\S]*?)<\/think>/);
-    
+
     if (thinkingMatch) {
         const thinking = thinkingMatch[1].trim();
         const actualReply = rawReply.replace(/<think>[\s\S]*?<\/think>/, '').trim();
-        
+
         return {
             thinking,
             actualReply
         };
     }
-    
+
     return {
         thinking: null,
         actualReply: rawReply.trim()
@@ -111,7 +114,7 @@ export default function TextGenerator() {
             console.log("Existing deployments:", deployments)
 
             const existingContainer = deployments.find(
-                (d: any) => {
+                (d: Deployment) => {
                     const name = typeof d?.name === "string" ? d.name.toLowerCase() : ""
                     return name.includes(selected.slug.toLowerCase())
                 }
@@ -211,7 +214,7 @@ export default function TextGenerator() {
             )
             const deployments = deploymentsResponse.data || []
             const existingContainer = deployments.find(
-                (d: any) => {
+                (d: Deployment) => {
                     const name = typeof d?.name === "string" ? d.name.toLowerCase() : ""
                     return name.includes(selected.slug.toLowerCase())
                 }
@@ -249,14 +252,14 @@ export default function TextGenerator() {
             // Parse the reply to remove thinking tags
             const parsed = parseModelReply(response.data.reply)
             console.log("PARSED: ", parsed)
-            
+
             // Store ONLY the actualReply (without thinking tags)
-            const assistantMessage: Message = { 
-                role: "assistant", 
+            const assistantMessage: Message = {
+                role: "assistant",
                 content: parsed.actualReply  // This ensures no thinking tags in state
             }
             setMessages([...updatedMessages, assistantMessage])
-            
+
             if (parsed.thinking) {
                 console.log("Model thinking:", parsed.thinking)
             }
@@ -295,18 +298,18 @@ export default function TextGenerator() {
     }
 
     return (
-        <div style={{ 
-            display: "flex", 
-            flexDirection: "column", 
+        <div style={{
+            display: "flex",
+            flexDirection: "column",
             height: "100vh",
             maxWidth: "1200px",
             margin: "0 auto",
             padding: "20px"
         }}>
             {/* Controls */}
-            <div style={{ 
-                display: "flex", 
-                flexDirection: "column", 
+            <div style={{
+                display: "flex",
+                flexDirection: "column",
                 gap: "10px",
                 marginBottom: "20px"
             }}>
@@ -335,10 +338,10 @@ export default function TextGenerator() {
             </div>
 
             {/* Chat Messages */}
-            <ScrollArea 
-                style={{ 
-                    flex: 1, 
-                    border: "1px solid #ddd", 
+            <ScrollArea
+                style={{
+                    flex: 1,
+                    border: "1px solid #ddd",
                     borderRadius: "8px",
                     padding: "20px",
                     marginBottom: "20px"
@@ -379,8 +382,8 @@ export default function TextGenerator() {
                     onKeyPress={handleKeyPress}
                     disabled={isLoading || !selectedModel}
                 />
-                <Button 
-                    onClick={GenerateText} 
+                <Button
+                    onClick={GenerateText}
                     disabled={!selectedModel || !prompt.trim() || isLoading}
                     loading={isLoading}
                 >
