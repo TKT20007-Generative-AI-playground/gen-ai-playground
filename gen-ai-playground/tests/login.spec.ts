@@ -1,5 +1,8 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 
+// Disable storageState
+test.use({ storageState: undefined });
+
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173/';
 const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:8000';
 const INVITATION_CODE = process.env.INVITATION_CODE ?? 'local-invitation-code';

@@ -1,5 +1,8 @@
 import { test, expect } from '@playwright/test';
 
+// Disable storageState
+test.use({ storageState: undefined });
+
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173/';
 
 test('register form shows correctly', async ({ page }) => {

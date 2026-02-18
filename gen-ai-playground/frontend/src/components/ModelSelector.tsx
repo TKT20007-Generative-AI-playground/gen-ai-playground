@@ -200,6 +200,7 @@ export default function ModelSelector({
             onChange={handleChange}
             clearable
             searchable
+            data-testid={label === "Model 1" ? "model-1-selector" : "model-2-selector"}
             rightSectionWidth={80}
             styles={{
               input: {
