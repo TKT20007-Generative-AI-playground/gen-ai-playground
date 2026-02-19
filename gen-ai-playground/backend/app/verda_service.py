@@ -546,7 +546,8 @@ class VerdaService:
             "message": "Deployment created. Model download and server startup may take several minutes.",
         }
 
-
+    # this will cause problems in the future
+    # need to find deployment with a name to be useful
     def get_deployment_status(self) -> dict:
         if not self._deployment_name:
             return {"status": "no_deployment", "message": "No active deployment"}
@@ -652,6 +653,7 @@ class VerdaService:
         max_tokens: int = 256,
         temperature: float = 0.7,
         top_p: float = 0.9,
+        enable_thinking: bool = False,
     ) -> dict:
         """
         Chat with the deployed model using the OpenAI-compatible chat API.
@@ -681,6 +683,7 @@ class VerdaService:
             "max_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
+            "chat_template_kwargs": {"enable_thinking": enable_thinking},
         }
 
         response = self._deployment.run_sync(

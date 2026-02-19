@@ -52,6 +52,7 @@ def deploy_model(
     """
     print(f"User {current_user.username} requesting model deployment: {request.model_path}")
     model_path = choose_text_model_path(request.model_path)
+    print("MODEL PATH: ", model_path)
     
     
     try:
@@ -65,6 +66,10 @@ def deploy_model(
             print("Deploying Qwen3-8B with optimized settings for 8B models")
             result = verda_service.deploy_from_template(
                 template_json="qwen3-sglang.json")
+        elif model_path == "Qwen/Qwen3-32B":
+            print("Deploying Qwen3-32B with optimized settings for 32B models")
+            result = verda_service.deploy_from_template(
+                template_json="qwen3-sglang-think.json")
             # result = verda_service.deploy_second_model(
             #     model_path=model_path,
             #     deployment_name=request.deployment_name,
