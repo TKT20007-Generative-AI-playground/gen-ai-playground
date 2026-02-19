@@ -25,6 +25,8 @@ from verda.containers import (
     ScalingPolicy,
     ScalingTriggers,
     UtilizationScalingTrigger,
+    VolumeMount,
+    VolumeMountType,
 )
 from verda.exceptions import APIException
 
@@ -155,7 +157,7 @@ class VerdaService:
         """Resolve the Docker image from a TemplateConfig."""
         SGLANG_DEFAULT_IMAGE = "docker.io/lmsysorg/sglang"
         VLLM_DEFAULT_IMAGE = "docker.io/vllm/vllm-openai"
-        SGLANG_DEFAULT_TAG = "v0.5.6.post2-cu129-amd64"
+        SGLANG_DEFAULT_TAG = "v0.5.8.post1-cu129-amd64-runtime"
         VLLM_DEFAULT_TAG = "v0.13.0"
 
         
@@ -265,8 +267,39 @@ class VerdaService:
                     name="HF_TOKEN",
                     value_or_reference_to_secret=HF_SECRET_NAME,
                     type=EnvVarType.SECRET,
-                )
+                ),
+                EnvVar(
+                    name="NCCL_DEBUG",
+                    value_or_reference_to_secret="INFO",
+                    type=EnvVarType.PLAIN,
+                ),
+                # EnvVar(
+                #     name="NCCL_IB_DISABLE",
+                #     value_or_reference_to_secret="1",
+                #     type=EnvVarType.PLAIN,
+                # ),
+                # EnvVar(
+                #     name="NCCL_P2P_DISABLE",
+                #     value_or_reference_to_secret="1",
+                #     type=EnvVarType.PLAIN,
+                # ),
+                # EnvVar(
+                #     name="NCCL_SHM_DISABLE",
+                #     value_or_reference_to_secret="0",
+                #     type=EnvVarType.PLAIN,
+                # ),
+                # EnvVar(
+                #     name="NCCL_NET_GDR_LEVEL",
+                #     value_or_reference_to_secret="0",
+                #     type=EnvVarType.PLAIN,
+                # ),
             ],
+            # for bigger models->
+            volume_mounts=[VolumeMount(
+                type=VolumeMountType.MEMORY,
+                mount_path="/dev/shm",
+                size_in_mb=2048,
+            )],
         )
 
         scaling_options = ScalingOptions(
