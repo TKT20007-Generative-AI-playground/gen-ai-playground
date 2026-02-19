@@ -1,7 +1,7 @@
 """
 Pydantic models for request and response validation
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
@@ -86,6 +86,8 @@ class DeploymentStatusResponse(BaseModel):
 
 class TextGenerateRequest(BaseModel):
     """Request model for text generation"""
+    deployment_name: str
+    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
     prompt: str
     max_tokens: int = 256
     temperature: float = 0.7
@@ -97,7 +99,7 @@ class TextGenerateResponse(BaseModel):
     generated_text: str
     model: str
     prompt: str
-    usage: Dict[str, Any] = {}
+    usage: Dict[str, Any] = Field(default_factory=dict)
 
 
 class ChatMessage(BaseModel):
@@ -108,6 +110,8 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     """Request model for chat completions"""
+    deployment_name: str
+    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
     messages: List[ChatMessage]
     max_tokens: int = 256
     temperature: float = 0.7
@@ -118,7 +122,7 @@ class ChatResponse(BaseModel):
     """Response model for chat completions"""
     reply: str
     model: str
-    usage: Dict[str, Any] = {}
+    usage: Dict[str, Any] = Field(default_factory=dict)
 
 
 # ---- Dashboard models ----
