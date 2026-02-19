@@ -103,11 +103,23 @@ class VerdaService:
                 "--host", host,
                 "--port", str(port),
             ]
-            if cfg.sglang and cfg.sglang.tp and cfg.sglang.tp > 1:
-                cmd += ["--tp", str(cfg.sglang.tp)]
+            # generate CLI flags from SGLangConfig fields (model_templastes)
+            # field_name -> --field-name  
+            if cfg.sglang:
+                for field_name, value in cfg.sglang.model_dump(exclude_none=True).items():
+                    flag = f"--{field_name.replace('_', '-')}"
+                    if isinstance(value, bool):
+                        if value:
+                            cmd.append(flag)
+                    else:
+                        cmd += [flag, str(value)]
+
             if cfg.model_loader_extra_config:
-                cmd += ["--model-loader-extra-config",
-                        json.dumps(cfg.model_loader_extra_config)]
+                config_json = json.dumps(cfg.model_loader_extra_config, separators=(',', ':'))
+                cmd += ["--model-loader-extra-config", config_json]
+            if cfg.trust_remote_code:
+                cmd.append("--trust-remote-code")
+
             return cmd
 
         elif cfg.engine == "vllm":
@@ -117,8 +129,19 @@ class VerdaService:
                 "--host", host,
                 "--port", str(port),
             ]
-            if cfg.vllm and cfg.vllm.tensor_parallel_size and cfg.vllm.tensor_parallel_size > 1:
-                cmd += ["--tensor-parallel-size", str(cfg.vllm.tensor_parallel_size)]
+            if cfg.vllm:
+                for field_name, value in cfg.vllm.model_dump(exclude_none=True).items():
+                    flag = f"--{field_name.replace('_', '-')}"
+                    if isinstance(value, bool):
+                        if value:
+                            cmd.append(flag)
+                    else:
+                        cmd += [flag, str(value)]
+                if cfg.model_loader_extra_config:
+                    config_json = json.dumps(cfg.model_loader_extra_config, separators=(',', ':'))
+                    cmd += ["--model-loader-extra-config", config_json]
+            if cfg.trust_remote_code:
+                cmd.append("--trust-remote-code")
             return cmd
 
         elif cfg.engine == "custom":
@@ -133,7 +156,7 @@ class VerdaService:
         SGLANG_DEFAULT_IMAGE = "docker.io/lmsysorg/sglang"
         VLLM_DEFAULT_IMAGE = "docker.io/vllm/vllm-openai"
         SGLANG_DEFAULT_TAG = "v0.5.6.post2-cu129-amd64"
-        VLLM_DEFAULT_TAG = "latest"
+        VLLM_DEFAULT_TAG = "v0.13.0"
 
         
         if cfg.engine == "sglang":
