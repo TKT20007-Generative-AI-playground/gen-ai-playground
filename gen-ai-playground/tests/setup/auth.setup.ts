@@ -36,4 +36,3 @@ test('authenticate and save storage state', async ({ page, request }) => {
   await page.context().storageState({ path: STORAGE_STATE_PATH });
 });
 
-
