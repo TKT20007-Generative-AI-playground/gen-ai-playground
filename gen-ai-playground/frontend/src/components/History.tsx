@@ -94,7 +94,7 @@ export default function History() {
           {group.images.map((item, i) => (
             <Stack key={i} gap="xs" align="center">
               <img
-                data-testid={`image-${item.prompt}`}
+                data-testid={`image-${item.prompt}-${item.model}`}
                 src={`data:image/${item.image_type || "png"};base64,${item.image_data}`}
                 alt={item.prompt}
                 style={{
@@ -106,13 +106,13 @@ export default function History() {
                 onClick={() => setSelectedImage(item)}
               />
 
-              <Badge data-testid={`model-${item.model}`} variant="light">{item.model}</Badge>
+              <Badge data-testid={`model-${item.prompt}-${item.model}`} variant="light">{item.model}</Badge>
 
-              <Text data-testid={`timestamp-${item.prompt}`} size="xs" c="dimmed">
+              <Text data-testid={`timestamp-${item.prompt}-${item.model}`} size="xs" c="dimmed">
                 {new Date(item.timestamp).toLocaleString()}
               </Text>
 
-              <Text data-testid={`type-${item.prompt}`} size="xs">
+              <Text data-testid={`type-${item.prompt}-${item.model}`} size="xs">
                 Type: {item.image_type || "generated"}
               </Text>
             </Stack>

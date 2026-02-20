@@ -65,20 +65,21 @@ test.describe('History drawer flows', () => {
         await expect(drawer).toBeVisible();
 
         for (const group of dummyHistory) {
-            await expect(drawer.getByTestId(`prompt-${group.prompt}`).first()).toBeVisible();
+            await expect(drawer.getByTestId(`prompt-${group.prompt}`)).toBeVisible();
 
             for (const image of group.images) {
-                await expect(drawer.getByTestId(`image-${image.prompt}`).first()).toBeVisible();
-                await expect(drawer.getByTestId(`model-${image.model}`).first()).toBeVisible();
-                await expect(drawer.getByTestId(`type-${image.prompt}`).first()).toBeVisible();
-                await expect(drawer.getByTestId(`timestamp-${image.prompt}`).first()).toBeVisible();
-                }
+            const id = `-${image.prompt}-${image.model}`;
+            await expect(drawer.getByTestId(`image${id}`)).toBeVisible();
+            await expect(drawer.getByTestId(`model${id}`)).toBeVisible();
+            await expect(drawer.getByTestId(`type${id}`)).toBeVisible();
+            await expect(drawer.getByTestId(`timestamp${id}`)).toBeVisible();
+            }
         }
     });
 
     test('opens image modal when clicking on an image', async ({ page }) => {
         await openHistoryDrawer(page);
-        const firstImage = page.getByTestId('image-Futuristic cityscape'); // use your prompt as testid
+        const firstImage = page.getByTestId('image-Futuristic cityscape-FLUX.2 [klein] 9B');
         await expect(firstImage).toBeVisible({ timeout: 5000 });
 
         await firstImage.click();
