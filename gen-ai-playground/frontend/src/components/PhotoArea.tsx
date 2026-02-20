@@ -1,28 +1,50 @@
-type PhotoAreaProps = {
-    src: string | null
-    alt: string
+import { Card, Text } from "@mantine/core"
+import type { ReactNode } from "react"
+
+export type PhotoAreaProps = {
+  src: string | null
+  alt: string
+  header?: ReactNode
+  height?: number
 }
-export default function PhotoArea({ src, alt }: PhotoAreaProps) {
-    if (!src) {
-        return <div></div>
-    }
-    return (
-        <div style={{
-            border: "1px solid #ccc",
-            padding: "10px",
-            marginLeft: "20px",
-            height: "450px",
-            width: "650px",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-        }}>
-            <img src={src} alt={alt}
+
+export default function PhotoArea({ src, alt, header, height = 420 }: PhotoAreaProps) {
+  const hasImage = Boolean(src)
+
+  return (
+    <Card withBorder radius="md" p="md" style={{ width: "100%" }}>
+      {header && <div style={{ marginBottom: 10 }}>{header}</div>}
+
+      <div
+        style={{
+          width: "100%",
+          borderRadius: 0,
+          overflow: "hidden",
+          background: "transparent",
+          height: hasImage ? "auto" : height,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {hasImage ? (
+          <img
+            src={src as string}
+            alt={alt}
             style={{
-                maxWidth: "100%",
-                maxHeight:"100%",
-                objectFit: "contain"
-            }} />
-        </div>
-    )
+              width: "100%",
+              height: "auto",
+              display: "block",
+              objectFit: "contain",
+              maxHeight: height,
+            }}
+          />
+        ) : (
+          <Text c="dimmed" size="sm">
+            No image
+          </Text>
+        )}
+      </div>
+    </Card>
+  )
 }

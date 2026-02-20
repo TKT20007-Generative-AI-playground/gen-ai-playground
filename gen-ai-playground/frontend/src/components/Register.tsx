@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useNavigate, Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import {
   Container,
   Paper,
@@ -18,11 +20,17 @@ export default function Register() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const { isLoggedIn } = useAuth()
+  const navigate = useNavigate()
 
   const backendUrl = import.meta.env.VITE_API_URL;
 
   if (!backendUrl) {
     throw new Error("VITE_API_URL is not defined");
+  }
+
+  if (isLoggedIn) {
+    return <Navigate to="/playground" replace />
   }
 
   const validatePassword = (password: string): string | null => {
@@ -83,6 +91,10 @@ export default function Register() {
       setConfirmPassword("");
       setInviteCode("");
       setPasswordError("");
+      setTimeout(() => {
+        navigate("/", { state: { openLoginModal: true } })
+      }, 1500) // timeout so that the user can see that registration was successful
+
     } catch {
       setError("Server unreachable");
     }

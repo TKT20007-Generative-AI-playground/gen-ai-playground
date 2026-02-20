@@ -1,48 +1,42 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
-import { Select, Group } from '@mantine/core'
 import TextGenerator from "../components/TextGenerator"
+import { Select, Group } from "@mantine/core"
+
 /**
- * 
  * @returns playground page where you can choose whether to create or edit an image using AI models
  */
 export default function Playground() {
+  const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const
+  type Tab = (typeof tabs)[number]
 
-    const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"]
-    const [selectedComponent, setSelectedComponent] = useState<string | null>("ImageGenerator")
-    const selectPlayingComponent = (componentName: string) => {
-        setSelectedComponent(componentName)
-    }
-    const componentsMap: Record<string, React.ReactNode> = {
-        ImageGenerator: <ImageGenerator />,
-        ImageEditor: <ImageEditor />,
-        TextGenerator: <TextGenerator />
-    }
+  const [selectedComponent, setSelectedComponent] = useState<Tab>("ImageGenerator")
 
+  const componentsMap: Record<Tab, ReactNode> = {
+    ImageGenerator: <ImageGenerator />,
+    ImageEditor: <ImageEditor />,
+    TextGenerator: <TextGenerator />,
+  }
 
+  return (
+    <>
+      <Group gap="md" p="md">
+        <Select
+          label="Select playground component"
+          data={tabs.map((tab) => ({ value: tab, label: tab }))}
+          value={selectedComponent}
+          onChange={(value) => {
+            if (value) setSelectedComponent(value as Tab)
+          }}
+        />
+      </Group>
 
-    return (
-        <>
-            {/* <div style={{ display: "flex", flexDirection: "row", justifyContent: "center", width: "100%", alignItems: "center" }}> */}
-            <Group
-                gap="md"
-                p="md"
-            >
-                <Select
-                    label="Select playground component"
-                    data={tabs.map(tab => ({ value: tab, label: tab }))}
-                    value={selectedComponent}
-                    onChange={(value: string | null) => selectPlayingComponent(value || "")}
-                />
-            </Group>
-            {/* </div> */}
-            < div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", alignItems: "center" }
-            }>
-                <div>
-                    {selectedComponent && componentsMap[selectedComponent]}
-                </div>
-            </div >
-        </>
-    )
+      <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
+        <div style={{ width: "100%", maxWidth: 1100, padding: "0 16px" }}>
+          {componentsMap[selectedComponent]}
+        </div>
+      </div>
+    </>
+  )
 }
