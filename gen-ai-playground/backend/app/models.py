@@ -11,6 +11,7 @@ class ImageRequestBody(BaseModel):
     prompt: str
     model: str
     image: Optional[str] = None  
+    image_to_edit: Optional[str] = None
 
 
 class RegisterRequest(BaseModel):
@@ -18,6 +19,7 @@ class RegisterRequest(BaseModel):
     username: str
     password: str
     invitation_code: str
+    
 
 
 class LoginRequest(BaseModel):

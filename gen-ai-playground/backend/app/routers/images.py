@@ -52,7 +52,8 @@ def get_history(
                 "timestamp": 1,
                 "image_size": 1,
                 "image_data": 1,
-                "image_type": 1
+                "image_type": 1,
+                "parent_image_id": 1,
             }
         ).sort("timestamp", -1).limit(50))
         
@@ -106,8 +107,19 @@ async def generate_image(
         "Content-Type": "application/json",
         "Authorization": f"Bearer {settings.VERDA_API_KEY}"
     }
-    data = build_request_data(model, prompt)
-    
+
+    if image_request.image_to_edit:
+        base64_img = image_request.image_to_edit
+
+        if "," in base64_img:
+            base64_img = base64_img.split(",", 1)[1]
+
+        data = build_request_data(model, prompt, base64_img)
+        image_type = "edited"
+    else:
+        data = build_request_data(model, prompt)
+        image_type = "generated"
+
     # Call Verda API
     resp = requests.post(url, headers=headers, json=data)
     
@@ -132,7 +144,15 @@ async def generate_image(
 
                 # Decode base64 to bytes
                 image_bytes = base64.b64decode(return_image_base64)
-                save_image_to_db(db, prompt, model, return_image_base64, current_user, image_type)
+                save_image_to_db(
+                    db,
+                    prompt,
+                    model,
+                    return_image_base64,
+                    current_user,
+                    image_type,
+                    user_base64_image=image_request.image_to_edit
+                )
                 
                 return Response(
                     content=image_bytes,
