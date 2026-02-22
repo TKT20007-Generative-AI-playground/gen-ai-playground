@@ -8,6 +8,7 @@ import ModelSelector from "./ModelSelector";
 import PhotoArea from "./PhotoArea";
 import GeneratingText from "./GeneratingText";
 import { useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 type SelectedModels = [string | null, string | null];
 
@@ -16,6 +17,7 @@ function base64FromHistoryImage(img: any) {
 }
 
 export default function ImageGenerator() {
+  const navigate = useNavigate();
   const location = useLocation();
   const imageToEdit = location.state?.imageToEdit || null;
   
@@ -87,8 +89,8 @@ export default function ImageGenerator() {
     });
   }
 
-  const model1 = selectedModels[0] ?? undefined;
-  const model2 = selectedModels[1] ?? undefined;
+  const model1 = selectedModels[0] || undefined;
+  const model2 = selectedModels[1] || undefined;
 
   function replaceImageUrl(next: string | null) {
     setImageUrl((prev) => {
@@ -99,18 +101,13 @@ export default function ImageGenerator() {
   }
 
   function replaceImageUrl2(next: string | null) {
-  if (!next) {
-    imageUrl2Ref.current = null;
-    setImageUrl2(null);
-    return;
+    setImageUrl2((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      imageUrl2Ref.current = next;
+      return next;
+    });
   }
 
-  setImageUrl2((prev) => {
-    if (prev) URL.revokeObjectURL(prev);
-    imageUrl2Ref.current = next;
-    return next;
-  });
-}  
 
   async function fetchTwoGeneratedImages(nextPrompt: string) {
 
@@ -175,20 +172,27 @@ export default function ImageGenerator() {
       const results = await Promise.all(promises);
 
       let idx = 0;
-      if (model1) {
-        const url = URL.createObjectURL(results[idx].data);
+      if (model1 && results[0]) {
+        const url = URL.createObjectURL(results[0].data);
         replaceImageUrl(url);
         idx++;
+
+        if (imageToEdit) {
+          setSelectedModels([model1, model2 ?? null]);
+        }
       }
-      if (model2) {
-        const url2 = URL.createObjectURL(results[idx].data);
+      if (model2 && results[1]) {
+        const url2 = URL.createObjectURL(results[1].data);
         replaceImageUrl2(url2);
       }
 
-      // 🔥 IMPORTANT: Clear edit mode after generating
-      if (imageToEdit) {
-        location.state.imageToEdit = null;
-      }
+        if (imageToEdit) {
+          navigate(location.pathname, {
+            replace: true,
+            state: {} 
+          });
+        }
+      
 
     } catch (err) {
       console.error("Error generating image:", err);
@@ -197,14 +201,13 @@ export default function ImageGenerator() {
     }
   }
 
-  return (
+ return (
+  <>
     <Stack align="center" w="100%" gap="md">
       {/* Show original image when editing */}
       {imageToEdit && (
         <PhotoArea
-          src={`data:image/${imageToEdit.image_type || "png"};base64,${
-            imageToEdit.image_data
-          }`}
+          src={`data:image/${imageToEdit.image_type || "png"};base64,${imageToEdit.image_data}`}
           alt="Original image"
           header={<Text fw={600}>Editing existing image</Text>}
           height={420}
@@ -221,7 +224,6 @@ export default function ImageGenerator() {
           </Text>
         </Stack>
       )}
-
 
       <div style={{ width: "100%", maxWidth: CONTROLS_MAX_WIDTH }}>
         <Text size="sm" c="dimmed" mb={6}>
@@ -241,7 +243,6 @@ export default function ImageGenerator() {
             onChange={(value) => setModelAtIndex(0, value)}
             width={SELECTOR_WIDTH}
           />
-
           <ModelSelector
             label="Model 2"
             data-testid="model-2-selector"
@@ -272,25 +273,41 @@ export default function ImageGenerator() {
             spacing="md"
           >
             {imageUrl && (
-              <PhotoArea
-                src={imageUrl}
-                alt="Generated image 1"
-                header={<Text fw={600}>Model: {getModelDisplayName(model1)}</Text>}
-                height={420}
-              />
+              <Stack gap="xs" align="center">
+                <PhotoArea
+                  src={imageUrl}
+                  alt="Generated image 1"
+                  header={<Text fw={600}>Model: {getModelDisplayName(model1)}</Text>}
+                  height={420}
+                />
+                <Text size="xs" c="dimmed">
+                  Timestamp: {new Date().toLocaleString()} 
+                </Text>
+                <Text size="xs">
+                  Type: {imageToEdit ? "edited" : "generated"}
+                </Text>
+              </Stack>
             )}
-
             {imageUrl2 && (
-              <PhotoArea
-                src={imageUrl2}
-                alt="Generated image 2"
-                header={<Text fw={600}>Model: {getModelDisplayName(model2)}</Text>}
-                height={420}
-              />
+              <Stack gap="xs" align="center">
+                <PhotoArea
+                  src={imageUrl2}
+                  alt="Generated image 2"
+                  header={<Text fw={600}>Model: {getModelDisplayName(model2)}</Text>}
+                  height={420}
+                />
+                <Text size="xs" c="dimmed">
+                  Timestamp: {new Date().toLocaleString()}
+                </Text>
+                <Text size="xs">
+                  Type: {imageToEdit ? "edited" : "generated"}
+                </Text>
+              </Stack>
             )}
           </SimpleGrid>
         </div>
       )}
     </Stack>
-  );
+  </>
+);
 }

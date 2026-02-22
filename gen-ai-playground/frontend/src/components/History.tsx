@@ -13,8 +13,8 @@ import {
 import { useNavigate } from "react-router-dom";
 
 interface ImageRecord {
-  id: number;
-  parent_image_id?: number| null;
+  id: string;
+  parent_image_id?: string | null;
   prompt: string;
   model: string;
   timestamp: string;
