@@ -1,7 +1,7 @@
 """
 Pydantic models for request and response validation
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
