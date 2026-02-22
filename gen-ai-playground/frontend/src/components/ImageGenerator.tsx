@@ -60,6 +60,16 @@ export default function ImageGenerator() {
     } 
   }, [imageToEdit]);
 
+  // reset playground
+    useEffect(() => {
+    if (!location.state?.imageToEdit) {
+      setPrompt("");
+      replaceImageUrl(null);
+      replaceImageUrl2(null);
+      setSelectedModels([null, null]);
+    }
+  }, [location.key]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -67,6 +77,7 @@ export default function ImageGenerator() {
       if (imageUrl2Ref.current) URL.revokeObjectURL(imageUrl2Ref.current);
     };
   }, []);
+
 
   function setModelAtIndex(index: 0 | 1, value: string | null) {
     setSelectedModels((prev) => {
