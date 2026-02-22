@@ -9,6 +9,7 @@ import {
   Text,
   Stack,
   Alert,
+  Select,
 } from '@mantine/core'
 
 interface Container {
@@ -18,11 +19,20 @@ interface Container {
   container_id: string
 }
 
+const textModelOptions = [
+  { value: 'deepseek-llm-7b', label: 'DeepSeek LLM 7B' },
+  { value: 'Qwen3-8B', label: 'Qwen 3 8B' },
+  { value: 'Qwen3-32B', label: 'Qwen 3 32B' },
+  { value: 'Llama-3.1-8B', label: 'Llama 3.1 8B' },
+]
+
 export default function Dashboard() {
   const [containers, setContainers] = useState<Container[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [selectedModel, setSelectedModel] = useState<string | null>(null)
+  const [deployLoading, setDeployLoading] = useState(false)
 
   const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
   const token = localStorage.getItem('token')
@@ -75,6 +85,31 @@ export default function Dashboard() {
     }
   }
 
+  const handleDeploy = async () => {
+    if (!selectedModel) return
+    setDeployLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`${backendUrl}/text/deploy`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ model_path: selectedModel }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.detail || 'Failed to deploy model')
+      }
+      await fetchContainers()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to deploy model')
+    } finally {
+      setDeployLoading(false)
+    }
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'healthy':
@@ -105,6 +140,24 @@ export default function Dashboard() {
         <Title order={2}>Dashboard - Verda Deployments</Title>
         <Button variant="light" onClick={fetchContainers}>
           Refresh
+        </Button>
+      </Group>
+
+      <Group align="end" gap="sm">
+        <Select
+          label="Deploy a model"
+          placeholder="Select model"
+          data={textModelOptions}
+          value={selectedModel}
+          onChange={setSelectedModel}
+          style={{ minWidth: 220 }}
+        />
+        <Button
+          onClick={handleDeploy}
+          disabled={!selectedModel}
+          loading={deployLoading}
+        >
+          Deploy
         </Button>
       </Group>
 

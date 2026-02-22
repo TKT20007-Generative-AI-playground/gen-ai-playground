@@ -8,7 +8,6 @@ import History from "./components/History";
 import { useAuth } from './context/AuthContext'
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
-import { Navigate } from 'react-router-dom'
 
 function App() {
   const { isLoggedIn } = useAuth()

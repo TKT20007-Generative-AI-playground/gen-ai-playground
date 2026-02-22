@@ -68,8 +68,6 @@ function parseModelReply(rawReply: string): {
 
 type ChatPanelProps = {
     panelId: 1 | 2
-    backendUrl: string
-    getAuthHeaders: () => Record<string, string>
     selectedModel: string | null
     onModelChange: (model: string | null) => void
     messages: Message[]
@@ -79,8 +77,6 @@ type ChatPanelProps = {
 
 function ChatPanel({
     panelId,
-    backendUrl,
-    getAuthHeaders,
     selectedModel,
     onModelChange,
     messages,
@@ -92,76 +88,6 @@ function ChatPanel({
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" })
     }, [messages, isLoading])
-
-    const findSelectedModel = () =>
-        modelOptions.find((m) => m.value === selectedModel) ?? null
-
-    const deployContainer = async () => {
-        if (!selectedModel) return
-        const selected = findSelectedModel()
-        if (!selected) return
-
-        try {
-            const deploymentsResponse = await axios.get(
-                `${backendUrl}/text/deployments`,
-                { headers: getAuthHeaders() }
-            )
-            const deployments = deploymentsResponse.data || []
-
-            console.log(deployments)
-
-            const existingContainer = deployments.find((d: Deployment) => {
-                const name = typeof d?.name === "string" ? d.name.toLowerCase() : ""
-                return name.includes(selected.slug.toLowerCase())
-            })
-
-            if (existingContainer) {
-                console.log("Found existing container for model:", existingContainer.name)
-
-                const connectResponse = await axios.post(
-                    `${backendUrl}/text/connect`,
-                    { deployment_name: existingContainer.name, model_path: selectedModel },
-                    { headers: getAuthHeaders() }
-                )
-                console.log(`Panel ${panelId}: Connected to existing container:`, connectResponse.data)
-                return connectResponse.data
-            }
-
-            console.log("No deployment found for model, creating new one...")
-
-            const response = await axios.post(
-                `${backendUrl}/text/deploy`,
-                { model_path: selectedModel },
-                { headers: getAuthHeaders() }
-            )
-            console.log(`Panel ${panelId}: Created new deployment:`, response.data)
-            return response.data
-        } catch (error) {
-            console.error(`Panel ${panelId} deploy error:`, error)
-        }
-    }
-
-    const deleteContainer = async () => {
-        try {
-            const response = await axios.delete(`${backendUrl}/text/deploy`, {
-                headers: getAuthHeaders()
-            })
-            console.log(`Panel ${panelId} delete:`, response.data)
-        } catch (error) {
-            console.error(`Panel ${panelId} delete error:`, error)
-        }
-    }
-
-    const checkContainerStatus = async () => {
-        try {
-            const response = await axios.get(`${backendUrl}/text/status`, {
-                headers: getAuthHeaders()
-            })
-            console.log(`Panel ${panelId} status:`, response.data)
-        } catch (error) {
-            console.error(`Panel ${panelId} status error:`, error)
-        }
-    }
 
     return (
         <div style={{ flex: "1 1 calc(50% - 10px)", minWidth: "320px", maxWidth: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>
@@ -178,15 +104,6 @@ function ChatPanel({
             />
 
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-                <Button size="xs" onClick={deployContainer} disabled={!selectedModel}>
-                    Deploy
-                </Button>
-                <Button size="xs" onClick={checkContainerStatus}>
-                    Status
-                </Button>
-                <Button size="xs" color="red" onClick={deleteContainer}>
-                    Delete
-                </Button>
                 <Button size="xs" color="orange" onClick={onClearMessages}>
                     Clear
                 </Button>
@@ -388,8 +305,6 @@ export default function TextGenerator() {
             }}>
                 <ChatPanel
                     panelId={1}
-                    backendUrl={backendUrl}
-                    getAuthHeaders={getAuthHeaders}
                     selectedModel={selectedModel1}
                     onModelChange={setSelectedModel1}
                     messages={messages1}
@@ -398,8 +313,6 @@ export default function TextGenerator() {
                 />
                 <ChatPanel
                     panelId={2}
-                    backendUrl={backendUrl}
-                    getAuthHeaders={getAuthHeaders}
                     selectedModel={selectedModel2}
                     onModelChange={setSelectedModel2}
                     messages={messages2}
