@@ -12,6 +12,7 @@ class ImageRequestBody(BaseModel):
     model: str
     image: Optional[str] = None  
     image_to_edit: Optional[str] = None
+    parent_image_id: Optional[str] = None
 
 
 class RegisterRequest(BaseModel):

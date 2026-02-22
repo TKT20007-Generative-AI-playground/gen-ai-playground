@@ -138,6 +138,7 @@ export default function ImageGenerator() {
               prompt: nextPrompt,
               model: model1,
               image_to_edit: imageToEdit ? base64FromHistoryImage(imageToEdit) : null,
+              parent_image_id: imageToEdit?.id ?? null,
             },
             {
               headers: {
@@ -158,6 +159,7 @@ export default function ImageGenerator() {
               prompt: nextPrompt,
               model: model2,
               image_to_edit: imageToEdit ? base64FromHistoryImage(imageToEdit) : null,
+              parent_image_id: imageToEdit?.id ?? null,
             },
             {
               headers: {
