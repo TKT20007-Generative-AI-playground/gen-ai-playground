@@ -27,6 +27,7 @@ export function PromptTextBox({ onSubmit, value, onChange, usage }: PromptTextBo
         minRows={3}
         maxRows={12}
         w="100%"
+        data-testid="prompt-input"
         styles={{
           input: { resize: "vertical" },
         }}

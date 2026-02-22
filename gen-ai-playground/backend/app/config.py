@@ -17,6 +17,11 @@ class Settings:
     # API Keys
     VERDA_API_KEY: str = os.getenv("VERDA_API_KEY")
     
+    # Verda SDK credentials (for container deployments)
+    VERDA_CLIENT_ID: str = os.getenv("VERDA_CLIENT_ID")
+    VERDA_CLIENT_SECRET: str = os.getenv("VERDA_CLIENT_SECRET")
+    HF_TOKEN: str = os.getenv("HF_TOKEN")
+    
     # JWT
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY")
     JWT_EXPIRY_HOURS: int = 24

@@ -69,7 +69,7 @@ export default function History() {
   if (loading)
     return (
       <Center mt="md">
-        <Loader />
+        <Loader data-testid="history-loader"/>
       </Center>
     );
 
@@ -86,7 +86,7 @@ export default function History() {
         <Stack gap="xl">
           {history.map((group, idx) => (
             <Stack key={idx} gap="md">
-              <Title order={4}>{group.prompt}</Title>
+              <Title order={4} data-testid={`prompt-${group.prompt}`}>{group.prompt}</Title>
 
               <div
                 style={{
@@ -141,6 +141,7 @@ export default function History() {
         {selectedImage && (
           <>
             <img
+      data-testid="modal-image"
               src={`data:image/${selectedImage.image_type || "png"};base64,${selectedImage.image_data}`}
               alt={selectedImage.prompt}
               style={{
