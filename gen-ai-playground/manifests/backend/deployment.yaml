@@ -57,6 +57,11 @@ spec:
                 secretKeyRef:
                   name: verda-api-secret
                   key: VERDA_CLIENT_ID
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token-secret
+                  key: HF_TOKEN
                 
           resources:
             limits:
