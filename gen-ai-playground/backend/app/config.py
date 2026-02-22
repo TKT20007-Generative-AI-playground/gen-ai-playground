@@ -16,6 +16,7 @@ class Settings:
     
     # API Keys
     VERDA_API_KEY: str = os.getenv("VERDA_API_KEY")
+    VERDA_INFERENCE_KEY: str = os.getenv("VERDA_INFERENCE_KEY") or os.getenv("VERDA_API_KEY")
     
     # Verda SDK credentials (for container deployments)
     VERDA_CLIENT_ID: str = os.getenv("VERDA_CLIENT_ID")
@@ -38,6 +39,11 @@ class Settings:
         "FLUX1_KREA_DEV": "https://inference.datacrunch.io/flux-krea-dev/runsync",
         "FLUX2_KLEIN_9B": "https://inference.datacrunch.io/flux2-klein-9b/generate",
         "FLUX2_KLEIN_4B": "https://inference.datacrunch.io/flux2-klein-4b/generate"
+    }
+    TEXT_MODEL_PATHS = {
+        "deepseek-llm-7b": "deepseek-ai/deepseek-llm-7b-chat",
+        "Llama-3.1-8B": "meta-llama/Llama-3.1-8B-Instruct",
+        "Qwen3-8B": "Qwen/Qwen3-8B"
     }
 
 

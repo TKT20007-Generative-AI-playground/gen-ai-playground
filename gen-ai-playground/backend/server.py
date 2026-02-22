@@ -37,9 +37,3 @@ app.include_router(text.router)
 def read_root():
     """Health check endpoint"""
     return {"message": "Gen AI Playground Backend API", "status": "running"}
-
-
-
-
-
-    
