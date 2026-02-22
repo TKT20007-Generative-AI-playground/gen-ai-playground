@@ -13,6 +13,8 @@ import {
 import { useNavigate } from "react-router-dom";
 
 interface ImageRecord {
+  id: number;
+  parent_image_id?: number| null;
   prompt: string;
   model: string;
   timestamp: string;
@@ -52,7 +54,7 @@ export default function History() {
 
         const grouped = Object.keys(groups).map((prompt) => ({
           prompt,
-          images: groups[prompt], // alkuperäinen + mahdollinen edit-kuva
+          images: groups[prompt], 
         }));
 
         setHistory(grouped);
@@ -93,7 +95,6 @@ export default function History() {
                   gap: "16px",
                 }}
               >
-                {/* Alkuperäinen kuva */}
                 <Stack gap="xs" align="center">
                   <img
                     src={`data:image/${group.images[0].image_type || "png"};base64,${group.images[0].image_data}`}
@@ -109,7 +110,6 @@ export default function History() {
                   <Badge variant="light">{group.images[0].model}</Badge>
                 </Stack>
 
-                {/* Edit-kuva, jos sellainen on */}
                 {group.images[1] && (
                   <Stack gap="xs" align="center">
                     <img
