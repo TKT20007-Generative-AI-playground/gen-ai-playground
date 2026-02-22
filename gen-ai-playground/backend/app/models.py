@@ -1,9 +1,9 @@
 """
 Pydantic models for request and response validation
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 
 class ImageRequestBody(BaseModel):
@@ -57,3 +57,67 @@ class HistoryResponse(BaseModel):
 class UserInfo(BaseModel):
     """Model for authenticated user information"""
     username: str
+
+
+# ---- Text generation models ----
+
+class DeployModelRequest(BaseModel):
+    """Request model for deploying a text model on Verda"""
+    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
+    deployment_name: Optional[str] = None
+
+
+class ConnectDeploymentRequest(BaseModel):
+    """Request model for connecting to an existing deployment"""
+    deployment_name: str
+    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
+
+
+class DeploymentStatusResponse(BaseModel):
+    """Response model for deployment status"""
+    name: Optional[str] = None
+    status: str
+    model: Optional[str] = None
+    healthy: Optional[bool] = None
+    message: Optional[str] = None
+
+
+class TextGenerateRequest(BaseModel):
+    """Request model for text generation"""
+    deployment_name: str
+    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
+    prompt: str
+    max_tokens: int = 256
+    temperature: float = 0.7
+    top_p: float = 0.9
+
+
+class TextGenerateResponse(BaseModel):
+    """Response model for text generation"""
+    generated_text: str
+    model: str
+    prompt: str
+    usage: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ChatMessage(BaseModel):
+    """A single chat message"""
+    role: str  # 'user', 'assistant', or 'system'
+    content: str
+
+
+class ChatRequest(BaseModel):
+    """Request model for chat completions"""
+    deployment_name: str
+    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
+    messages: List[ChatMessage]
+    max_tokens: int = 256
+    temperature: float = 0.7
+    top_p: float = 0.9
+
+
+class ChatResponse(BaseModel):
+    """Response model for chat completions"""
+    reply: str
+    model: str
+    usage: Dict[str, Any] = Field(default_factory=dict)
