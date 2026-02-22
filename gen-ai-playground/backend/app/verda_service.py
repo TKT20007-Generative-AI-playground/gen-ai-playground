@@ -66,14 +66,9 @@ class VerdaService:
                 raise RuntimeError(
                     "VERDA_CLIENT_ID and VERDA_CLIENT_SECRET must be set in environment"
                 )
-            if not settings.VERDA_API_KEY:
-                raise RuntimeError(
-                    "VERDA_API_KEY must be set in environment for inference requests"
-                )
             self._client = VerdaClient(
                 client_id=settings.VERDA_CLIENT_ID,
                 client_secret=settings.VERDA_CLIENT_SECRET,
-                inference_key=settings.VERDA_API_KEY,
             )
         return self._client
 
@@ -749,7 +744,11 @@ class VerdaService:
 
     def list_deployments(self) -> list[dict]:
         """List all existing container deployments."""
-        client = self._get_client()
+        try:
+            client = self._get_client()
+        except RuntimeError as e:
+            print(f"Verda client not configured: {e}")
+            return []
         try:
             deployments = client.containers.get_deployments()
             return [

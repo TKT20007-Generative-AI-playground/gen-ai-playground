@@ -16,6 +16,7 @@ class Settings:
     
     # API Keys
     VERDA_API_KEY: str = os.getenv("VERDA_API_KEY")
+    VERDA_INFERENCE_KEY: str = os.getenv("VERDA_INFERENCE_KEY") or os.getenv("VERDA_API_KEY")
     
     # Verda SDK credentials (for container deployments)
     VERDA_CLIENT_ID: str = os.getenv("VERDA_CLIENT_ID")

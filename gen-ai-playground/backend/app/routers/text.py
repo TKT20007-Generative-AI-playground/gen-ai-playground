@@ -158,6 +158,8 @@ def list_deployments(
     try:
         return verda_service.list_deployments()
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
