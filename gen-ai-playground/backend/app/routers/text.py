@@ -12,6 +12,7 @@ from pymongo.database import Database
 from datetime import datetime
 from typing import Optional
 
+
 from app.database import get_database
 from app.dependencies import get_current_user
 from app.models import (
@@ -25,6 +26,7 @@ from app.models import (
     UserInfo,
 )
 from app.verda_service import verda_service
+from app.config import settings
 
 
 router = APIRouter(
@@ -52,11 +54,29 @@ def deploy_model(
         Deployment status information
     """
     print(f"User {current_user.username} requesting model deployment: {request.model_path}")
+    model_path = choose_text_model_path(request.model_path)
+    print("MODEL PATH: ", model_path)
+    
+    
     try:
-        result = verda_service.deploy_model(
-            model_path=request.model_path,
+        if model_path == "deepseek-ai/deepseek-llm-7b-chat":
+            print("Deploying deepseek-llm-7b-chat with optimized settings for 7B models")
+            result = verda_service.deploy_model(
+            model_path=model_path,
             deployment_name=request.deployment_name,
-        )
+            )
+        elif model_path == "Qwen/Qwen3-8B":
+            print("Deploying Qwen3-8B with optimized settings for 8B models")
+            result = verda_service.deploy_from_template(
+                template_json="qwen3-sglang.json")
+        elif model_path == "Qwen/Qwen3-32B":
+            print("Deploying Qwen3-32B with optimized settings for 32B models")
+            result = verda_service.deploy_from_template(
+                template_json="qwen3-sglang-think.json")
+            # result = verda_service.deploy_second_model(
+            #     model_path=model_path,
+            #     deployment_name=request.deployment_name,
+            # )
         return DeploymentStatusResponse(**result)
     except RuntimeError as e:
         print(f"Deploy RuntimeError: {e}")
@@ -91,7 +111,7 @@ def connect_to_deployment(
     try:
         result = verda_service.connect_to_existing(
             deployment_name=request.deployment_name,
-            model_path=request.model_path,
+            model_path=choose_text_model_path(request.model_path),
         )
         if result.get("status") == "error":
             raise HTTPException(status_code=404, detail=result.get("message", "Deployment not found"))
@@ -100,6 +120,18 @@ def connect_to_deployment(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+def choose_text_model_path(model: str) -> str:
+    model = model.strip()
+
+    try:
+        return settings.TEXT_MODEL_PATHS[model]
+    except KeyError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported model: {model}. "
+                   f"Supported models: {list(settings.TEXT_MODEL_PATHS.keys())}" # for better debugging and user feedback
+        )
 
 
 @router.get("/status", response_model=DeploymentStatusResponse)
@@ -134,6 +166,8 @@ def list_deployments(
     try:
         return verda_service.list_deployments()
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -205,8 +239,12 @@ def generate_text(
         )
 
     except RuntimeError as e:
+        print(f"Generate RuntimeError: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Generate unexpected error: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Text generation failed: {str(e)}",

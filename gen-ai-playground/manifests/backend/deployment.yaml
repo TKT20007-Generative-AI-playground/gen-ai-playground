@@ -47,6 +47,22 @@ spec:
                 secretKeyRef:
                   name: jwt-secret
                   key: JWT_SECRET_KEY
+            - name: VERDA_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: verda-api-secret
+                  key: VERDA_CLIENT_SECRET
+            - name: VERDA_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: verda-api-secret
+                  key: VERDA_CLIENT_ID
+            - name: HF_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hf-token-secret
+                  key: HF_TOKEN
+                
           resources:
             limits:
               memory: "512Mi"

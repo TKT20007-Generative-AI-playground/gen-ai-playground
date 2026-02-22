@@ -1,180 +1,198 @@
-import { useState } from "react"
-import { PromptTextBox } from "./PromtTextBox"
+import { useEffect, useRef, useState } from "react"
+import { PromptTextBox } from "./PromptTextBox"
 import axios from "axios"
-import { useAuth } from "../context/AuthContext"
-import {
-  Loader,
-  Card,
-  Text,
-  Image,
-  MultiSelect,
-  SimpleGrid
-} from '@mantine/core'
+import type { AxiosResponse } from "axios"
+import { Text, SimpleGrid, Stack } from "@mantine/core"
+import { MODELS, getModelDisplayName } from "../constants/models"
+import ModelSelector from "./ModelSelector"
+import PhotoArea from "./PhotoArea"
+import GeneratingText from "./GeneratingText"
 
-
-/**
- * ImageGenerator component (page) allows users to input a prompt for image generation.
- * contains a PromtTextBox component for user input and also display area component.
- */
-
+type SelectedModels = [string | null, string | null]
 
 export default function ImageGenerator() {
-  const { isLoggedIn } = useAuth()
+
   const [prompt, setPrompt] = useState("")
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageUrl2, setImageUrl2] = useState<string | null>(null)
-  const [selectedModels, setSelectedModels] = useState<string[]>([])
-  const backendUrl = import.meta.env.VITE_API_URL
+  const [selectedModels, setSelectedModels] = useState<SelectedModels>([null, null])
   const [isLoading, setIsLoading] = useState(false)
-  const models = [
-    "FLUX1_KONTEXT_DEV",
-    "FLUX1_KREA_DEV",
-    "FLUX2_KLEIN_9B",
-    "FLUX2_KLEIN_4B"
-  ] //TODO: Add more models
 
-  if (!isLoggedIn) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          textAlign: "center",
-          padding: 40,
-        }}
-      >
-        <p>You must be logged in to generate images.</p>
-      </div>
-    )
+  // Keep refs to the latest URLs so we can revoke them on unmount
+  const imageUrlRef = useRef<string | null>(null)
+  const imageUrl2Ref = useRef<string | null>(null)
+
+  const backendUrl = import.meta.env.VITE_API_URL
+  const models = MODELS
+
+  const SELECTOR_WIDTH = 500
+  const CONTROLS_MAX_WIDTH = 1100
+  const PROMPT_MAX_WIDTH = CONTROLS_MAX_WIDTH
+
+  function setModelAtIndex(index: 0 | 1, value: string | null) {
+    setSelectedModels((prev) => {
+      const next: SelectedModels = [...prev] as SelectedModels
+      next[index] = value
+      return next
+    })
   }
 
-  //function to fetch generated images from backend
-  async function fetchTwoGeneratedImages() {
-    // make both image urls null before fetching new ones
-    if (imageUrl) {
-      setImageUrl(null)
+  const model1 = selectedModels[0] ?? undefined
+  const model2 = selectedModels[1] ?? undefined
+
+  // One-time unmount cleanup
+  useEffect(() => {
+    return () => {
+      if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current)
+      if (imageUrl2Ref.current) URL.revokeObjectURL(imageUrl2Ref.current)
     }
-    if (imageUrl2) {
-      setImageUrl2(null)
-    }
-    //set loading state true
+  }, [])
+
+  function replaceImageUrl(next: string | null) {
+    setImageUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      imageUrlRef.current = next
+      return next
+    })
+  }
+
+  function replaceImageUrl2(next: string | null) {
+    setImageUrl2((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      imageUrl2Ref.current = next
+      return next
+    })
+  }
+
+  async function fetchTwoGeneratedImages(nextPrompt: string) {
+    setPrompt(nextPrompt)
+
+    // Clear previous results (this revokes old URLs too)
+    replaceImageUrl(null)
+    replaceImageUrl2(null)
+
     setIsLoading(true)
 
-    if (selectedModels.length === 0) {
-      alert("please select at least one model!")
+    if (!model1 && !model2) {
+      alert("Please select a model")
       setIsLoading(false)
       return
     }
 
     try {
-      console.log("Fetching generated images for prompt:", prompt)
+      const promises: Promise<AxiosResponse<Blob>>[] = []
 
-      const promises = []
-
-      if (selectedModels[0]) {
+      if (model1) {
         promises.push(
-          axios.post(`${backendUrl}/images/generate`, {
-            prompt: prompt,
-            model: selectedModels[0]
-          }, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-              "Content-Type": "application/json"
-            },
-            responseType: 'blob'
-          })
+          axios.post(
+            `${backendUrl}/images/generate`,
+            { prompt: nextPrompt, model: model1 },
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                "Content-Type": "application/json",
+              },
+              responseType: "blob",
+            }
+          )
         )
       }
 
-      if (selectedModels[1]) {
+      if (model2) {
         promises.push(
-          axios.post(`${backendUrl}/images/generate`, {
-            prompt: prompt,
-            model: selectedModels[1]
-          }, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-              "Content-Type": "application/json"
-            },
-            responseType: 'blob'
-          })
+          axios.post(
+            `${backendUrl}/images/generate`,
+            { prompt: nextPrompt, model: model2 },
+            {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                "Content-Type": "application/json",
+              },
+              responseType: "blob",
+            }
+          )
         )
       }
 
       const results = await Promise.all(promises)
 
-      let resultIndex = 0
-      if (selectedModels[0]) {
-        const image = URL.createObjectURL(results[resultIndex].data)
-        setImageUrl(image)
-        resultIndex++
+      let idx = 0
+      if (model1) {
+        const url = URL.createObjectURL(results[idx].data)
+        replaceImageUrl(url)
+        idx++
       }
-
-      if (selectedModels[1]) {
-        const image = URL.createObjectURL(results[resultIndex].data)
-        setImageUrl2(image)
+      if (model2) {
+        const url2 = URL.createObjectURL(results[idx].data)
+        replaceImageUrl2(url2)
       }
-
-    } catch (error) {
-      console.error("Error fetching generated image:", error)
+    } catch (err) {
+      console.error(err)
     } finally {
       setIsLoading(false)
     }
   }
+
   return (
-    // styles are only for better visibility at this moment
-    <>
-      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: "100%", alignItems: "center" }}>
-        <MultiSelect
-          label="Select models to generate images with, max 2"
-          placeholder={selectedModels.length > 0 ? `${selectedModels.length} model(s) selected` : "Select model(s)"}
-          data={models}
-          maxValues={2}
-          onChange={setSelectedModels}
-        />
-        <PromptTextBox onSubmit={fetchTwoGeneratedImages}
-          value={prompt}
-          onChange={setPrompt}
-          usage="Create image" />
-        <p>prompt: {prompt}</p>
-      </div >
-      <div style={{
-        display: "flex",
-        justifyContent: "center",
-      }}>
-        {isLoading &&
-          <><p>Generating images...</p><Loader /></>
-        }
-        {imageUrl === null && imageUrl2 === null && !isLoading && <p>Generated images will appear here</p>}
+    <Stack align="center" w="100%" gap="md">
+      <div style={{ width: "100%", maxWidth: CONTROLS_MAX_WIDTH }}>
+        <Text size="sm" c="dimmed" mb={6}>
+          Select at least 1 model for image generation
+        </Text>
+
         <SimpleGrid
-          cols={{ base: 1, md: imageUrl && imageUrl2 ? 2 : 1 }}
-          spacing="md"
+          cols={{ base: 1, md: 2 }}
+          spacing={18}
+          style={{ justifyItems: "center" }}
         >
-          {imageUrl && (
-            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ maxWidth: 500 }}>
-              <Text fw={500} size="lg" mb="md">Model used: {selectedModels[0]}</Text>
-              <Image
-                src={imageUrl}
-                alt="Generated image"
-                fit="contain"
+          <ModelSelector
+            label="Model 1"
+            models={models}
+            value={model1}
+            onChange={(value) => setModelAtIndex(0, value)}
+            width={SELECTOR_WIDTH}
+          />
 
-              />
-            </Card>
-          )}
-
-          {imageUrl2 && (
-            <Card shadow="sm" padding="lg" radius="md" withBorder style={{ maxWidth: 500 }}>
-              <Text fw={500} size="lg" mb="md">Model used: {selectedModels[1]}</Text>
-              <Image
-                src={imageUrl2}
-                alt="Generated image 2"
-                fit="contain"
-              />
-            </Card>
-          )}
+          <ModelSelector
+            label="Model 2"
+            models={models}
+            value={model2}
+            onChange={(value) => setModelAtIndex(1, value)}
+            width={SELECTOR_WIDTH}
+            placeholder="Select model (optional)"
+          />
         </SimpleGrid>
       </div>
-    </>
+
+      <div style={{ width: "100%", maxWidth: PROMPT_MAX_WIDTH }}>
+        <PromptTextBox onSubmit={fetchTwoGeneratedImages} value={prompt} onChange={setPrompt} usage="Create image" />
+      </div>
+
+      {isLoading && <GeneratingText baseText="Generating image" />}
+
+      {(imageUrl || imageUrl2) && (
+        <div style={{ width: "100%", maxWidth: CONTROLS_MAX_WIDTH }}>
+          <SimpleGrid cols={{ base: 1, md: imageUrl && imageUrl2 ? 2 : 1 }} spacing="md">
+            {imageUrl && (
+              <PhotoArea
+                src={imageUrl}
+                alt="Generated image 1"
+                header={<Text fw={600}>Model: {getModelDisplayName(model1)}</Text>}
+                height={420}
+              />
+            )}
+
+            {imageUrl2 && (
+              <PhotoArea
+                src={imageUrl2}
+                alt="Generated image 2"
+                header={<Text fw={600}>Model: {getModelDisplayName(model2)}</Text>}
+                height={420}
+              />
+            )}
+          </SimpleGrid>
+        </div>
+      )}
+    </Stack>
   )
 }

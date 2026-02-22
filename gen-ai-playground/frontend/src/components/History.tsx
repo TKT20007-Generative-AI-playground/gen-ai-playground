@@ -1,77 +1,148 @@
 import { useEffect, useState } from "react";
-
+import {
+  Stack,
+  Title,
+  Text,
+  Badge,
+  ScrollArea,
+  Loader,
+  Center,
+  Modal
+} from "@mantine/core";
 
 interface ImageRecord {
-  prompt: string
-  model: string
-  timestamp: string
-  image_data: string
-  image_type: string | null | undefined
+  prompt: string;
+  model: string;
+  timestamp: string;
+  image_data: string;
+  image_type: string | null | undefined;
 }
 
-interface PromtGroup {
-  prompt: string
-  images: ImageRecord[]
+interface PromptGroup {
+  prompt: string;
+  images: ImageRecord[];
 }
-const backendUrl = import.meta.env.VITE_API_URL
+
+const backendUrl = import.meta.env.VITE_API_URL;
 
 export default function History() {
-  const [history, setHistory] = useState<PromtGroup[]>([]);
+  const [history, setHistory] = useState<PromptGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
 
   useEffect(() => {
     fetch(`${backendUrl}/images/history`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json"
-      }
+        "Content-Type": "application/json",
+      },
     })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         const groups: { [prompt: string]: ImageRecord[] } = {};
+
         (data.history || []).forEach((item: ImageRecord) => {
-          if (!groups[item.prompt]) groups[item.prompt] = []
-          groups[item.prompt].push(item)
+          if (!groups[item.prompt]) groups[item.prompt] = [];
+          groups[item.prompt].push(item);
         });
-        const grouped = Object.keys(groups).map(prompt => ({
+
+        const grouped = Object.keys(groups).map((prompt) => ({
           prompt,
           images: groups[prompt],
         }));
+
         setHistory(grouped);
         setLoading(false);
       })
-      .catch(err => {
-        console.error("Failed to fetch history:", err)
+      .catch((err) => {
+        console.error("Failed to fetch history:", err);
         setLoading(false);
       });
   }, []);
 
+  if (loading)
+    return (
+      <Center mt="md">
+        <Loader />
+      </Center>
+    );
 
-  if (loading) return <p>Loading history...</p>
-  if (history.length === 0) return <p>No history to show.</p>
+  if (history.length === 0)
+    return (
+      <Center mt="md">
+        <Text c="dimmed">No history to show.</Text>
+      </Center>
+    );
 
   return (
-    <div>
-      <h2>History</h2>
-      {history.map((group, idx) => (
-        <div key={idx} style={{ marginBottom: "2rem" }}>
-          <h3>{group.prompt}</h3>
-          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-            {group.images.map((item, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <img
-                  src={`data:image/png;base64,${item.image_data}`}
-                  alt={item.prompt}
-                  style={{ maxWidth: "200px", maxHeight: "200px", objectFit: "contain" }}
-                />
-                <p>Model: {item.model}</p>
-                <p>Time: {new Date(item.timestamp).toLocaleString()}</p>
-                <p>Type: {item.image_type} </p>
-              </div>
-            ))}
-          </div>
+    <>
+<ScrollArea h="100%">
+  <Stack gap="xl">
+
+    {history.map((group, idx) => (
+      <Stack key={idx} gap="md">
+
+        <Title order={4}>{group.prompt}</Title>
+
+        <div
+          style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "16px",
+          }}
+        >
+          {group.images.map((item, i) => (
+            <Stack key={i} gap="xs" align="center">
+              <img
+                src={`data:image/${item.image_type || "png"};base64,${item.image_data}`}
+                alt={item.prompt}
+                style={{
+                width: "100%",
+                aspectRatio: "1 / 1",
+                objectFit: "cover",
+                cursor: "pointer",
+                }}
+                onClick={() => setSelectedImage(item)}
+              />
+
+              <Badge variant="light">{item.model}</Badge>
+
+              <Text size="xs" c="dimmed">
+                {new Date(item.timestamp).toLocaleString()}
+              </Text>
+
+              <Text size="xs">
+                Type: {item.image_type || "generated"}
+              </Text>
+            </Stack>
+          ))}
         </div>
-      ))}
-    </div>
+
+
+      </Stack>
+    ))}
+
+  </Stack>
+</ScrollArea>
+<Modal
+  opened={!!selectedImage}
+  onClose={() => setSelectedImage(null)}
+  centered
+  size="lg"
+>
+  {selectedImage && (
+    <img
+      src={`data:image/${selectedImage.image_type || "png"};base64,${selectedImage.image_data}`}
+      alt={selectedImage.prompt}
+      style={{
+        width: "100%",
+        height: "auto",
+        maxHeight: "80vh",
+        objectFit: "contain",
+      }}
+    />
+  )}
+</Modal>
+</>
   );
 }

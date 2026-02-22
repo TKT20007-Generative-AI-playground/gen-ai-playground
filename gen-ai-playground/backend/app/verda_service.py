@@ -10,8 +10,10 @@ held on the instance.  Callers must pass ``deployment_name`` and
 workers, and concurrent requests.
 """
 import time
+import json
 from datetime import datetime
 from typing import Optional
+from pathlib import Path
 
 from verda import VerdaClient
 from verda.containers import (
@@ -28,6 +30,8 @@ from verda.containers import (
     ScalingPolicy,
     ScalingTriggers,
     UtilizationScalingTrigger,
+    VolumeMount,
+    VolumeMountType,
 )
 from verda.exceptions import APIException
 
@@ -36,7 +40,10 @@ from app.config import settings
 
 # Default model configuration
 DEFAULT_MODEL = "deepseek-ai/deepseek-llm-7b-chat"
+SECOND_MODEL = "Qwen/Qwen3-8B"
 SGLANG_IMAGE = "docker.io/lmsysorg/sglang:v0.4.1.post6-cu124"
+SGLANG_IMAGE_QWEN = "docker.io/lmsysorg/sglang:v0.5.8.post1-cu129-amd64-runtime"
+DEFAULT_IMAGE =  "docker.io/lmsysorg/sglang:v0.5.6.post2-cu129-amd64"
 HF_SECRET_NAME = "huggingface-token"
 APP_PORT = 30000
 DEFAULT_COMPUTE = "L40S"  # 48GB VRAM, good for 7B models
@@ -96,6 +103,256 @@ class VerdaService:
         except APIException as e:
             raise RuntimeError(f"Failed to manage HuggingFace secret: {e}")
 
+    def _generate_command_from_template(self, cfg) -> list[str]:
+        """Build the SGLang/vLLM launch command from a TemplateConfig."""
+        host = cfg.host or "0.0.0.0"
+        port = cfg.port or APP_PORT
+
+        if cfg.engine == "sglang":
+            cmd = [
+                "python3", "-m", "sglang.launch_server",
+                "--model-path", cfg.model,
+                "--host", host,
+                "--port", str(port),
+            ]
+            # generate CLI flags from SGLangConfig fields (model_templastes)
+            # field_name -> --field-name  
+            if cfg.sglang:
+                for field_name, value in cfg.sglang.model_dump(exclude_none=True).items():
+                    flag = f"--{field_name.replace('_', '-')}"
+                    if isinstance(value, bool):
+                        if value:
+                            cmd.append(flag)
+                    else:
+                        cmd += [flag, str(value)]
+
+            if cfg.model_loader_extra_config:
+                config_json = json.dumps(cfg.model_loader_extra_config, separators=(',', ':'))
+                cmd += ["--model-loader-extra-config", config_json]
+            if cfg.trust_remote_code:
+                cmd.append("--trust-remote-code")
+
+            return cmd
+
+        elif cfg.engine == "vllm":
+            cmd = [
+                "python3", "-m", "vllm.entrypoints.openai.api_server",
+                "--model", cfg.model,
+                "--host", host,
+                "--port", str(port),
+            ]
+            if cfg.vllm:
+                for field_name, value in cfg.vllm.model_dump(exclude_none=True).items():
+                    flag = f"--{field_name.replace('_', '-')}"
+                    if isinstance(value, bool):
+                        if value:
+                            cmd.append(flag)
+                    else:
+                        cmd += [flag, str(value)]
+                if cfg.model_loader_extra_config:
+                    config_json = json.dumps(cfg.model_loader_extra_config, separators=(',', ':'))
+                    cmd += ["--model-loader-extra-config", config_json]
+            if cfg.trust_remote_code:
+                cmd.append("--trust-remote-code")
+            return cmd
+
+        elif cfg.engine == "custom":
+            # Custom engine: caller must provide image; no default command
+            raise RuntimeError("Custom engine templates must provide their own entrypoint via the image")
+
+        else:
+            raise RuntimeError(f"Unsupported engine: {cfg.engine}")
+
+    def _resolve_image_from_template(self, cfg) -> str:
+        """Resolve the Docker image from a TemplateConfig."""
+        SGLANG_DEFAULT_IMAGE = "docker.io/lmsysorg/sglang"
+        VLLM_DEFAULT_IMAGE = "docker.io/vllm/vllm-openai"
+        SGLANG_DEFAULT_TAG = "v0.5.8.post1-cu129-amd64-runtime"
+        VLLM_DEFAULT_TAG = "v0.13.0"
+
+        
+        if cfg.engine == "sglang":
+            tag = cfg.image_tag or SGLANG_DEFAULT_TAG
+            return f"{SGLANG_DEFAULT_IMAGE}:{tag}"
+
+        elif cfg.engine == "vllm":
+            tag = cfg.image_tag or VLLM_DEFAULT_TAG
+            return f"{VLLM_DEFAULT_IMAGE}:{tag}"
+
+        elif cfg.engine == "custom":
+            if not cfg.custom or not cfg.custom.image:
+                raise RuntimeError("No image specified for custom engine")
+            image = cfg.custom.image
+            if ":" not in image and cfg.image_tag:
+                image = f"{image}:{cfg.image_tag}"
+            return image
+
+        raise RuntimeError(f"Cannot resolve image for engine: {cfg.engine}")
+
+    def deploy_from_template(
+        self,
+        template_json: str,
+        deployment_name: Optional[str] = None,
+        gpu_type: Optional[str] = None,
+    ) -> dict:
+        """
+        Deploy a model from a JSON template config (TemplateConfig).
+
+        Args:
+            template_json: JSON string matching TemplateConfig schema.
+            deployment_name: Custom deployment name. Auto-generated if not provided.
+            gpu_type: Override GPU type (e.g. 'L40S'). Uses template gpu_types or DEFAULT_COMPUTE.
+
+        Returns:
+            dict with deployment info (name, status, model)
+        """
+        from app.template_models import TemplateConfig
+
+        # Parse and validate template
+        try:
+            from pathlib import Path
+            template_path = Path(__file__).resolve().parent.parent / "templates" / template_json
+            cfg = TemplateConfig.model_validate_json(
+                template_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            raise RuntimeError(f"Invalid template config: {e}")
+        
+        print(f"Parsed template config: {cfg}")
+
+        cfg.host = "0.0.0.0"
+        if not cfg.port:
+            cfg.port = APP_PORT
+
+        client = self._get_client()
+        self._model_path = cfg.model
+
+        # Generate deployment name
+        if deployment_name is None:
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S").lower()
+            model_slug = cfg.model.split("/")[-1].lower()
+            deployment_name = f"{model_slug}-{timestamp}"
+        self._deployment_name = deployment_name
+
+        self._ensure_hf_secret()
+
+        # Resolve GPU
+        gpu_count = 1
+        if cfg.engine == "sglang" and cfg.sglang and cfg.sglang.tp:
+            gpu_count = cfg.sglang.tp
+        elif cfg.engine == "vllm" and cfg.vllm and cfg.vllm.tensor_parallel_size:
+            gpu_count = cfg.vllm.tensor_parallel_size
+            
+        #L40S is good and cheap option 
+        if cfg.gpu_types and "l40s" in cfg.gpu_types:
+            compute_name = "L40S"
+        else:
+            compute_name = gpu_type or (cfg.gpu_types[0].upper() if cfg.gpu_types else DEFAULT_COMPUTE)
+
+        # Build launch command
+        cmd = self._generate_command_from_template(cfg)
+
+        # Resolve image
+        image = self._resolve_image_from_template(cfg)
+
+        print(f"Deploying from template...")
+        print(f"  Model: {cfg.model}")
+        print(f"  Engine: {cfg.engine}")
+        print(f"  Image: {image}")
+        print(f"  GPU: {gpu_count} + {compute_name}")
+        print(f"  Command: {' '.join(cmd)}")
+
+        # Build Verda container
+        container = Container(
+            image=image,
+            exposed_port=cfg.port,
+            healthcheck=HealthcheckSettings(
+                enabled=True, port=cfg.port, path="/health"
+            ),
+            entrypoint_overrides=EntrypointOverridesSettings(
+                enabled=True,
+                cmd=cmd,
+            ),
+            env=[
+                EnvVar(
+                    name="HF_TOKEN",
+                    value_or_reference_to_secret=HF_SECRET_NAME,
+                    type=EnvVarType.SECRET,
+                ),
+                EnvVar(
+                    name="NCCL_DEBUG",
+                    value_or_reference_to_secret="INFO",
+                    type=EnvVarType.PLAIN,
+                ),
+                # EnvVar(
+                #     name="NCCL_IB_DISABLE",
+                #     value_or_reference_to_secret="1",
+                #     type=EnvVarType.PLAIN,
+                # ),
+                # EnvVar(
+                #     name="NCCL_P2P_DISABLE",
+                #     value_or_reference_to_secret="1",
+                #     type=EnvVarType.PLAIN,
+                # ),
+                # EnvVar(
+                #     name="NCCL_SHM_DISABLE",
+                #     value_or_reference_to_secret="0",
+                #     type=EnvVarType.PLAIN,
+                # ),
+                # EnvVar(
+                #     name="NCCL_NET_GDR_LEVEL",
+                #     value_or_reference_to_secret="0",
+                #     type=EnvVarType.PLAIN,
+                # ),
+            ],
+            # for bigger models->
+            volume_mounts=[VolumeMount(
+                type=VolumeMountType.MEMORY,
+                mount_path="/dev/shm",
+                size_in_mb=2048,
+            )],
+        )
+
+        scaling_options = ScalingOptions(
+            min_replica_count=1,
+            max_replica_count=3,
+            scale_down_policy=ScalingPolicy(delay_seconds=300),
+            scale_up_policy=ScalingPolicy(delay_seconds=0),
+            queue_message_ttl_seconds=500,
+            concurrent_requests_per_replica=32,
+            scaling_triggers=ScalingTriggers(
+                queue_load=QueueLoadScalingTrigger(threshold=1),
+                cpu_utilization=UtilizationScalingTrigger(
+                    enabled=True, threshold=90
+                ),
+                gpu_utilization=UtilizationScalingTrigger(
+                    enabled=True, threshold=90
+                ),
+            ),
+        )
+
+        compute = ComputeResource(name=compute_name, size=gpu_count)
+
+        deployment = Deployment(
+            name=deployment_name,
+            containers=[container],
+            compute=compute,
+            scaling=scaling_options,
+            is_spot=False,
+        )
+
+        created = client.containers.create_deployment(deployment)
+        self._deployment = created
+        self._initialized = True
+
+        print(f"Created deployment from template: {created.name}")
+        return {
+            "name": created.name,
+            "status": "deploying",
+            "model": cfg.model,
+            "message": f"Deployment created from template ({cfg.engine} engine). "
+                       "Model download and server startup may take several minutes.",
+        }
+
     def deploy_model(
         self,
         model_path: str = DEFAULT_MODEL,
@@ -116,7 +373,9 @@ class VerdaService:
         # Generate a unique deployment name if not provided
         if deployment_name is None:
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S").lower()
-            deployment_name = f"genai-playground-{timestamp}"
+            #deployment_name = f"genai-playground-{timestamp}"
+            deployment_name = f'{model_path.split("/")[-1].lower()}-{timestamp}'
+        self._deployment_name = deployment_name
 
         # Ensure HF secret exists
         self._ensure_hf_secret()
@@ -191,33 +450,139 @@ class VerdaService:
             "model": model_path,
             "message": "Deployment created. Model download and server startup may take several minutes.",
         }
-
-    def get_deployment_status(
+        
+    def deploy_second_model(
         self,
-        deployment_name: str,
-        model_path: str = DEFAULT_MODEL,
+        model_path: str = SECOND_MODEL,
+        deployment_name: Optional[str] = None,
     ) -> dict:
         """
-        Check the current status of a deployment.
+        Deploy an SGLang container with the specified LLM model on Verda.
         
         Args:
-            deployment_name: Name of the deployment to query.
-            model_path: Model identifier associated with the deployment.
-
+            model_path: HuggingFace model identifier (e.g. 'Qwen/Qwen3-8B')
+            deployment_name: Custom deployment name. Auto-generated if not provided.
+            
         Returns:
-            dict with deployment name and status
+            dict with deployment info (name, status, model)
         """
         client = self._get_client()
+        self._model_path = model_path
+
+        # Generate a unique deployment name if not provided
+        if deployment_name is None:
+            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S").lower()
+            #deployment_name = f"genai-playground-{timestamp}"
+            deployment_name = f'{model_path.split("/")[-1].lower()}-{timestamp}'
+        self._deployment_name = deployment_name
+
+        # Ensure HF secret exists
+        self._ensure_hf_secret()
+
+        # Create container configuration
+        # Use v0.5.8 image which natively supports Qwen3
+        container = Container(
+            image=SGLANG_IMAGE_QWEN,
+            exposed_port=APP_PORT,
+            healthcheck=HealthcheckSettings(
+                enabled=True, port=APP_PORT, path="/health"
+            ),
+            entrypoint_overrides=EntrypointOverridesSettings(
+                enabled=True,
+                cmd=[
+                    "python3",
+                    "-m",
+                    "sglang.launch_server",
+                    "--model-path",
+                    model_path,
+                    "--host",
+                    "0.0.0.0",
+                    "--port",
+                    str(APP_PORT),
+                    "--trust-remote-code",
+                ],
+            ),
+            env=[
+                EnvVar(
+                    name="HF_TOKEN",
+                    value_or_reference_to_secret=HF_SECRET_NAME,
+                    type=EnvVarType.SECRET,
+                )
+            ],
+        )
+
+        # Create scaling configuration (minimal for dev/playground use)
+        scaling_options = ScalingOptions(
+            min_replica_count=1,
+            max_replica_count=3,
+            scale_down_policy=ScalingPolicy(delay_seconds=300),
+            scale_up_policy=ScalingPolicy(delay_seconds=0),
+            queue_message_ttl_seconds=500,
+            concurrent_requests_per_replica=32,
+            scaling_triggers=ScalingTriggers(
+                queue_load=QueueLoadScalingTrigger(threshold=1),
+                cpu_utilization=UtilizationScalingTrigger(
+                    enabled=True, threshold=90
+                ),
+                gpu_utilization=UtilizationScalingTrigger(
+                    enabled=True, threshold=90
+                ),
+            ),
+        )
+
+        # General Compute = 24GB VRAM, sufficient for 7B models
+        compute = ComputeResource(name=DEFAULT_COMPUTE, size=1)
+
+        # Create deployment
+        deployment = Deployment(
+            name=deployment_name,
+            containers=[container],
+            compute=compute,
+            scaling=scaling_options,
+            is_spot=False,
+        )
+        
+        created = client.containers.create_deployment(deployment)
+        self._deployment = created
+        self._initialized = True
+        print(f"Created deployment: {created.name}")
+        return {
+            "name": created.name,
+            "status": "deploying",
+            "model": model_path,
+            "message": "Deployment created. Model download and server startup may take several minutes.",
+        }
+
+    # this will cause problems in the future
+    # need to find deployment with a name to be useful
+    def get_deployment_status(self) -> dict:
+        if not self._deployment_name:
+            return {"status": "no_deployment", "message": "No active deployment"}
+
+        client = self._get_client()
+
         try:
-            status = client.containers.get_deployment_status(deployment_name)
+            status = client.containers.get_deployment_status(self._deployment_name)
+
             return {
                 "name": deployment_name,
                 "status": status.value,
                 "model": model_path,
                 "healthy": status == ContainerDeploymentStatus.HEALTHY,
             }
+
         except APIException as e:
-            print(f"Error checking deployment status for '{deployment_name}': {e}")
+            print(f"Error checking deployment status for '{self._deployment_name}': {e}")
+
+            if "not_found" in str(e).lower():
+                self._deployment_name = None
+                self._model_path = None
+
+                return {
+                    "status": "no_deployment",
+                    "message": "Deployment no longer exists"
+                }
+
             return {
                 "name": deployment_name,
                 "status": "error",
@@ -250,7 +615,15 @@ class VerdaService:
         """
         client = self._get_client()
 
-        deployment = client.containers.get_deployment_by_name(deployment_name)
+        # Refresh the deployment object and attach inference client
+        print("Running inference on deployment:", self._deployment_name)
+        self._deployment = client.containers.get_deployment_by_name(
+            self._deployment_name
+        )
+        if settings.VERDA_INFERENCE_KEY:
+            self._deployment.set_inference_client(settings.VERDA_INFERENCE_KEY)
+        else:
+            print("No VERDA_INFERENCE_KEY set.")
 
         # Use OpenAI-compatible completions API (SGLang serves this)
         completions_data = {
@@ -290,6 +663,7 @@ class VerdaService:
         max_tokens: int = 256,
         temperature: float = 0.7,
         top_p: float = 0.9,
+        enable_thinking: bool = False,
     ) -> dict:
         """
         Chat with a deployed model using the OpenAI-compatible chat API.
@@ -306,7 +680,11 @@ class VerdaService:
             dict with the assistant's reply and metadata
         """
         client = self._get_client()
-        deployment = client.containers.get_deployment_by_name(deployment_name)
+        self._deployment = client.containers.get_deployment_by_name(
+            self._deployment_name
+        )
+        if settings.VERDA_INFERENCE_KEY:
+            self._deployment.set_inference_client(settings.VERDA_INFERENCE_KEY)
 
         chat_data = {
             "model": model_path,
@@ -314,6 +692,7 @@ class VerdaService:
             "max_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
+            "chat_template_kwargs": {"enable_thinking": enable_thinking},
         }
 
         response = deployment.run_sync(
@@ -349,15 +728,36 @@ class VerdaService:
         """
         client = self._get_client()
         try:
-            client.containers.delete_deployment(deployment_name)
-            print(f"Deleted deployment: {deployment_name}")
-            return {"status": "deleted", "name": deployment_name}
+            client.containers.delete_deployment(name)
+            self._deployment = None
+            self._deployment_name = None
+            self._initialized = False
+            print(f"Deleted deployment: {name}")
+            return {"status": "deleted", "name": name}
+        except json.JSONDecodeError as e:
+            print(f"JSONDecodeError when deleting {name}: {str(e)}")
+            self._deployment = None
+            self._deployment_name = None
+            self._initialized = False
+            return {
+                "status": "deleted", 
+                "name": name,
+                "message": "Deployment not found on Verda (may have been already deleted)"
+            }
         except APIException as e:
-            return {"status": "error", "name": deployment_name, "message": str(e)}
+            print(f"APIException when deleting {name}: {str(e)}")
+            return {"status": "error", "name": name, "message": str(e)}
+        except Exception as e:
+            print(f"Unexpected error when deleting {name}: {str(e)}")
+            return {"status": "error", "name": name, "message": str(e)}
 
     def list_deployments(self) -> list[dict]:
         """List all existing container deployments."""
-        client = self._get_client()
+        try:
+            client = self._get_client()
+        except RuntimeError as e:
+            print(f"Verda client not configured: {e}")
+            return []
         try:
             deployments = client.containers.get_deployments()
             return [
