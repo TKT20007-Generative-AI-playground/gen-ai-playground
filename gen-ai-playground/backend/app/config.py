@@ -43,7 +43,8 @@ class Settings:
     TEXT_MODEL_PATHS = {
         "deepseek-llm-7b": "deepseek-ai/deepseek-llm-7b-chat",
         "Llama-3.1-8B": "meta-llama/Llama-3.1-8B-Instruct",
-        "Qwen3-8B": "Qwen/Qwen3-8B"
+        "Qwen3-8B": "Qwen/Qwen3-8B",
+        "Qwen3-32B": "Qwen/Qwen3-32B"
     }
 
 
