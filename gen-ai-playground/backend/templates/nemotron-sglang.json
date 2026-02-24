@@ -1,0 +1,18 @@
+{
+  "engine": "sglang",
+  "model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-FP8",
+  "explanation": "NVIDIA Nemotron 3 Nano 30B with FP8 quantization. Configured with Nano V3 reasoning parser and Qwen3 Coder tool parser. Requires trust_remote_code.",
+  "short_explanation": "Nemotron 3 Nano 30B FP8 with reasoning and tools",
+  "trust_remote_code": true,
+  "gpu_types": ["h200", "b200"],
+  "model_loader_extra_config": {
+    "enable_multithread_load": true,
+    "num_threads": 8
+  },
+  "sglang": {
+    "tp": 4,
+    "kv_cache_dtype": "fp8_e4m3",
+    "reasoning_parser": "nano_v3",
+    "tool_call_parser": "qwen3_coder"
+  }
+}

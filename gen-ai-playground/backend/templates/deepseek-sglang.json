@@ -1,0 +1,16 @@
+{
+  "engine": "sglang",
+  "model": "deepseek-ai/DeepSeek-V3.2",
+  "explanation": "DeepSeek V3.2 with 8-way tensor parallelism. Includes DeepSeek-V3 reasoning parser and DeepSeekV3.2 tool calling parser for advanced reasoning and function calling capabilities.",
+  "short_explanation": "DeepSeek V3.2 with reasoning and tool calling",
+  "gpu_types": ["h200", "b200"],
+  "model_loader_extra_config": {
+    "enable_multithread_load": true,
+    "num_threads": 64
+  },
+  "sglang": {
+    "tp": 8,
+    "reasoning_parser": "deepseek-v3",
+    "tool_call_parser": "deepseekv32"
+  }
+}
