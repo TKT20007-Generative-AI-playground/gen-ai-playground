@@ -150,6 +150,27 @@ class TestRegisterEndpoint:
         response = client.post("/register", json=data_without_code)
         assert response.status_code == 422  # Validation error
 
+    @pytest.mark.parametrize(
+        "password, expected_error",
+        [
+            ("short", "Password must be at least 8 characters long"),
+            ("nouppercase123!", "Password must contain at least one uppercase letter"),
+            ("NoNumber!", "Password must contain at least one number"),
+            ("NoSpecial123", "Password must contain at least one special character"),
+        ]
+    )
+
+    def test_password_validation(self, client, test_user_data, password, expected_error):
+        """Test that backend rejects passwords failing validation rules"""
+        invalid_data = test_user_data.copy()
+        invalid_data["password"] = password
+        invalid_data["username"] = f"user_{password}"
+
+        response = client.post("/register", json=invalid_data)
+
+        assert response.status_code == 400
+        assert expected_error in response.json()["detail"]
+
 
 class TestLoginEndpoint:
     """Tests for /login endpoint"""

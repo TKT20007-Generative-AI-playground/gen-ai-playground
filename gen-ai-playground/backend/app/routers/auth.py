@@ -10,7 +10,7 @@ import jwt
 from app.config import settings
 from app.database import get_database
 from app.models import RegisterRequest, LoginRequest, RegisterResponse, LoginResponse
-
+from app.utils.validation import validate_password
 
 router = APIRouter(
     tags=["authentication"]
@@ -22,6 +22,10 @@ def register(
     user_data: RegisterRequest,
     db: Database = Depends(get_database)
 ):
+    
+    # Password validation
+    validate_password(user_data.password)
+    
     """
     Register a new user
     
