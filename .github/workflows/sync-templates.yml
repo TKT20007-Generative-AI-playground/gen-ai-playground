@@ -2,9 +2,9 @@ name: Sync templates from Verdas repository
 permissions:
     contents: write
 on:
-   push:
-     branches:
-      - templates
+   # push:
+   #   branches:
+   #    - templates
    schedule:
       - cron: '0 0 * * 0' # every sunday at midnight
    workflow_dispatch: # Allows manual triggering of the workflow
