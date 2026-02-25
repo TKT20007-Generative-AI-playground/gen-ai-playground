@@ -36,7 +36,7 @@ jobs:
 
            - name: Commit changes if needed
              run: |
-                git add backend/templates
+                git add gen-ai-playground/backend/templates
                 git diff --quiet --cached || git commit -m "Sync templates from Verdas repository [skip ci]"      
            - name: Push
              run: |
