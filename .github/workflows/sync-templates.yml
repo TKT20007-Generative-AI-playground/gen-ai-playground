@@ -2,9 +2,6 @@ name: Sync templates from Verdas repository
 permissions:
     contents: write
 on:
-   # push:
-   #   branches:
-   #    - templates
    schedule:
       - cron: '0 0 * * 0' # every sunday at midnight
    workflow_dispatch: # Allows manual triggering of the workflow
@@ -37,7 +34,7 @@ jobs:
            - name: Commit changes if needed
              run: |
                 git add gen-ai-playground/backend/templates
-                git diff --quiet --cached || git commit -m "Sync templates from Verdas repository [skip ci]"      
+                git diff --quiet --cached || git commit -m "Sync templates from Verdas repository"      
            - name: Push
              run: |
                 git push
