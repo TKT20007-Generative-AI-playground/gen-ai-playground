@@ -24,9 +24,10 @@ jobs:
                 git clone --depth 1 https://github.com/verda-cloud/model-templates.git external-repo
 
            - name: Update templates folder
+             working-directory: gen-ai-playground
              run: |
                 mkdir -p backend/templates
-                cp -r external-repo/templates/* backend/templates/ || true
+                cp -r ../external-repo/templates/* backend/templates/ || true
 
            - name: Configure git
              run: |
