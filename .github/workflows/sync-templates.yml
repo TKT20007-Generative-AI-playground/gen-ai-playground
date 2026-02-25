@@ -2,9 +2,12 @@ name: Sync templates from Verdas repository
 permissions:
     contents: write
 on:
-    schedule:
-    - cron: '0 0 * * 0' # every sunday at midnight
-    workflow_dispatch: # Allows manual triggering of the workflow
+   push:
+     branches:
+      - templates
+   schedule:
+      - cron: '0 0 * * 0' # every sunday at midnight
+   workflow_dispatch: # Allows manual triggering of the workflow
 
 jobs:
     get-templates:
@@ -33,7 +36,7 @@ jobs:
            - name: Commit changes if needed
              run: |
                 git add backend/templates
-                git diff --quiet --cached || git commit -m "Sync templates from Verdas repository"      
+                git diff --quiet --cached || git commit -m "Sync templates from Verdas repository [skip ci]"      
            - name: Push
              run: |
                 git push
