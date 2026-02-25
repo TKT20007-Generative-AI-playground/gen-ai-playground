@@ -1,0 +1,20 @@
+{
+  "engine": "custom",
+  "model": "my-org/my-model",
+  "explanation": "Example configuration for custom inference engines. Demonstrates how to use a custom base command with positional args and key-value arguments for non-standard inference frameworks.",
+  "short_explanation": "Custom engine configuration template",
+  "gpu_types": ["h100", "h200", "b200", "a100", "l40s"],
+  "custom": {
+    "base_command": "python -m my_inference_engine.serve",
+    "model_flag": "--model-path",
+    "args": [
+      "--workers 4",
+      "--batch-size 32"
+    ],
+    "kv_args": {
+      "--timeout": 60,
+      "--max-tokens": 2048,
+      "--temperature": 0.7
+    }
+  }
+}
