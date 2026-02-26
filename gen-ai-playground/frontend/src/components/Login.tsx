@@ -34,6 +34,7 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
+        credentials: 'include',
       })
 
       const data = await res.json()
@@ -43,7 +44,7 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
         return
       }
 
-      login(data.token, data.username)
+      login(data.username)
       onClose()
     } catch {
       alert('Server unreachable')

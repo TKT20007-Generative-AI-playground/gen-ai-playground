@@ -3,8 +3,8 @@ import { createContext, useContext } from 'react'
 interface AuthContextType {
   isLoggedIn: boolean
   username: string | null
-  login: (token: string, username: string) => void
-  logout: () => void
+  login: (username: string) => void
+  logout: () => Promise<void>
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null)

@@ -104,7 +104,9 @@ function ChatPanel({
         try {
             const deploymentsResponse = await axios.get(
                 `${backendUrl}/text/deployments`,
-                { headers: getAuthHeaders() }
+                { headers: getAuthHeaders(),
+                withCredentials: true    
+                }
             )
             const deployments = deploymentsResponse.data || []
 
@@ -121,7 +123,7 @@ function ChatPanel({
                 const connectResponse = await axios.post(
                     `${backendUrl}/text/connect`,
                     { deployment_name: existingContainer.name, model_path: selectedModel },
-                    { headers: getAuthHeaders() }
+                    { headers: getAuthHeaders(), withCredentials: true }
                 )
                 console.log(`Panel ${panelId}: Connected to existing container:`, connectResponse.data)
                 return connectResponse.data
@@ -132,7 +134,7 @@ function ChatPanel({
             const response = await axios.post(
                 `${backendUrl}/text/deploy`,
                 { model_path: selectedModel },
-                { headers: getAuthHeaders() }
+                { headers: getAuthHeaders(), withCredentials: true }
             )
             console.log(`Panel ${panelId}: Created new deployment:`, response.data)
             return response.data
@@ -144,7 +146,8 @@ function ChatPanel({
     const deleteContainer = async () => {
         try {
             const response = await axios.delete(`${backendUrl}/text/deploy`, {
-                headers: getAuthHeaders()
+                headers: getAuthHeaders(),
+                withCredentials: true
             })
             console.log(`Panel ${panelId} delete:`, response.data)
         } catch (error) {
@@ -155,7 +158,8 @@ function ChatPanel({
     const checkContainerStatus = async () => {
         try {
             const response = await axios.get(`${backendUrl}/text/status`, {
-                headers: getAuthHeaders()
+                headers: getAuthHeaders(),
+                withCredentials: true
             })
             console.log(`Panel ${panelId} status:`, response.data)
         } catch (error) {
@@ -252,12 +256,7 @@ export default function TextGenerator() {
     const [isLoading2, setIsLoading2] = useState(false)
 
     const getAuthHeaders = () => {
-        const token = localStorage.getItem("token")
-        if (!token) throw new Error("Token puuttuu")
-        return {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-        }
+        return { "Content-Type": "application/json" }
     }
 
     const connectToModel = async (modelValue: string): Promise<boolean> => {
@@ -267,7 +266,9 @@ export default function TextGenerator() {
         try {
             const deploymentsResponse = await axios.get(
                 `${backendUrl}/text/deployments`,
-                { headers: getAuthHeaders() }
+                { headers: getAuthHeaders(),
+                  withCredentials: true
+                }
             )
             const deployments = deploymentsResponse.data || []
             const existingContainer = deployments.find((d: Deployment) => {
@@ -283,7 +284,7 @@ export default function TextGenerator() {
             await axios.post(
                 `${backendUrl}/text/connect`,
                 { deployment_name: existingContainer.name, model_path: modelValue },
-                { headers: getAuthHeaders() }
+                { headers: getAuthHeaders(), withCredentials: true }
             )
             console.log("Connected to deployment:", existingContainer.name)
             return true
@@ -303,7 +304,7 @@ export default function TextGenerator() {
                     temperature: 0.7,
                     top_p: 0.9
                 },
-                { headers: getAuthHeaders() }
+                { headers: getAuthHeaders(), withCredentials: true }
             )
             const parsed = parseModelReply(response.data.reply)
             if (parsed.thinking) {

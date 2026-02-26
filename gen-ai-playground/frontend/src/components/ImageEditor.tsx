@@ -73,7 +73,8 @@ export default function ImageEditor() {
         { image: base64, prompt: nextPrompt, model: selectedModel },
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+            withCredentials: true,
           },
           responseType: "blob",
         }

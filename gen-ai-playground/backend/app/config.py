@@ -11,6 +11,10 @@ load_dotenv('.env.local')
 class Settings:
     """Application settings loaded from environment variables"""
     
+    # Is it production
+    ENV = os.getenv("ENV", "development")
+    IS_PROD = ENV == "production"
+
     # MongoDB
     MONGO_DB_URL: str = os.getenv("MONGO_DB_URL")
     

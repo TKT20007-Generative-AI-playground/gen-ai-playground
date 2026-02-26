@@ -89,9 +89,9 @@ export default function ImageGenerator() {
             { prompt: nextPrompt, model: model1 },
             {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-                "Content-Type": "application/json",
+                "Content-Type": "application/json"
               },
+              withCredentials: true,
               responseType: "blob",
             }
           )
@@ -105,9 +105,9 @@ export default function ImageGenerator() {
             { prompt: nextPrompt, model: model2 },
             {
               headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-                "Content-Type": "application/json",
+                "Content-Type": "application/json"
               },
+              withCredentials: true,
               responseType: "blob",
             }
           )

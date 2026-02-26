@@ -1,7 +1,7 @@
 """
 FastAPI dependencies for authentication and authorization
 """
-from fastapi import HTTPException, Header, Depends
+from fastapi import HTTPException, Header, Depends, Cookie
 from pymongo.database import Database
 import jwt
 from app.config import settings
@@ -10,7 +10,8 @@ from app.models import UserInfo
 
 
 def get_current_user(
-    authorization: str = Header(...),
+    authorization: str = Header(None),
+    access_token: str = Cookie(None),
     db: Database = Depends(get_database)
 ) -> UserInfo:
     """
@@ -26,16 +27,20 @@ def get_current_user(
     Raises:
         HTTPException: If authentication fails
     """
-    try:
-        # Extract token from Bearer header
-        if not authorization.startswith("Bearer "):
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid authorization header"
-            )
-        
+    token = None
+
+    # Mobile
+    if authorization and authorization.startswith("Bearer "):
         token = authorization.replace("Bearer ", "")
-        
+
+    # Browser
+    elif access_token:
+        token = access_token
+
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    try:
         # Decode and verify token
         payload = jwt.decode(
             token,

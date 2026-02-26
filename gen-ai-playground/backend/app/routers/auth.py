@@ -1,7 +1,7 @@
 """
 Authentication routes: registration and login
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Response, Cookie
 from pymongo.database import Database
 from datetime import datetime, timedelta
 import bcrypt
@@ -88,6 +88,7 @@ def register(
 @router.post("/login", response_model=LoginResponse)
 def login(
     credentials: LoginRequest,
+    response: Response,
     db: Database = Depends(get_database)
 ):
     """
@@ -136,6 +137,16 @@ def login(
             settings.JWT_SECRET_KEY,
             algorithm="HS256"
         )
+
+        # Set HTTPonly cookie
+        response.set_cookie(
+            key="access_token",
+            value=token,
+            httponly=True,
+            secure=settings.IS_PROD,  # keep False for local dev
+            samesite="strict",
+            max_age=settings.JWT_EXPIRY_HOURS * 3600
+        )
         
         return LoginResponse(
             message="Login successful",
@@ -149,3 +160,26 @@ def login(
             status_code=500,
             detail=f"Login failed: {str(e)}"
         )
+
+@router.get("/me")
+def me(access_token: str = Cookie(None)):
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(access_token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+        return {"username": payload.get("username")}
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+@router.post("/logout")
+def logout(response: Response):
+    # Clear the cookie
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        samesite="strict",
+        secure=settings.IS_PROD  # True in production
+    )
+    return {"message": "Logged out successfully"}
