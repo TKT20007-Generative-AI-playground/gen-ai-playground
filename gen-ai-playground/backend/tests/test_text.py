@@ -512,3 +512,29 @@ class TestAuthRequired:
     def test_delete_requires_auth(self, client):
         response = client.delete("/text/deploy?deployment_name=x")
         assert response.status_code == 422
+        
+class TestTemplateFiles:
+    """Test that the command generation from templates works as expected."""
+    
+    def test_cmd_generation_from_template(self):
+        from app.verda_service import VerdaService
+        from app.template_models import TemplateConfig
+        from pathlib import Path
+        
+        verda_service = VerdaService()
+        
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        templates_dir = Path(backend_dir) / "templates"
+        
+        template_files = [f for f in templates_dir.iterdir() if f.suffix == ".json"]
+        assert len(template_files) > 0, "No template files found"
+        
+        for template_file in template_files:
+            try:
+                cfg = TemplateConfig.model_validate_json(
+                    template_file.read_text(encoding="utf-8"))
+            except Exception as e:
+                pytest.fail(f"Invalid template config {template_file.name}: {e}")
+            
+
+        

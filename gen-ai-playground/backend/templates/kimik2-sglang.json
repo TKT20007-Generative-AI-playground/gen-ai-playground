@@ -12,6 +12,7 @@
     "tp": 8,
     "dp": 4,
     "ep": 4,
+    "enable_dp_attention": true,
     "tool_call_parser": "kimi"
   }
 }
