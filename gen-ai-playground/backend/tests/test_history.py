@@ -162,7 +162,7 @@ class TestHistoryEndpoint:
         """Test getting history without authentication token"""
         response = client.get("/images/history")
         
-        assert response.status_code == 422  # Missing required header
+        assert response.status_code == 401  # Missing required header
     
     def test_get_history_with_invalid_token(self, client, populated_history):
         """Test getting history with invalid token"""
@@ -259,7 +259,7 @@ class TestHistoryEndpoint:
         response = client.get("/images/history", headers=headers)
         
         assert response.status_code == 401
-        assert "Invalid authorization header" in response.json()["detail"]
+        assert "Not authenticated" in response.json()["detail"]
     
     def test_get_history_database_unavailable(self, auth_token):
         """Test history endpoint when database is unavailable"""
@@ -315,7 +315,7 @@ class TestGenerateImageWithAuth:
         
         response = client.post("/images/generate", json=image_request)
         
-        assert response.status_code == 422  # Missing required header
+        assert response.status_code == 401  # Missing required header
     
     def test_generate_image_with_invalid_token(self, client):
         """Test generating image with invalid token"""

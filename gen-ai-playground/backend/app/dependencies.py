@@ -29,11 +29,11 @@ def get_current_user(
     """
     token = None
 
-    # Mobile
+    # Mobile / API client
     if authorization and authorization.startswith("Bearer "):
         token = authorization.replace("Bearer ", "")
 
-    # Browser
+    # Browser cookie
     elif access_token:
         token = access_token
 

@@ -32,10 +32,7 @@ export default function History() {
 
   useEffect(() => {
     fetch(`${backendUrl}/images/history`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json",
-      },
+      credentials: "include",
     })
       .then((res) => res.json())
       .then((data) => {

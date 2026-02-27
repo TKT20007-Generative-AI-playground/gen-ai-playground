@@ -74,8 +74,8 @@ export default function ImageEditor() {
         {
           headers: {
             "Content-Type": "application/json",
-            withCredentials: true,
           },
+          withCredentials: true,
           responseType: "blob",
         }
       )

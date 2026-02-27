@@ -488,27 +488,27 @@ class TestAuthRequired:
 
     def test_deploy_requires_auth(self, client):
         response = client.post("/text/deploy", json={"model_path": "x"})
-        assert response.status_code == 422  # missing Authorization header
+        assert response.status_code == 401  # missing Authorization header
 
     def test_connect_requires_auth(self, client):
         response = client.post("/text/connect", json={"deployment_name": "x"})
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     def test_status_requires_auth(self, client):
         response = client.get("/text/status?deployment_name=x")
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     def test_generate_requires_auth(self, client):
         response = client.post("/text/generate", json={"deployment_name": "x", "prompt": "hi"})
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     def test_chat_requires_auth(self, client):
         response = client.post(
             "/text/chat",
             json={"deployment_name": "x", "messages": [{"role": "user", "content": "hi"}]},
         )
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     def test_delete_requires_auth(self, client):
         response = client.delete("/text/deploy?deployment_name=x")
-        assert response.status_code == 422
+        assert response.status_code == 401
