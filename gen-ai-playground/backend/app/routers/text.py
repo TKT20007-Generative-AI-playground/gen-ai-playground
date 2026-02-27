@@ -31,6 +31,10 @@ router = APIRouter(
     tags=["text"],
 )
 
+@router.post("/available-compute")
+def get_available_compute():
+    """for testing, check available compute resources for a given size"""
+    return verda_service.check_compute_recources(1)
 
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_model(

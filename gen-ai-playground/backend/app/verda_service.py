@@ -8,7 +8,7 @@ import time
 import json
 from datetime import datetime
 from typing import Optional
-from pathlib import Path
+
 
 from verda import VerdaClient
 from verda.containers import (
@@ -43,6 +43,11 @@ HF_SECRET_NAME = "huggingface-token"
 APP_PORT = 30000
 DEFAULT_COMPUTE = "L40S"  # 48GB VRAM, good for 7B models
 
+class NoComputeResourcesError(Exception):
+    """Custom exception for no available GPU resources."""
+    def __init__(self, gpu_count: int):
+        super().__init__(f"No compute resources available for {gpu_count} GPUs")
+      
 
 class VerdaService:
     """
@@ -177,6 +182,47 @@ class VerdaService:
             return image
 
         raise RuntimeError(f"Cannot resolve image for engine: {cfg.engine}")
+    
+    def check_compute_recources(self, size):
+        """Check available compute resources for the specified template config."""
+        client = self._get_client()
+        
+        #Temp workaround because client.containers.get_compute_resources() may contain a bug
+        
+        from verda.containers._containers import (
+            SERVERLESS_COMPUTE_RESOURCES_ENDPOINT,   #import endpoint and ComputeResource dataclass
+            ComputeResource,
+        )
+        
+        response = client.containers.client.get(SERVERLESS_COMPUTE_RESOURCES_ENDPOINT)
+        print(response.json())
+        print(type(response.json()))
+         
+        resources = []
+        for item in response.json():
+            if isinstance(item, list):
+                for item_in_items in item:
+                    resources.append(ComputeResource.from_dict(item_in_items))
+            elif isinstance(item, dict):
+                resources.append(ComputeResource.from_dict(item))
+                
+        available_resources = [r for r in resources if r.is_available and r.size >= size] # filter resources based on availability and size 
+        
+        print(available_resources)    
+        
+        return available_resources
+    
+    def _set_compute_name(self, cfg, available_gpu_types):
+        """Determine the compute resource name based on template config and available GPU types.
+        Selects cheapest option from cfg.gpu_types that is available
+        """
+        gpu_type_priority = ["l40s", "a100", "h100", "h200", "b200","b300"]
+        for gpu_type in gpu_type_priority:
+            if gpu_type in cfg.gpu_types and any(
+                name.startswith(gpu_type.upper()) for name in available_gpu_types
+            ):
+                return gpu_type.upper()
+            
 
     def deploy_from_template(
         self,
@@ -217,9 +263,8 @@ class VerdaService:
 
         # Generate deployment name
         if deployment_name is None:
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S").lower()
             model_slug = cfg.model.split("/")[-1].lower()
-            deployment_name = f"{model_slug}-{timestamp}"
+            deployment_name = model_slug.strip()
         self._deployment_name = deployment_name
 
         self._ensure_hf_secret()
@@ -230,12 +275,13 @@ class VerdaService:
             gpu_count = cfg.sglang.tp
         elif cfg.engine == "vllm" and cfg.vllm and cfg.vllm.tensor_parallel_size:
             gpu_count = cfg.vllm.tensor_parallel_size
-            
-        #L40S is good and cheap option 
-        if cfg.gpu_types and "l40s" in cfg.gpu_types:
-            compute_name = "L40S"
-        else:
-            compute_name = gpu_type or (cfg.gpu_types[0].upper() if cfg.gpu_types else DEFAULT_COMPUTE)
+        
+        #check compute resources for the requested gpu count 
+        available_resources = self.check_compute_recources(gpu_count)
+        if not available_resources:
+            raise NoComputeResourcesError(gpu_count)
+        available_gpu_types = {r.name for r in available_resources} 
+        compute_name = self._set_compute_name(cfg, available_gpu_types)
 
         # Build launch command
         cmd = self._generate_command_from_template(cfg)
