@@ -465,6 +465,20 @@ class TestStatusEndpoint:
         assert data["healthy"] is True
 
     @patch("app.routers.text.verda_service")
+    def test_status_accepts_cookie_auth(
+        self, mock_vs, client, registered_user, auth_token
+    ):
+        mock_vs.get_deployment_status.return_value = _healthy_status()
+        client.cookies.set("access_token", auth_token)
+
+        response = client.get("/text/status?deployment_name=test-deploy")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert data["healthy"] is True
+
+    @patch("app.routers.text.verda_service")
     def test_status_no_active_deployment(
         self, mock_vs, client, registered_user, auth_headers
     ):

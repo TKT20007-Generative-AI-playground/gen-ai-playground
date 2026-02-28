@@ -157,6 +157,24 @@ class TestHistoryEndpoint:
         data = response.json()
         assert "history" in data
         assert len(data["history"]) == 3  # Only user 1's images
+
+    def test_get_history_with_valid_cookie(self, client, registered_user, auth_token, populated_history):
+        """Test getting history with access_token cookie auth"""
+        client.cookies.set("access_token", auth_token)
+        response = client.get("/images/history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "history" in data
+        assert len(data["history"]) == 3
+
+    def test_get_history_with_invalid_cookie(self, client, populated_history):
+        """Test getting history with invalid access_token cookie"""
+        client.cookies.set("access_token", "invalid_token")
+        response = client.get("/images/history")
+
+        assert response.status_code == 401
+        assert "Invalid token" in response.json()["detail"]
     
     def test_get_history_without_token(self, client, populated_history):
         """Test getting history without authentication token"""

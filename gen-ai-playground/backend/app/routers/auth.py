@@ -1,5 +1,11 @@
 """
 Authentication routes: registration and login
+
+Security Model:
+- User authentication uses HTTPOnly cookies (secure, XSS-protected)
+- Token is returned in login response body for flexibility
+- Frontend relies on HTTPOnly cookies (no localStorage)
+- Cookie settings: httponly=True, samesite="strict", secure=IS_PROD
 """
 from fastapi import APIRouter, HTTPException, Depends, Response, Cookie
 from pymongo.database import Database

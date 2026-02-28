@@ -190,6 +190,21 @@ class TestLoginEndpoint:
         assert data["username"] == registered_user["username"]
         assert "token" in data
         assert data["token"] != ""
+
+    def test_login_sets_httponly_cookie(self, client, registered_user):
+        """Test login sets access_token as an HTTPOnly cookie"""
+        login_data = {
+            "username": registered_user["username"],
+            "password": registered_user["password"]
+        }
+
+        response = client.post("/login", json=login_data)
+
+        assert response.status_code == 200
+        set_cookie_header = response.headers.get("set-cookie", "")
+        assert "access_token=" in set_cookie_header
+        assert "HttpOnly" in set_cookie_header
+        assert "SameSite=strict" in set_cookie_header
     
     def test_jwt_token_structure(self, client, registered_user):
         """Test that JWT token contains correct claims and is valid"""
@@ -286,3 +301,42 @@ class TestAuthIntegration:
         
         assert login_response.status_code == 200
         assert "token" in login_response.json()
+
+    def test_me_endpoint_with_cookie(self, client, test_user_data):
+        """Test /me returns user when authenticated via access_token cookie"""
+        register_response = client.post("/register", json=test_user_data)
+        assert register_response.status_code == 200
+
+        login_response = client.post(
+            "/login",
+            json={
+                "username": test_user_data["username"],
+                "password": test_user_data["password"]
+            }
+        )
+        assert login_response.status_code == 200
+
+        me_response = client.get("/me")
+        assert me_response.status_code == 200
+        assert me_response.json()["username"] == test_user_data["username"]
+
+    def test_logout_clears_cookie_and_me_fails(self, client, test_user_data):
+        """Test /logout clears cookie so /me becomes unauthorized"""
+        register_response = client.post("/register", json=test_user_data)
+        assert register_response.status_code == 200
+
+        login_response = client.post(
+            "/login",
+            json={
+                "username": test_user_data["username"],
+                "password": test_user_data["password"]
+            }
+        )
+        assert login_response.status_code == 200
+
+        logout_response = client.post("/logout")
+        assert logout_response.status_code == 200
+
+        me_response = client.get("/me")
+        assert me_response.status_code == 401
+        assert "Not authenticated" in me_response.json()["detail"]

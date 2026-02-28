@@ -10,6 +10,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Rehydrate state from backend on mount
   useEffect(() => {
+    // Cleanup legacy client-side tokens from older auth flow
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+
     async function fetchMe() {
       try {
         const res = await fetch(`${backendUrl}/me`, {
@@ -30,9 +34,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetchMe();
   }, []);
 
-  // Login function
-  const login = (username: string) => {
-    setUsername(username)  // just update state
+  // Login function - only updates state, cookie is set by backend
+  const login = (user: string) => {
+    setUsername(user);
   };
 
   // Logout calls backend to clear httpOnly cookie
@@ -43,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         credentials: "include", // include cookie
       });
     } finally {
-      setUsername(null); // always clear frontend state
+      setUsername(null); // clear frontend state
     }
   };
 

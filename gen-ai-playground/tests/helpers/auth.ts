@@ -25,7 +25,7 @@ export function createTestUser(prefix = 'pw'): TestUser {
 
   return {
     username: `${prefix}_${unique}`,
-    password: 'pw-test-password-1234',
+    password: 'ValidPass1234!',
   };
 }
 
