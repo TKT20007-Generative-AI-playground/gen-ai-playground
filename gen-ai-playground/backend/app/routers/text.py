@@ -36,7 +36,7 @@ def list_available_models():
     """List available models that can be deployed."""
     return {"available_models": list(settings.TEXT_MODEL_PATHS_V2.keys())}
 
-@router.post("/available-compute")
+@router.get("/available-compute")
 def get_available_compute():
     """for testing, check available compute resources for a given size"""
     return verda_service.check_compute_recources(1)
