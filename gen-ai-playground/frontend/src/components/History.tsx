@@ -7,14 +7,10 @@ import {
   ScrollArea,
   Loader,
   Center,
-  Modal,
-  Button
+  Modal
 } from "@mantine/core";
-import { useNavigate } from "react-router-dom";
 
 interface ImageRecord {
-  id: string;
-  parent_image_id?: string | null;
   prompt: string;
   model: string;
   timestamp: string;
@@ -34,8 +30,6 @@ export default function History() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
 
-  const navigate = useNavigate();
-
   useEffect(() => {
     fetch(`${backendUrl}/images/history`, {
       headers: {
@@ -54,7 +48,7 @@ export default function History() {
 
         const grouped = Object.keys(groups).map((prompt) => ({
           prompt,
-          images: groups[prompt], 
+          images: groups[prompt],
         }));
 
         setHistory(grouped);
@@ -82,88 +76,75 @@ export default function History() {
 
   return (
     <>
-      <ScrollArea h="100%">
-        <Stack gap="xl">
-          {history.map((group, idx) => (
-            <Stack key={idx} gap="md">
-              <Title order={4}>{group.prompt}</Title>
+<ScrollArea h="100%">
+  <Stack gap="xl">
 
-              <div
+    {history.map((group, idx) => (
+      <Stack key={idx} gap="md">
+
+        <Title order={4} data-testid={`prompt-${group.prompt}`}>{group.prompt}</Title>
+
+        <div
+          style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gap: "16px",
+          }}
+        >
+          {group.images.map((item, i) => (
+            <Stack key={i} gap="xs" align="center">
+              <img
+                data-testid={`image-${item.prompt}-${item.model}`}
+                src={`data:image/${item.image_type || "png"};base64,${item.image_data}`}
+                alt={item.prompt}
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                  gap: "16px",
+                width: "100%",
+                aspectRatio: "1 / 1",
+                objectFit: "cover",
+                cursor: "pointer",
                 }}
-              >
-                <Stack gap="xs" align="center">
-                  <img
-                    src={`data:image/${group.images[0].image_type || "png"};base64,${group.images[0].image_data}`}
-                    alt={group.images[0].prompt}
-                    style={{
-                      width: "100%",
-                      aspectRatio: "1 / 1",
-                      objectFit: "cover",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => setSelectedImage(group.images[0])}
-                  />
-                  <Badge variant="light">{group.images[0].model}</Badge>
-                </Stack>
+                onClick={() => setSelectedImage(item)}
+              />
 
-                {group.images[1] && (
-                  <Stack gap="xs" align="center">
-                    <img
-                      src={`data:image/${group.images[1].image_type || "png"};base64,${group.images[1].image_data}`}
-                      alt={group.images[1].prompt}
-                      style={{
-                        width: "100%",
-                        aspectRatio: "1 / 1",
-                        objectFit: "cover",
-                        cursor: "pointer",
-                      }}
-                      onClick={() => setSelectedImage(group.images[1])}
-                    />
-                    <Badge variant="light">{group.images[1].model}</Badge>
-                  </Stack>
-                )}
-              </div>
+              <Badge data-testid={`model-${item.prompt}-${item.model}`} variant="light">{item.model}</Badge>
+
+              <Text data-testid={`timestamp-${item.prompt}-${item.model}`} size="xs" c="dimmed">
+                {new Date(item.timestamp).toLocaleString()}
+              </Text>
+
+              <Text data-testid={`type-${item.prompt}-${item.model}`} size="xs">
+                Type: {item.image_type || "generated"}
+              </Text>
             </Stack>
           ))}
-        </Stack>
-      </ScrollArea>
+        </div>
 
-      <Modal
-        opened={!!selectedImage}
-        onClose={() => setSelectedImage(null)}
-        centered
-        size="lg"
-      >
-        {selectedImage && (
-          <>
-            <img
-              src={`data:image/${selectedImage.image_type || "png"};base64,${selectedImage.image_data}`}
-              alt={selectedImage.prompt}
-              style={{
-                width: "100%",
-                height: "auto",
-                maxHeight: "80vh",
-                objectFit: "contain",
-              }}
-            />
 
-            <Button
-              mt="md"
-              fullWidth
-              onClick={() => {
-                navigate("/playground", { state: { imageToEdit: selectedImage } });
-                setSelectedImage(null);
-              }}
-            >
-              Edit with new prompt
-            </Button>
-          </>
-        )}
-      </Modal>
-    </>
+      </Stack>
+    ))}
+
+  </Stack>
+</ScrollArea>
+<Modal
+  opened={!!selectedImage}
+  onClose={() => setSelectedImage(null)}
+  centered
+  size="lg"
+>
+  {selectedImage && (
+    <img
+      data-testid="modal-image"
+      src={`data:image/${selectedImage.image_type || "png"};base64,${selectedImage.image_data}`}
+      alt={selectedImage.prompt}
+      style={{
+        width: "100%",
+        height: "auto",
+        maxHeight: "80vh",
+        objectFit: "contain",
+      }}
+    />
+  )}
+</Modal>
+</>
   );
 }
