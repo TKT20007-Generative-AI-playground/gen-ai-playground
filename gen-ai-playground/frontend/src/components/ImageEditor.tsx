@@ -6,8 +6,13 @@ import { EDIT_MODELS } from "../constants/models"
 import ModelSelector from "./ModelSelector"
 import PhotoArea from "./PhotoArea"
 import GeneratingText from "./GeneratingText"
+import { useLocation } from "react-router-dom";
+
 
 export default function ImageEditor() {
+  const location = useLocation();
+  const imageToEdit = location.state?.imageToEdit;
+
 
   const [prompt, setPrompt] = useState("")
   const [userImage, setUserImage] = useState<File | null>(null)
@@ -48,6 +53,22 @@ export default function ImageEditor() {
       if (editedUrlRef.current) URL.revokeObjectURL(editedUrlRef.current)
     }
   }, [])
+
+  useEffect(() => {
+  if (imageToEdit) {
+    // Change base64 → blob → file → userImage
+    const byteCharacters = atob(imageToEdit.image_data);
+    const byteNumbers = new Array(byteCharacters.length)
+      .fill(0)
+      .map((_, i) => byteCharacters.charCodeAt(i));
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: "image/png" });
+
+    const file = new File([blob], "edited.png", { type: "image/png" });
+    setUserImage(file);
+  }
+}, [imageToEdit]);
+
 
   function replaceEditedUrl(next: string | null) {
     setEditedImageUrl((prev) => {
@@ -141,6 +162,18 @@ export default function ImageEditor() {
       </div>
 
       {isLoading && <GeneratingText baseText="Editing image" />}
+
+      {originalImageUrl && !editedImageUrl && (
+        <div style={{ width: "100%" }}>
+          <PhotoArea
+            src={originalImageUrl}
+            alt="Original"
+            height={420}
+            header={<Text fw={600}>Original</Text>}
+          />
+        </div>
+      )}
+
 
       {editedImageUrl && (
         <div style={{ width: "100%" }}>
