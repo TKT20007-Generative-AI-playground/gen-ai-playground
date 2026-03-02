@@ -2,23 +2,27 @@ import { useEffect, useRef, useState } from "react"
 import { PromptTextBox } from "./PromptTextBox"
 import axios from "axios"
 import type { AxiosResponse } from "axios"
-import { Text, SimpleGrid, Stack } from "@mantine/core"
+import { Text, SimpleGrid, Stack, Button } from "@mantine/core"
 import { MODELS, getModelDisplayName } from "../constants/models"
 import ModelSelector from "./ModelSelector"
 import PhotoArea from "./PhotoArea"
 import GeneratingText from "./GeneratingText"
+import { useNavigate } from "react-router-dom"
 
 type SelectedModels = [string | null, string | null]
 
 export default function ImageGenerator() {
 
+  const navigate = useNavigate()
+
   const [prompt, setPrompt] = useState("")
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageUrl2, setImageUrl2] = useState<string | null>(null)
+  const [blob1, setBlob1] = useState<Blob | null>(null)
+  const [blob2, setBlob2] = useState<Blob | null>(null)
   const [selectedModels, setSelectedModels] = useState<SelectedModels>([null, null])
   const [isLoading, setIsLoading] = useState(false)
 
-  // Keep refs to the latest URLs so we can revoke them on unmount
   const imageUrlRef = useRef<string | null>(null)
   const imageUrl2Ref = useRef<string | null>(null)
 
@@ -40,7 +44,6 @@ export default function ImageGenerator() {
   const model1 = selectedModels[0] ?? undefined
   const model2 = selectedModels[1] ?? undefined
 
-  // One-time unmount cleanup
   useEffect(() => {
     return () => {
       if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current)
@@ -64,12 +67,21 @@ export default function ImageGenerator() {
     })
   }
 
+  async function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve((reader.result as string).split(",")[1])
+      reader.readAsDataURL(blob)
+    })
+  }
+
   async function fetchTwoGeneratedImages(nextPrompt: string) {
     setPrompt(nextPrompt)
 
-    // Clear previous results (this revokes old URLs too)
     replaceImageUrl(null)
     replaceImageUrl2(null)
+    setBlob1(null)
+    setBlob2(null)
 
     setIsLoading(true)
 
@@ -118,12 +130,16 @@ export default function ImageGenerator() {
 
       let idx = 0
       if (model1) {
-        const url = URL.createObjectURL(results[idx].data)
+        const blob = results[idx].data
+        setBlob1(blob)
+        const url = URL.createObjectURL(blob)
         replaceImageUrl(url)
         idx++
       }
       if (model2) {
-        const url2 = URL.createObjectURL(results[idx].data)
+        const blob = results[idx].data
+        setBlob2(blob)
+        const url2 = URL.createObjectURL(blob)
         replaceImageUrl2(url2)
       }
     } catch (err) {
@@ -175,23 +191,69 @@ export default function ImageGenerator() {
       {(imageUrl || imageUrl2) && (
         <div style={{ width: "100%", maxWidth: CONTROLS_MAX_WIDTH }}>
           <SimpleGrid cols={{ base: 1, md: imageUrl && imageUrl2 ? 2 : 1 }} spacing="md">
+
             {imageUrl && (
-              <PhotoArea
-                src={imageUrl}
-                alt="Generated image 1"
-                header={<Text fw={600}>Model: {getModelDisplayName(model1)}</Text>}
-                height={420}
-              />
+              <Stack gap="xs" align="center">
+                <PhotoArea
+                  src={imageUrl}
+                  alt="Generated image 1"
+                  header={<Text fw={600}>Model: {getModelDisplayName(model1)}</Text>}
+                  height={420}
+                />
+
+                <Button
+                  onClick={async () => {
+                    if (!blob1) return
+                    const base64 = await blobToBase64(blob1)
+                    navigate("/edit-image", {
+                      state: {
+                        imageToEdit: {
+                          image_data: base64,
+                          image_type: "png",
+                          prompt,
+                          model: model1,
+                          id: null
+                        }
+                      }
+                    })
+                  }}
+                >
+                  Edit image
+                </Button>
+              </Stack>
             )}
 
             {imageUrl2 && (
-              <PhotoArea
-                src={imageUrl2}
-                alt="Generated image 2"
-                header={<Text fw={600}>Model: {getModelDisplayName(model2)}</Text>}
-                height={420}
-              />
+              <Stack gap="xs" align="center">
+                <PhotoArea
+                  src={imageUrl2}
+                  alt="Generated image 2"
+                  header={<Text fw={600}>Model: {getModelDisplayName(model2)}</Text>}
+                  height={420}
+                />
+
+                <Button
+                  onClick={async () => {
+                    if (!blob2) return
+                    const base64 = await blobToBase64(blob2)
+                    navigate("/edit-image", {
+                      state: {
+                        imageToEdit: {
+                          image_data: base64,
+                          image_type: "png",
+                          prompt,
+                          model: model2,
+                          id: null
+                        }
+                      }
+                    })
+                  }}
+                >
+                  Edit image
+                </Button>
+              </Stack>
             )}
+
           </SimpleGrid>
         </div>
       )}
