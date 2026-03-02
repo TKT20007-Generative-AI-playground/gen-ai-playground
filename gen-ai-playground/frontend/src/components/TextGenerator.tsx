@@ -1,8 +1,9 @@
 import axios from "axios"
 import { useAuth } from "../context/AuthContext"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 
 import {
+    Alert,
     Button,
     MultiSelect,
     Paper,
@@ -18,13 +19,12 @@ type ModelOption = {
 }
 
 type Message = {
-    role: "user" | "assistant" | "system"
+    role: "user" | "assistant"
     content: string
+    modelLabel?: string
 }
 
-type Deployment = {
-    name: string
-}
+type ModelStatus = "live" | "starting" | "offline" | "unknown"
 
 const modelOptions: ModelOption[] = [
     {
@@ -64,28 +64,42 @@ function parseModelReply(rawReply: string): {
     return { thinking: null, actualReply: rawReply.trim() }
 }
 
+// Build dropdown data with colored status dots; disable non-live models
+function buildDropdownData(statuses: Record<string, ModelStatus>) {
+    return modelOptions.map(m => {
+        const st = statuses[m.value]
+        const isLive = st === "live"
+        const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
+        return {
+            value: m.value,
+            label: `${emoji} ${m.label}`,
+            disabled: !isLive,
+        }
+    })
+}
+
 // --- Chat panel (display only) ---
 
 type ChatPanelProps = {
     panelId: 1 | 2
-    backendUrl: string
-    getAuthHeaders: () => Record<string, string>
     selectedModel: string | null
     onModelChange: (model: string | null) => void
     messages: Message[]
     onClearMessages: () => void
     isLoading: boolean
+    modelStatuses: Record<string, ModelStatus>
+    statusMessage: string | null
 }
 
 function ChatPanel({
     panelId,
-    backendUrl,
-    getAuthHeaders,
     selectedModel,
     onModelChange,
     messages,
     onClearMessages,
-    isLoading
+    isLoading,
+    modelStatuses,
+    statusMessage,
 }: ChatPanelProps) {
     const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -93,75 +107,9 @@ function ChatPanel({
         bottomRef.current?.scrollIntoView({ behavior: "smooth" })
     }, [messages, isLoading])
 
-    const findSelectedModel = () =>
-        modelOptions.find((m) => m.value === selectedModel) ?? null
+    const dropdownData = buildDropdownData(modelStatuses)
 
-    const deployContainer = async () => {
-        if (!selectedModel) return
-        const selected = findSelectedModel()
-        if (!selected) return
-
-        try {
-            const deploymentsResponse = await axios.get(
-                `${backendUrl}/text/deployments`,
-                { headers: getAuthHeaders() }
-            )
-            const deployments = deploymentsResponse.data || []
-
-            console.log(deployments)
-
-            const existingContainer = deployments.find((d: Deployment) => {
-                const name = typeof d?.name === "string" ? d.name.toLowerCase() : ""
-                return name.includes(selected.slug.toLowerCase())
-            })
-
-            if (existingContainer) {
-                console.log("Found existing container for model:", existingContainer.name)
-
-                const connectResponse = await axios.post(
-                    `${backendUrl}/text/connect`,
-                    { deployment_name: existingContainer.name, model_path: selectedModel },
-                    { headers: getAuthHeaders() }
-                )
-                console.log(`Panel ${panelId}: Connected to existing container:`, connectResponse.data)
-                return connectResponse.data
-            }
-
-            console.log("No deployment found for model, creating new one...")
-
-            const response = await axios.post(
-                `${backendUrl}/text/deploy`,
-                { model_path: selectedModel },
-                { headers: getAuthHeaders() }
-            )
-            console.log(`Panel ${panelId}: Created new deployment:`, response.data)
-            return response.data
-        } catch (error) {
-            console.error(`Panel ${panelId} deploy error:`, error)
-        }
-    }
-
-    const deleteContainer = async () => {
-        try {
-            const response = await axios.delete(`${backendUrl}/text/deploy`, {
-                headers: getAuthHeaders()
-            })
-            console.log(`Panel ${panelId} delete:`, response.data)
-        } catch (error) {
-            console.error(`Panel ${panelId} delete error:`, error)
-        }
-    }
-
-    const checkContainerStatus = async () => {
-        try {
-            const response = await axios.get(`${backendUrl}/text/status`, {
-                headers: getAuthHeaders()
-            })
-            console.log(`Panel ${panelId} status:`, response.data)
-        } catch (error) {
-            console.error(`Panel ${panelId} status error:`, error)
-        }
-    }
+    const selectedStatus = selectedModel ? (modelStatuses[selectedModel] ?? "unknown") : null
 
     return (
         <div style={{ flex: "1 1 calc(50% - 10px)", minWidth: "320px", maxWidth: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>
@@ -170,23 +118,36 @@ function ChatPanel({
             <MultiSelect
                 label="Select model"
                 placeholder="Select model"
-                data={modelOptions}
+                data={dropdownData}
                 maxValues={1}
                 value={selectedModel ? [selectedModel] : []}
                 onChange={(value) => onModelChange(value[0] ?? null)}
-                mb={8}
+                mb={4}
             />
 
+            {selectedModel && selectedStatus && selectedStatus !== "live" && (
+                <Alert
+                    color={selectedStatus === "starting" ? "yellow" : "gray"}
+                    variant="light"
+                    mb={8}
+                    p="xs"
+                    styles={{ message: { fontSize: 13 } }}
+                >
+                    {statusMessage
+                        ? statusMessage
+                        : selectedStatus === "starting"
+                            ? "This model is starting up. It usually takes about 2 minutes."
+                            : "This model is not deployed. Ask an admin to deploy it from the dashboard."}
+                </Alert>
+            )}
+
+            {selectedModel && selectedStatus === "live" && statusMessage && (
+                <Alert color="green" variant="light" mb={8} p="xs" styles={{ message: { fontSize: 13 } }}>
+                    {statusMessage}
+                </Alert>
+            )}
+
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-                <Button size="xs" onClick={deployContainer} disabled={!selectedModel}>
-                    Deploy
-                </Button>
-                <Button size="xs" onClick={checkContainerStatus}>
-                    Status
-                </Button>
-                <Button size="xs" color="red" onClick={deleteContainer}>
-                    Delete
-                </Button>
                 <Button size="xs" color="orange" onClick={onClearMessages}>
                     Clear
                 </Button>
@@ -205,28 +166,30 @@ function ChatPanel({
                 {messages.length === 0 ? (
                     <Text c="dimmed" ta="center" size="sm">No messages yet.</Text>
                 ) : (
-                    messages.map((message, index) => (
-                        <Paper
-                            key={index}
-                            p="sm"
-                            mb="xs"
-                            style={{
-                                backgroundColor: message.role === "user" ? "#e3f2fd" : "#f5f5f5",
-                                marginLeft: message.role === "user" ? "15%" : "0",
-                                marginRight: message.role === "user" ? "0" : "15%",
-                            }}
-                        >
-                            <Text fw={700} size="xs" mb={4}>
-                                {message.role === "user" ? "You" : selectedModel ?? "Assistant"}
-                            </Text>
-                            <Text size="sm" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}>
-                                {message.content}
-                            </Text>
-                        </Paper>
-                    ))
-                )}
-                {isLoading && (
-                    <Text c="dimmed" size="sm" ta="center">Generating...</Text>
+                    <>
+                        {messages.map((message, index) => (
+                            <Paper
+                                key={index}
+                                p="sm"
+                                mb="xs"
+                                style={{
+                                    backgroundColor: message.role === "user" ? "#e3f2fd" : "#f5f5f5",
+                                    marginLeft: message.role === "user" ? "15%" : "0",
+                                    marginRight: message.role === "user" ? "0" : "15%",
+                                }}
+                            >
+                                <Text fw={700} size="xs" mb={4}>
+                                    {message.role === "user" ? "You" : message.modelLabel ?? selectedModel ?? "Assistant"}
+                                </Text>
+                                <Text size="sm" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}>
+                                    {message.content}
+                                </Text>
+                            </Paper>
+                        ))}
+                        {isLoading && (
+                            <Text c="dimmed" size="sm" ta="center">Generating...</Text>
+                        )}
+                    </>
                 )}
                 <div ref={bottomRef} />
             </ScrollArea>
@@ -251,6 +214,10 @@ export default function TextGenerator() {
     const [isLoading1, setIsLoading1] = useState(false)
     const [isLoading2, setIsLoading2] = useState(false)
 
+    const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
+    const [statusMsg1, setStatusMsg1] = useState<string | null>(null)
+    const [statusMsg2, setStatusMsg2] = useState<string | null>(null)
+
     const getAuthHeaders = () => {
         const token = localStorage.getItem("token")
         if (!token) throw new Error("Token puuttuu")
@@ -260,59 +227,66 @@ export default function TextGenerator() {
         }
     }
 
-    const connectToModel = async (modelValue: string): Promise<boolean> => {
-        const selected = modelOptions.find((m) => m.value === modelValue)
-        if (!selected) return false
-
+    // Poll model statuses (background, for dropdown indicators)
+    const fetchStatuses = useCallback(async () => {
         try {
-            const deploymentsResponse = await axios.get(
-                `${backendUrl}/text/deployments`,
-                { headers: getAuthHeaders() }
-            )
-            const deployments = deploymentsResponse.data || []
-            const existingContainer = deployments.find((d: Deployment) => {
-                const name = typeof d?.name === "string" ? d.name.toLowerCase() : ""
-                return name.includes(selected.slug.toLowerCase())
+            const res = await axios.get(`${backendUrl}/text/model-statuses`, {
+                headers: getAuthHeaders(),
             })
-
-            if (!existingContainer) {
-                console.error("No running deployment found for model:", modelValue)
-                return false
-            }
-
-            await axios.post(
-                `${backendUrl}/text/connect`,
-                { deployment_name: existingContainer.name, model_path: modelValue },
-                { headers: getAuthHeaders() }
-            )
-            console.log("Connected to deployment:", existingContainer.name)
-            return true
-        } catch (error) {
-            console.error("Error connecting to model:", error)
-            return false
+            setModelStatuses(res.data)
+        } catch {
+            // silent
         }
-    }
+    }, [backendUrl])
 
-    const chatWithCurrentModel = async (messages: Message[]): Promise<string | null> => {
+    useEffect(() => {
+        if (!isLoggedIn) return
+        fetchStatuses()
+        const id = setInterval(fetchStatuses, 30000)
+        return () => clearInterval(id)
+    }, [fetchStatuses, isLoggedIn])
+
+    // Clear status messages when user switches model
+    useEffect(() => { setStatusMsg1(null) }, [selectedModel1])
+    useEffect(() => { setStatusMsg2(null) }, [selectedModel2])
+
+    /**
+     * Send message to a single panel.
+     * Only works with live/healthy models (dropdown enforces this).
+     */
+    const sendToPanel = async (
+        modelValue: string,
+        messagesWithUser: Message[],
+        setMessages: (msgs: Message[] | ((prev: Message[]) => Message[])) => void,
+        setIsLoading: (v: boolean) => void,
+        setStatusMsg: (msg: string | null) => void,
+    ) => {
+        setIsLoading(true)
+
         try {
             const response = await axios.post(
                 `${backendUrl}/text/chat`,
                 {
-                    messages,
+                    model_path: modelValue,
+                    messages: messagesWithUser,
                     max_tokens: 256,
                     temperature: 0.7,
-                    top_p: 0.9
+                    top_p: 0.9,
                 },
                 { headers: getAuthHeaders() }
             )
-            const parsed = parseModelReply(response.data.reply)
-            if (parsed.thinking) {
-                console.log("Model thinking:", parsed.thinking)
-            }
-            return parsed.actualReply
-        } catch (error) {
-            console.error("Error during chat:", error)
-            return null
+
+            const result = response.data
+            const parsed = parseModelReply(result.reply)
+            if (parsed.thinking) console.log("Thinking:", parsed.thinking)
+            const label = modelOptions.find(m => m.value === modelValue)?.label ?? modelValue
+            setMessages([...messagesWithUser, { role: "assistant", content: parsed.actualReply, modelLabel: label }])
+        } catch (error: any) {
+            console.error("chat error:", error)
+            const detail = error?.response?.data?.detail
+            setStatusMsg(detail || "Failed to reach the server.")
+        } finally {
+            setIsLoading(false)
         }
     }
 
@@ -324,39 +298,32 @@ export default function TextGenerator() {
 
         const userMessage: Message = { role: "user", content: currentPrompt }
 
-        // --- Model 1 ---
+        // Launch both panels in parallel
+        const promises: Promise<void>[] = []
+
         if (selectedModel1) {
             const updatedMessages1 = [...messages1, userMessage]
             setMessages1(updatedMessages1)
-            setIsLoading1(true)
-
-            const connected = await connectToModel(selectedModel1)
-            if (connected) {
-                const reply = await chatWithCurrentModel(updatedMessages1)
-                if (reply) {
-                    setMessages1([...updatedMessages1, { role: "assistant", content: reply }])
-                }
-            }
-
-            setIsLoading1(false)
+            promises.push(
+                sendToPanel(
+                    selectedModel1, updatedMessages1,
+                    setMessages1, setIsLoading1, setStatusMsg1,
+                )
+            )
         }
 
-        // --- Model 2 ---
         if (selectedModel2) {
             const updatedMessages2 = [...messages2, userMessage]
             setMessages2(updatedMessages2)
-            setIsLoading2(true)
-
-            const connected = await connectToModel(selectedModel2)
-            if (connected) {
-                const reply = await chatWithCurrentModel(updatedMessages2)
-                if (reply) {
-                    setMessages2([...updatedMessages2, { role: "assistant", content: reply }])
-                }
-            }
-
-            setIsLoading2(false)
+            promises.push(
+                sendToPanel(
+                    selectedModel2, updatedMessages2,
+                    setMessages2, setIsLoading2, setStatusMsg2,
+                )
+            )
         }
+
+        await Promise.all(promises)
     }
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -388,23 +355,23 @@ export default function TextGenerator() {
             }}>
                 <ChatPanel
                     panelId={1}
-                    backendUrl={backendUrl}
-                    getAuthHeaders={getAuthHeaders}
                     selectedModel={selectedModel1}
                     onModelChange={setSelectedModel1}
                     messages={messages1}
                     onClearMessages={() => setMessages1([])}
                     isLoading={isLoading1}
+                    modelStatuses={modelStatuses}
+                    statusMessage={statusMsg1}
                 />
                 <ChatPanel
                     panelId={2}
-                    backendUrl={backendUrl}
-                    getAuthHeaders={getAuthHeaders}
                     selectedModel={selectedModel2}
                     onModelChange={setSelectedModel2}
                     messages={messages2}
                     onClearMessages={() => setMessages2([])}
                     isLoading={isLoading2}
+                    modelStatuses={modelStatuses}
+                    statusMessage={statusMsg2}
                 />
             </div>
 

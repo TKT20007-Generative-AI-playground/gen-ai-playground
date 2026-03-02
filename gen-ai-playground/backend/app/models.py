@@ -86,6 +86,21 @@ class DeploymentStatusResponse(BaseModel):
     message: Optional[str] = None
 
 
+class ContainerInfo(BaseModel):
+    """Model for a single container deployment info (dashboard)"""
+    name: str
+    status: str
+    image: str = ""
+    container_id: str
+
+
+class ContainerActionResponse(BaseModel):
+    """Response model for container actions (stop/delete)"""
+    message: str
+    container: str
+    action: str
+
+
 class TextGenerateRequest(BaseModel):
     """Request model for text generation"""
     prompt: str
@@ -110,6 +125,7 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     """Request model for chat completions"""
+    model_path: str
     messages: List[ChatMessage]
     max_tokens: int = 256
     temperature: float = 0.7
@@ -121,3 +137,6 @@ class ChatResponse(BaseModel):
     reply: str
     model: str
     usage: Dict[str, Any] = {}
+
+
+
