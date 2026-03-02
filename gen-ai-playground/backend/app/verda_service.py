@@ -8,6 +8,8 @@ import time
 import json
 from datetime import datetime
 from typing import Optional
+import json
+from pathlib import Path
 
 
 from verda import VerdaClient
@@ -31,6 +33,7 @@ from verda.containers import (
 from verda.exceptions import APIException
 
 from app.config import settings
+from app.template_models import TemplateConfig
 
 
 # Default model configuration
@@ -183,6 +186,24 @@ class VerdaService:
 
         raise RuntimeError(f"Cannot resolve image for engine: {cfg.engine}")
     
+    def available_models(self) -> list[dict]:
+        """Return template name and availability from all JSON templates."""
+        
+        # Fetch available resources once to avoid multiple api calls in the loop
+        all_resources = self.check_compute_recources(1)
+
+        results = []
+        for template_name in list(settings.TEXT_MODEL_PATHS_V2.values()):
+            cfg = self._parse_and_validate_template(template_name)
+            compute_name, gpu_count = self._resolve_gpu(cfg, all_resources)
+
+            results.append({
+                "template": template_name,
+                "tp": gpu_count,
+                "availability": compute_name,
+            })
+        return results
+      
     def check_compute_recources(self, size):
         """Check available compute resources for the specified template config."""
         client = self._get_client()
@@ -222,8 +243,39 @@ class VerdaService:
                 name.startswith(gpu_type.upper()) for name in available_gpu_types
             ):
                 return gpu_type.upper()
+        return "not available"
             
+    def _parse_and_validate_template(self, template_json: str) -> TemplateConfig:
+        """Parse and validate the template JSON config."""
+        try:
+            template_path = Path(__file__).resolve().parent.parent / "templates" / template_json
+            cfg = TemplateConfig.model_validate_json(
+                template_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            raise RuntimeError(f"Invalid template config: {e}")
+        
+        print(f"Parsed template config: {cfg}")
+        return cfg
+    
+    def _resolve_gpu(self, cfg, resources=None):
+        """ Determine GPU count and compute resource name based on template config and available resources."""
+        gpu_count = 1
+        if cfg.engine == "sglang" and cfg.sglang and cfg.sglang.tp:
+            gpu_count = cfg.sglang.tp
+        elif cfg.engine == "vllm" and cfg.vllm and cfg.vllm.tensor_parallel_size:
+            gpu_count = cfg.vllm.tensor_parallel_size
 
+        
+        # resources can be passed in to avoid multiple api calls when checking all templates in available_models() 
+        if resources is None:
+            resources = self.check_compute_recources(gpu_count)
+            
+        available = [r for r in resources if r.is_available and r.size >= gpu_count]
+        available_gpu_types = {r.name for r in available}
+
+        compute_name = self._set_compute_name(cfg, available_gpu_types)
+        return compute_name, gpu_count
+    
     def deploy_from_template(
         self,
         template_json: str,
@@ -244,16 +296,10 @@ class VerdaService:
         from app.template_models import TemplateConfig
 
         # Parse and validate template
-        try:
-            from pathlib import Path
-            template_path = Path(__file__).resolve().parent.parent / "templates" / template_json
-            cfg = TemplateConfig.model_validate_json(
-                template_path.read_text(encoding="utf-8"))
-        except Exception as e:
-            raise RuntimeError(f"Invalid template config: {e}")
-        
-        print(f"Parsed template config: {cfg}")
+        cfg = self._parse_and_validate_template(template_json)
 
+        
+        # Add host and port defaults, and model path 
         cfg.host = "0.0.0.0"
         if not cfg.port:
             cfg.port = APP_PORT
@@ -261,27 +307,19 @@ class VerdaService:
         client = self._get_client()
         self._model_path = cfg.model
 
-        # Generate deployment name
+        # Generate deployment name if not provided
         if deployment_name is None:
             model_slug = cfg.model.split("/")[-1].lower()
             deployment_name = model_slug.strip()
         self._deployment_name = deployment_name
-
-        self._ensure_hf_secret()
-
-        # Resolve GPU
-        gpu_count = 1
-        if cfg.engine == "sglang" and cfg.sglang and cfg.sglang.tp:
-            gpu_count = cfg.sglang.tp
-        elif cfg.engine == "vllm" and cfg.vllm and cfg.vllm.tensor_parallel_size:
-            gpu_count = cfg.vllm.tensor_parallel_size
         
-        #check compute resources for the requested gpu count 
-        available_resources = self.check_compute_recources(gpu_count)
-        if not available_resources:
+        # ensure hf secret exists
+        self._ensure_hf_secret()
+        
+        # Check compute resources and determine compute name and GPU count
+        compute_name, gpu_count = self._resolve_gpu(cfg)
+        if compute_name == "not available":
             raise NoComputeResourcesError(gpu_count)
-        available_gpu_types = {r.name for r in available_resources} 
-        compute_name = self._set_compute_name(cfg, available_gpu_types)
 
         # Build launch command
         cmd = self._generate_command_from_template(cfg)

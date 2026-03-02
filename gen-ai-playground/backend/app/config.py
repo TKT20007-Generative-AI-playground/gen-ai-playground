@@ -48,7 +48,7 @@ class Settings:
     }
     TEXT_MODEL_PATHS_V2 = {
         # DeepSeek
-        "deepseek-llm-7b": "deepseek-ai/deepseek-llm-7b-chat",
+        #"deepseek-llm-7b": "deepseek-ai/deepseek-llm-7b-chat",
         "deepseek-r1-0528": "deepseek-r1-sglang.json",
         "deepseek-v3.2-fp8": "deepseek-sglang-fp8.json",
         "deepseek-v3.2": "deepseek-sglang.json",

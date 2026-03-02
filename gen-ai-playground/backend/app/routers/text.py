@@ -34,7 +34,8 @@ router = APIRouter(
 @router.get("/models")
 def list_available_models():
     """List available models that can be deployed."""
-    return {"available_models": list(settings.TEXT_MODEL_PATHS_V2.keys())}
+    available_models = verda_service.available_models()
+    return {"available_models": available_models}
 
 @router.get("/available-compute")
 def get_available_compute():
