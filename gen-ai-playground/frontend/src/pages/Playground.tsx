@@ -29,6 +29,7 @@ export default function Playground() {
           onChange={(value) => {
             if (value) setSelectedComponent(value as Tab)
           }}
+          data-testid="playground-select"
         />
       </Group>
 

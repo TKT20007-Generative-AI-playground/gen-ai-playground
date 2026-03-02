@@ -3,11 +3,8 @@ Text generation routes using Verda container deployments.
 
 Provides endpoints to deploy an LLM on Verda, check deployment status,
 generate text completions, chat with the model, and clean up.
-
-All endpoints are **stateless** – the caller supplies deployment_name /
-model_path rather than relying on hidden server-side state.
 """
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends
 from pymongo.database import Database
 from datetime import datetime
 from typing import Optional
@@ -136,20 +133,15 @@ def choose_text_model_path(model: str) -> str:
 
 @router.get("/status", response_model=DeploymentStatusResponse)
 def get_deployment_status(
-    deployment_name: str = Query(..., description="Name of the deployment to query"),
-    model_path: str = Query("deepseek-ai/deepseek-llm-7b-chat", description="Model identifier"),
     current_user: UserInfo = Depends(get_current_user),
 ):
     """
-    Check the current status of a text model deployment.
+    Check the current status of the active text model deployment.
     
     Returns:
         Current deployment status (deploying, healthy, error, etc.)
     """
-    result = verda_service.get_deployment_status(
-        deployment_name=deployment_name,
-        model_path=model_path,
-    )
+    result = verda_service.get_deployment_status()
     return DeploymentStatusResponse(**result)
 
 
@@ -178,13 +170,13 @@ def generate_text(
     db: Database = Depends(get_database),
 ):
     """
-    Generate text using a deployed LLM model.
+    Generate text using the deployed LLM model.
     
     Sends a prompt to the SGLang-hosted model and returns the generated text.
     The deployment must be healthy before calling this endpoint.
     
     Args:
-        request: Text generation parameters (deployment_name, prompt, max_tokens, etc.)
+        request: Text generation parameters (prompt, max_tokens, etc.)
         current_user: Authenticated user
         db: Database for saving history
         
@@ -194,10 +186,7 @@ def generate_text(
     print(f"Text generation for user: {current_user.username}, prompt: {request.prompt[:50]}...")
 
     # Check deployment is healthy first
-    status = verda_service.get_deployment_status(
-        deployment_name=request.deployment_name,
-        model_path=request.model_path,
-    )
+    status = verda_service.get_deployment_status()
     if not status.get("healthy"):
         raise HTTPException(
             status_code=503,
@@ -207,8 +196,6 @@ def generate_text(
 
     try:
         result = verda_service.generate_text(
-            deployment_name=request.deployment_name,
-            model_path=request.model_path,
             prompt=request.prompt,
             max_tokens=request.max_tokens,
             temperature=request.temperature,
@@ -258,12 +245,12 @@ def chat_with_model(
     db: Database = Depends(get_database),
 ):
     """
-    Chat with a deployed LLM using the OpenAI-compatible chat completions API.
+    Chat with the deployed LLM using the OpenAI-compatible chat completions API.
     
     Send a list of messages and receive an assistant reply.
     
     Args:
-        request: Chat parameters (deployment_name, messages, max_tokens, etc.)
+        request: Chat parameters (messages, max_tokens, etc.)
         current_user: Authenticated user
         db: Database for saving history
         
@@ -272,10 +259,7 @@ def chat_with_model(
     """
     print(f"Chat request from user: {current_user.username}")
 
-    status = verda_service.get_deployment_status(
-        deployment_name=request.deployment_name,
-        model_path=request.model_path,
-    )
+    status = verda_service.get_deployment_status()
     if not status.get("healthy"):
         raise HTTPException(
             status_code=503,
@@ -284,8 +268,6 @@ def chat_with_model(
 
     try:
         result = verda_service.chat(
-            deployment_name=request.deployment_name,
-            model_path=request.model_path,
             messages=[msg.model_dump() for msg in request.messages],
             max_tokens=request.max_tokens,
             temperature=request.temperature,
@@ -324,19 +306,18 @@ def chat_with_model(
 
 @router.delete("/deploy")
 def delete_deployment(
-    deployment_name: str = Query(..., description="Name of the deployment to delete"),
     current_user: UserInfo = Depends(get_current_user),
 ):
     """
-    Delete a deployment and clean up resources.
+    Delete the active deployment and clean up resources.
     
     Important: Always clean up deployments when done to avoid unnecessary charges.
     
     Returns:
         Deletion status
     """
-    print(f"User {current_user.username} deleting deployment: {deployment_name}")
-    result = verda_service.delete_deployment(deployment_name=deployment_name)
+    print(f"User {current_user.username} deleting deployment")
+    result = verda_service.delete_deployment()
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("message"))
     return result

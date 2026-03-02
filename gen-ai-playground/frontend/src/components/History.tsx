@@ -63,7 +63,7 @@ export default function History() {
   if (loading)
     return (
       <Center mt="md">
-        <Loader />
+        <Loader data-testid="history-loader"/>
       </Center>
     );
 
@@ -82,7 +82,7 @@ export default function History() {
     {history.map((group, idx) => (
       <Stack key={idx} gap="md">
 
-        <Title order={4}>{group.prompt}</Title>
+        <Title order={4} data-testid={`prompt-${group.prompt}`}>{group.prompt}</Title>
 
         <div
           style={{
@@ -94,6 +94,7 @@ export default function History() {
           {group.images.map((item, i) => (
             <Stack key={i} gap="xs" align="center">
               <img
+                data-testid={`image-${item.prompt}-${item.model}`}
                 src={`data:image/${item.image_type || "png"};base64,${item.image_data}`}
                 alt={item.prompt}
                 style={{
@@ -105,13 +106,13 @@ export default function History() {
                 onClick={() => setSelectedImage(item)}
               />
 
-              <Badge variant="light">{item.model}</Badge>
+              <Badge data-testid={`model-${item.prompt}-${item.model}`} variant="light">{item.model}</Badge>
 
-              <Text size="xs" c="dimmed">
+              <Text data-testid={`timestamp-${item.prompt}-${item.model}`} size="xs" c="dimmed">
                 {new Date(item.timestamp).toLocaleString()}
               </Text>
 
-              <Text size="xs">
+              <Text data-testid={`type-${item.prompt}-${item.model}`} size="xs">
                 Type: {item.image_type || "generated"}
               </Text>
             </Stack>
@@ -132,6 +133,7 @@ export default function History() {
 >
   {selectedImage && (
     <img
+      data-testid="modal-image"
       src={`data:image/${selectedImage.image_type || "png"};base64,${selectedImage.image_data}`}
       alt={selectedImage.prompt}
       style={{

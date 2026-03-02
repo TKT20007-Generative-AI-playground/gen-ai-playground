@@ -66,12 +66,14 @@ class UserInfo(BaseModel):
 class DeployModelRequest(BaseModel):
     """Request model for deploying a text model on Verda"""
     model_path: str
+    model_path: str
     deployment_name: Optional[str] = None
 
 
 class ConnectDeploymentRequest(BaseModel):
     """Request model for connecting to an existing deployment"""
     deployment_name: str
+    model_path: str
     model_path: str
 
 
@@ -86,8 +88,6 @@ class DeploymentStatusResponse(BaseModel):
 
 class TextGenerateRequest(BaseModel):
     """Request model for text generation"""
-    deployment_name: str
-    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
     prompt: str
     max_tokens: int = 256
     temperature: float = 0.7
@@ -99,7 +99,7 @@ class TextGenerateResponse(BaseModel):
     generated_text: str
     model: str
     prompt: str
-    usage: Dict[str, Any] = Field(default_factory=dict)
+    usage: Dict[str, Any] = {}
 
 
 class ChatMessage(BaseModel):
@@ -110,8 +110,6 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     """Request model for chat completions"""
-    deployment_name: str
-    model_path: str = "deepseek-ai/deepseek-llm-7b-chat"
     messages: List[ChatMessage]
     max_tokens: int = 256
     temperature: float = 0.7
@@ -122,21 +120,4 @@ class ChatResponse(BaseModel):
     """Response model for chat completions"""
     reply: str
     model: str
-    usage: Dict[str, Any] = Field(default_factory=dict)
-
-
-# ---- Dashboard models ----
-
-class ContainerInfo(BaseModel):
-    """Model for Verda deployment status information"""
-    name: str
-    status: str
-    image: str  # endpoint URL
-    container_id: str  # deployment name
-
-
-class ContainerActionResponse(BaseModel):
-    """Response for deployment delete action"""
-    message: str
-    container: str
-    action: str
+    usage: Dict[str, Any] = {}

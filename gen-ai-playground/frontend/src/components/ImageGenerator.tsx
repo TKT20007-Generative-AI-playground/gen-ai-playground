@@ -147,6 +147,7 @@ export default function ImageGenerator() {
         >
           <ModelSelector
             label="Model 1"
+            data-testid="model-1-selector"
             models={models}
             value={model1}
             onChange={(value) => setModelAtIndex(0, value)}
@@ -155,6 +156,7 @@ export default function ImageGenerator() {
 
           <ModelSelector
             label="Model 2"
+            data-testid="model-2-selector"
             models={models}
             value={model2}
             onChange={(value) => setModelAtIndex(1, value)}

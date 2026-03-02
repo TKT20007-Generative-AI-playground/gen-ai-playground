@@ -3,11 +3,6 @@ Verda Cloud service for deploying and managing AI model containers.
 
 Uses the Verda Python SDK to deploy SGLang-based LLM containers
 and run inference against them.
-
-This service is **stateless**: no per-request or per-user mutable state is
-held on the instance.  Callers must pass ``deployment_name`` and
-``model_path`` explicitly so the service is safe to share across threads,
-workers, and concurrent requests.
 """
 import time
 import json
@@ -51,19 +46,18 @@ DEFAULT_COMPUTE = "L40S"  # 48GB VRAM, good for 7B models
 
 class VerdaService:
     """
-    Stateless helper for Verda container deployments.
-
-    All deployment-specific identifiers (``deployment_name``, ``model_path``)
-    are passed into each method rather than stored on the instance, making
-    the service safe to use as a shared singleton in a multi-threaded /
-    multi-worker FastAPI server.
-
-    Only the Verda API *client* is lazily cached, since it is constructed
-    from server-wide credentials and is itself thread-safe.
+    Manages Verda container deployments for running AI text models.
+    
+    This service handles the full lifecycle: deploying an SGLang container
+    with an LLM, checking health, running inference, and cleanup.
     """
 
     def __init__(self):
         self._client: Optional[VerdaClient] = None
+        self._deployment: Optional[Deployment] = None
+        self._deployment_name: Optional[str] = None
+        self._model_path: str = DEFAULT_MODEL
+        self._initialized = False
 
     def _get_client(self) -> VerdaClient:
         """Get or create the Verda API client."""
@@ -72,14 +66,9 @@ class VerdaService:
                 raise RuntimeError(
                     "VERDA_CLIENT_ID and VERDA_CLIENT_SECRET must be set in environment"
                 )
-            if not settings.VERDA_API_KEY:
-                raise RuntimeError(
-                    "VERDA_API_KEY must be set in environment for inference requests"
-                )
             self._client = VerdaClient(
                 client_id=settings.VERDA_CLIENT_ID,
                 client_secret=settings.VERDA_CLIENT_SECRET,
-                inference_key=settings.VERDA_API_KEY,
             )
         return self._client
 
@@ -369,6 +358,7 @@ class VerdaService:
             dict with deployment info (name, status, model)
         """
         client = self._get_client()
+        self._model_path = model_path
 
         # Generate a unique deployment name if not provided
         if deployment_name is None:
@@ -442,6 +432,8 @@ class VerdaService:
         )
 
         created = client.containers.create_deployment(deployment)
+        self._deployment = created
+        self._initialized = True
 
         print(f"Created deployment: {created.name}")
         return {
@@ -565,9 +557,9 @@ class VerdaService:
             status = client.containers.get_deployment_status(self._deployment_name)
 
             return {
-                "name": deployment_name,
+                "name": self._deployment_name,
                 "status": status.value,
-                "model": model_path,
+                "model": self._model_path,
                 "healthy": status == ContainerDeploymentStatus.HEALTHY,
             }
 
@@ -584,27 +576,23 @@ class VerdaService:
                 }
 
             return {
-                "name": deployment_name,
+                "name": self._deployment_name,
                 "status": "error",
                 "message": str(e),
-                "model": model_path,
+                "model": self._model_path,
             }
 
     def generate_text(
         self,
-        deployment_name: str,
-        model_path: str,
         prompt: str,
         max_tokens: int = 256,
         temperature: float = 0.7,
         top_p: float = 0.9,
     ) -> dict:
         """
-        Generate text using a deployed model via sync inference.
+        Generate text using the deployed model via sync inference.
         
         Args:
-            deployment_name: Name of the Verda deployment to target.
-            model_path: HuggingFace model identifier served by the deployment.
             prompt: The text prompt to send to the model.
             max_tokens: Maximum tokens to generate.
             temperature: Sampling temperature (0.0-2.0).
@@ -613,6 +601,9 @@ class VerdaService:
         Returns:
             dict with generated text and metadata
         """
+        if not self._deployment_name:
+            raise RuntimeError("No active deployment. Deploy a model first.")
+
         client = self._get_client()
 
         # Refresh the deployment object and attach inference client
@@ -627,14 +618,14 @@ class VerdaService:
 
         # Use OpenAI-compatible completions API (SGLang serves this)
         completions_data = {
-            "model": model_path,
+            "model": self._model_path,
             "prompt": prompt,
             "max_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
         }
 
-        response = deployment.run_sync(
+        response = self._deployment.run_sync(
             completions_data,
             path="/v1/completions",
         )
@@ -649,7 +640,7 @@ class VerdaService:
 
         return {
             "generated_text": generated_text,
-            "model": model_path,
+            "model": self._model_path,
             "prompt": prompt,
             "usage": result.get("usage", {}) if isinstance(result, dict) else {},
             "raw_response": result,
@@ -657,8 +648,6 @@ class VerdaService:
 
     def chat(
         self,
-        deployment_name: str,
-        model_path: str,
         messages: list[dict],
         max_tokens: int = 256,
         temperature: float = 0.7,
@@ -666,11 +655,9 @@ class VerdaService:
         enable_thinking: bool = False,
     ) -> dict:
         """
-        Chat with a deployed model using the OpenAI-compatible chat API.
+        Chat with the deployed model using the OpenAI-compatible chat API.
         
         Args:
-            deployment_name: Name of the Verda deployment to target.
-            model_path: HuggingFace model identifier served by the deployment.
             messages: List of message dicts with 'role' and 'content' keys.
             max_tokens: Maximum tokens to generate.
             temperature: Sampling temperature.
@@ -679,6 +666,9 @@ class VerdaService:
         Returns:
             dict with the assistant's reply and metadata
         """
+        if not self._deployment_name:
+            raise RuntimeError("No active deployment. Deploy a model first.")
+
         client = self._get_client()
         self._deployment = client.containers.get_deployment_by_name(
             self._deployment_name
@@ -687,7 +677,7 @@ class VerdaService:
             self._deployment.set_inference_client(settings.VERDA_INFERENCE_KEY)
 
         chat_data = {
-            "model": model_path,
+            "model": self._model_path,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
@@ -695,7 +685,7 @@ class VerdaService:
             "chat_template_kwargs": {"enable_thinking": enable_thinking},
         }
 
-        response = deployment.run_sync(
+        response = self._deployment.run_sync(
             chat_data,
             path="/v1/chat/completions",
         )
@@ -711,22 +701,23 @@ class VerdaService:
 
         return {
             "reply": assistant_message,
-            "model": model_path,
+            "model": self._model_path,
             "usage": result.get("usage", {}) if isinstance(result, dict) else {},
             "raw_response": result,
         }
 
-    def delete_deployment(self, deployment_name: str) -> dict:
+    def delete_deployment(self) -> dict:
         """
-        Delete a deployment and clean up resources.
-
-        Args:
-            deployment_name: Name of the deployment to delete.
+        Delete the active deployment and clean up resources.
         
         Returns:
             dict with deletion status
         """
+        if not self._deployment_name:
+            return {"status": "no_deployment", "message": "No active deployment to delete"}
+
         client = self._get_client()
+        name = self._deployment_name
         try:
             client.containers.delete_deployment(name)
             self._deployment = None
@@ -773,7 +764,7 @@ class VerdaService:
 
     def connect_to_existing(self, deployment_name: str, model_path: str = DEFAULT_MODEL) -> dict:
         """
-        Verify that an already-running deployment exists and return its status.
+        Connect to an already-running deployment instead of creating a new one.
         
         Args:
             deployment_name: Name of the existing deployment.
@@ -784,7 +775,10 @@ class VerdaService:
         """
         client = self._get_client()
         try:
-            client.containers.get_deployment_by_name(deployment_name)
+            self._deployment = client.containers.get_deployment_by_name(deployment_name)
+            self._deployment_name = deployment_name
+            self._model_path = model_path
+            self._initialized = True
             status = client.containers.get_deployment_status(deployment_name)
             return {
                 "name": deployment_name,
@@ -797,6 +791,5 @@ class VerdaService:
             return {"status": "error", "message": str(e)}
 
 
-# Shared stateless instance – safe for concurrent use because no
-# per-request / per-user mutable state is stored on the instance.
+# Singleton instance used across the app
 verda_service = VerdaService()
