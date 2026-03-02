@@ -66,6 +66,11 @@ export default function ImageEditor() {
 
     const file = new File([blob], "edited.png", { type: "image/png" });
     setUserImage(file);
+
+    replaceEditedUrl(null);
+    setPrompt(""); 
+    setModel("");
+
   }
 }, [imageToEdit]);
 
@@ -178,13 +183,57 @@ export default function ImageEditor() {
       {editedImageUrl && (
         <div style={{ width: "100%" }}>
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-            <PhotoArea src={originalImageUrl} alt="Original" height={420} header={<Text fw={600}>Original</Text>} />
-            <PhotoArea
-              src={editedImageUrl}
-              alt="Edited result"
-              height={420}
-              header={<Text fw={600}>Edited result</Text>}
-            />
+            <div>
+              <PhotoArea
+                src={originalImageUrl}
+                alt="Original"
+                height={420}
+                header={<Text fw={600}>Original</Text>}
+              />
+              <Button
+                mt="sm"
+                fullWidth
+                onClick={() => {
+                  const src = originalImageUrl!;
+                  fetch(src)
+                    .then(res => res.blob())
+                    .then(blob => {
+                      const file = new File([blob], "reedit.png", { type: blob.type });
+                      setUserImage(file);
+                      replaceEditedUrl(null);
+                      setPrompt("");
+                    });
+                }}
+              >
+                Edit image
+              </Button>
+            </div>
+
+            <div>
+              <PhotoArea
+                src={editedImageUrl}
+                alt="Edited result"
+                height={420}
+                header={<Text fw={600}>Edited result</Text>}
+              />
+              <Button
+                mt="sm"
+                fullWidth
+                onClick={() => {
+                  const src = editedImageUrl!;
+                  fetch(src)
+                    .then(res => res.blob())
+                    .then(blob => {
+                      const file = new File([blob], "reedit.png", { type: blob.type });
+                      setUserImage(file);
+                      replaceEditedUrl(null);
+                      setPrompt("");
+                    });
+                }}
+              >
+                Edit image
+              </Button>
+            </div>
           </SimpleGrid>
         </div>
       )}

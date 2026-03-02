@@ -93,7 +93,7 @@ export default function History() {
                   gap: "16px",
                 }}
               >
-                {group.images.map((item, i) => (
+                {group.images?.filter(Boolean).map((item, i) => (
                   <Stack key={i} gap="xs" align="center">
                     <img
                       data-testid={`image-${item.prompt}-${item.model}`}
@@ -142,9 +142,11 @@ export default function History() {
         onClose={() => setSelectedImage(null)}
         centered
         size="lg"
-        withinPortal={false}
+        withinPortal={true}
+        yOffset={0}
+        scrollAreaComponent={ScrollArea}
       >
-  {selectedImage && (
+  {selectedImage != null && selectedImage.image_data && (
     <Stack>
       <img
         data-testid="modal-image"
@@ -162,11 +164,21 @@ export default function History() {
         mt="md"
         fullWidth
         onClick={() => {
-          navigate("/playground", {
-            state: { imageToEdit: selectedImage },
-          });
-          setSelectedImage(null);
-        }}
+          const img = selectedImage;
+          setSelectedImage(null);  
+          setTimeout(() => {
+            navigate("/edit-image", {
+              state: {
+                imageToEdit: {
+                  image_data: img.image_data,
+                  image_type: img.image_type,
+                  prompt: img.prompt,
+                  model: img.model
+                }
+              }
+            });
+          }, 0);
+          }}
       >
         Edit image
       </Button>
