@@ -4,6 +4,7 @@ import Header from "./components/Header"
 import Register from "./components/Register"
 import Playground from "./pages/Playground"
 import History from "./components/History";
+import ImageEditor from "./components/ImageEditor";
 import { useAuth } from './context/AuthContext'
 import { ProtectedRoute } from "./components/ProtectedRoute"
 
@@ -27,6 +28,11 @@ function App() {
             <ProtectedRoute>
               <Playground />
             </ProtectedRoute>
+          } />
+          <Route path="/edit-image" element={
+            <ProtectedRoute>
+              <ImageEditor />
+            </ProtectedRoute> 
           } />
           <Route path="/history" element={
             <ProtectedRoute>
