@@ -76,6 +76,7 @@ type ChatPanelProps = {
   messages: Message[]
   onClearMessages: () => void
   isLoading: boolean
+  isBusy: boolean
 }
 
 function ChatPanel({
@@ -86,6 +87,7 @@ function ChatPanel({
   messages,
   onClearMessages,
   isLoading,
+  isBusy,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -174,16 +176,16 @@ function ChatPanel({
       </Text>
 
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-        <Button size="xs" onClick={deployContainer} disabled={isLoading}>
+        <Button size="xs" onClick={deployContainer} disabled={isBusy}>
           Deploy
         </Button>
-        <Button size="xs" onClick={checkContainerStatus} disabled={isLoading}>
+        <Button size="xs" onClick={checkContainerStatus} disabled={isBusy}>
           Status
         </Button>
-        <Button size="xs" color="red" onClick={deleteContainer} disabled={isLoading}>
+        <Button size="xs" color="red" onClick={deleteContainer} disabled={isBusy}>
           Delete
         </Button>
-        <Button size="xs" color="orange" onClick={onClearMessages} disabled={isLoading}>
+        <Button size="xs" color="orange" onClick={onClearMessages} disabled={isBusy}>
           Clear
         </Button>
       </div>
@@ -253,11 +255,17 @@ export default function TextGenerator() {
   const [messagesByModel, setMessagesByModel] = useState<Record<string, Message[]>>({})
   const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
 
-  // Keep a ref in sync so async loops always see the latest messages.
+  // Keep a ref so async loops always see the latest messages.
   const messagesByModelRef = useRef<Record<string, Message[]>>({})
-  useEffect(() => {
-    messagesByModelRef.current = messagesByModel
-  }, [messagesByModel])
+
+  const setMessagesForModel = (modelValue: string, next: Message[]) => {
+    messagesByModelRef.current = { ...messagesByModelRef.current, [modelValue]: next }
+    setMessagesByModel((prev) => ({ ...prev, [modelValue]: next }))
+  }
+
+  const clearMessagesForModel = (modelValue: string) => {
+    setMessagesForModel(modelValue, [])
+  }
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem("token")
@@ -339,16 +347,14 @@ export default function TextGenerator() {
 
       const existingMessages = messagesByModelRef.current[modelValue] ?? []
       const updatedMessages = existingMessages.concat(userMessage)
-      messagesByModelRef.current = { ...messagesByModelRef.current, [modelValue]: updatedMessages }
-      setMessagesByModel((prev) => ({ ...prev, [modelValue]: updatedMessages }))
+      setMessagesForModel(modelValue, updatedMessages)
 
       const connected = await connectToModel(modelValue)
       if (connected) {
         const reply = await chatWithCurrentModel(updatedMessages)
         if (reply) {
           const withReply = updatedMessages.concat({ id: makeMessageId(), role: "assistant", content: reply })
-          messagesByModelRef.current = { ...messagesByModelRef.current, [modelValue]: withReply }
-          setMessagesByModel((prev) => ({ ...prev, [modelValue]: withReply }))
+          setMessagesForModel(modelValue, withReply)
         }
       }
 
@@ -441,8 +447,9 @@ export default function TextGenerator() {
                       backendUrl={backendUrl}
                       getAuthHeaders={getAuthHeaders}
                       messages={messagesByModel[modelValue] ?? []}
-                      onClearMessages={() => setMessagesByModel((prev) => ({ ...prev, [modelValue]: [] }))}
+                      onClearMessages={() => clearMessagesForModel(modelValue)}
                       isLoading={loadingByModel[modelValue] ?? false}
+                      isBusy={isAnyLoading}
                     />
                   ))}
                 </div>
@@ -469,8 +476,9 @@ export default function TextGenerator() {
                   backendUrl={backendUrl}
                   getAuthHeaders={getAuthHeaders}
                   messages={messagesByModel[modelValue] ?? []}
-                  onClearMessages={() => setMessagesByModel((prev) => ({ ...prev, [modelValue]: [] }))}
+                  onClearMessages={() => clearMessagesForModel(modelValue)}
                   isLoading={loadingByModel[modelValue] ?? false}
+                  isBusy={isAnyLoading}
                 />
               ))}
             </div>
