@@ -7,7 +7,7 @@ Security Model:
 - Frontend relies on HTTPOnly cookies (no localStorage)
 - Cookie settings: httponly=True, samesite="strict", secure=IS_PROD
 """
-from fastapi import APIRouter, HTTPException, Depends, Response, Cookie
+from fastapi import APIRouter, HTTPException, Depends, Response
 from pymongo.database import Database
 from datetime import datetime, timedelta
 import bcrypt
@@ -17,6 +17,7 @@ from app.config import settings
 from app.database import get_database
 from app.models import RegisterRequest, LoginRequest, RegisterResponse, LoginResponse
 from app.utils.validation import validate_password
+from app.dependencies import get_current_user
 
 router = APIRouter(
     tags=["authentication"]
@@ -28,10 +29,6 @@ def register(
     user_data: RegisterRequest,
     db: Database = Depends(get_database)
 ):
-    
-    # Password validation
-    validate_password(user_data.password)
-    
     """
     Register a new user
     
@@ -45,6 +42,10 @@ def register(
     Raises:
         HTTPException: If registration fails
     """
+
+    # Password validation
+    validate_password(user_data.password)
+
     try:
         # Validate invitation code
         if not settings.INVITATION_CODE or user_data.invitation_code != settings.INVITATION_CODE:
@@ -168,16 +169,12 @@ def login(
         )
 
 @router.get("/me")
-def me(access_token: str = Cookie(None)):
-    if not access_token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = jwt.decode(access_token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
-        return {"username": payload.get("username")}
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+def me(current_user=Depends(get_current_user)):
+    """
+    Return the current authenticated user's username.
+    Uses the same authentication logic as protected endpoints.
+    """
+    return {"username": current_user.username}
     
 @router.post("/logout")
 def logout(response: Response):
