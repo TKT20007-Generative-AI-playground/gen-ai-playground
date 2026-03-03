@@ -4,7 +4,7 @@ Text generation routes using Verda container deployments.
 Provides endpoints to deploy an LLM on Verda, check deployment status,
 generate text completions, chat with the model, and clean up.
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from pymongo.database import Database
 from datetime import datetime
 from typing import Optional
@@ -24,6 +24,7 @@ from app.models import (
 )
 from app.verda_service import verda_service
 from app.config import settings
+from verda.containers import ContainerDeploymentStatus
 
 
 router = APIRouter(
@@ -130,15 +131,17 @@ def _deploy_model_internal(model_key: str) -> dict:
 
 @router.get("/status", response_model=DeploymentStatusResponse)
 def get_deployment_status(
+    deployment_name: str = Query(..., description="Name of the deployment to check"),
+    model_path: Optional[str] = Query(None, description="Model path for metadata"),
     current_user: UserInfo = Depends(get_current_user),
 ):
     """
-    Check the current status of the active text model deployment.
+    Check the status of a specific text model deployment.
     
     Returns:
         Current deployment status (deploying, healthy, error, etc.)
     """
-    result = verda_service.get_deployment_status()
+    result = verda_service.get_deployment_status(deployment_name, model_path)
     return DeploymentStatusResponse(**result)
 
 
@@ -210,9 +213,9 @@ def generate_text(
     db: Database = Depends(get_database),
 ):
     """
-    Generate text using the deployed LLM model.
+    Generate text using a deployed LLM model.
     
-    Sends a prompt to the SGLang-hosted model and returns the generated text.
+    Automatically discovers the correct deployment for the requested model.
     The deployment must be healthy before calling this endpoint.
     
     Args:
@@ -225,17 +228,69 @@ def generate_text(
     """
     print(f"Text generation for user: {current_user.username}, prompt: {request.prompt[:50]}...")
 
-    # Check deployment is healthy first
-    status = verda_service.get_deployment_status()
-    if not status.get("healthy"):
+    # Discover deployment for the requested model
+    model_path = request.model_path if hasattr(request, 'model_path') and request.model_path else None
+    if model_path:
+        model_path = choose_text_model_path(model_path)
+    
+    # Find a running deployment
+    try:
+        deployments = verda_service.list_deployments()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail="Could not reach deployment service.")
+
+    deployment_name = None
+    used_model_path = model_path
+
+    if model_path:
+        model_slug = model_path.split("/")[-1].lower()
+        for d in deployments:
+            if model_slug in d.get("name", "").lower():
+                deployment_name = d["name"]
+                break
+    else:
+        # Fallback: use any healthy deployment
+        client = verda_service._get_client()
+        for d in deployments:
+            try:
+                dep_status = client.containers.get_deployment_status(d["name"])
+                if dep_status == ContainerDeploymentStatus.HEALTHY:
+                    deployment_name = d["name"]
+                    # Try to infer model path from deployment name
+                    for mp in settings.TEXT_MODEL_PATHS.values():
+                        if mp.split("/")[-1].lower() in d["name"].lower():
+                            used_model_path = mp
+                            break
+                    break
+            except Exception:
+                continue
+
+    if not deployment_name:
         raise HTTPException(
             status_code=503,
-            detail=f"Deployment is not healthy. Current status: {status.get('status', 'unknown')}. "
-                   "Wait for the deployment to become healthy before generating text.",
+            detail="No suitable deployment found. Ask an admin to deploy a model.",
         )
+
+    # Check deployment health
+    try:
+        client = verda_service._get_client()
+        dep_status = client.containers.get_deployment_status(deployment_name)
+        status_str = dep_status.value if hasattr(dep_status, 'value') else str(dep_status)
+        if status_str != "healthy":
+            raise HTTPException(
+                status_code=503,
+                detail=f"Deployment is not healthy. Current status: {status_str}. "
+                       "Wait for the deployment to become healthy before generating text.",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
 
     try:
         result = verda_service.generate_text(
+            deployment_name=deployment_name,
+            model_path=used_model_path or "",
             prompt=request.prompt,
             max_tokens=request.max_tokens,
             temperature=request.temperature,
@@ -318,26 +373,31 @@ def chat_with_model(
             break
 
     if not existing:
+        dep_names = [d.get("name", "?") for d in deployments]
+        print(f"No deployment found for slug '{model_slug}'. Available: {dep_names}")
         raise HTTPException(
             status_code=503,
             detail=f"Model {model_key} is not deployed. Ask an admin to deploy it from the dashboard.",
         )
 
-    # Connect to the deployment
+    # Check deployment health without mutating singleton state
     deployment_name = existing["name"]
+    print(f"Found deployment '{deployment_name}' for model_slug '{model_slug}'")
     try:
-        conn = verda_service.connect_to_existing(
-            deployment_name=deployment_name,
-            model_path=model_path,
-        )
+        client = verda_service._get_client()
+        dep_status = client.containers.get_deployment_status(deployment_name)
+        status_str = dep_status.value if hasattr(dep_status, 'value') else str(dep_status)
+        print(f"Deployment '{deployment_name}' status: {status_str}")
+        if status_str != "healthy":
+            raise HTTPException(
+                status_code=503,
+                detail=f"Model {model_key} is not healthy yet (status: {status_str}). Please wait and try again.",
+            )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to connect to deployment: {str(e)}")
-
-    if conn.get("status") == "unknown" or not conn.get("healthy"):
-        raise HTTPException(
-            status_code=503,
-            detail=f"Model {model_key} is not healthy yet. Please wait and try again.",
-        )
+        print(f"Failed to check deployment status for '{deployment_name}': {e}")
+        raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
 
     # Chat
     try:
@@ -346,6 +406,8 @@ def chat_with_model(
             max_tokens=request.max_tokens,
             temperature=request.temperature,
             top_p=request.top_p,
+            deployment_name=deployment_name,
+            model_path=model_path,
         )
 
         # Save to history
@@ -380,18 +442,19 @@ def chat_with_model(
 
 @router.delete("/deploy")
 def delete_deployment(
+    deployment_name: str = Query(..., description="Name of the deployment to delete"),
     current_user: UserInfo = Depends(get_admin_user),
 ):
     """
-    Delete the active deployment and clean up resources.
+    Delete a specific deployment and clean up resources.
     
     Important: Always clean up deployments when done to avoid unnecessary charges.
     
     Returns:
         Deletion status
     """
-    print(f"User {current_user.username} deleting deployment")
-    result = verda_service.delete_deployment()
+    print(f"User {current_user.username} deleting deployment: {deployment_name}")
+    result = verda_service.delete_deployment(deployment_name)
     if result.get("status") == "error":
         raise HTTPException(status_code=500, detail=result.get("message"))
     return result

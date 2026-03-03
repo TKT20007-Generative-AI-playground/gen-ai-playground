@@ -104,6 +104,7 @@ class ContainerActionResponse(BaseModel):
 class TextGenerateRequest(BaseModel):
     """Request model for text generation"""
     prompt: str
+    model_path: Optional[str] = None
     max_tokens: int = 256
     temperature: float = 0.7
     top_p: float = 0.9
