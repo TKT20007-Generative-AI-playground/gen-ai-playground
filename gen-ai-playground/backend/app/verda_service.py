@@ -193,12 +193,13 @@ class VerdaService:
         all_resources = self.check_compute_recources(1)
 
         results = []
-        for template_name in list(settings.TEXT_MODEL_PATHS_V2.values()):
+        for template_name in list(settings.TEXT_MODEL_PATHS_V2.keys()):
             cfg = self._parse_and_validate_template(template_name)
             compute_name, gpu_count = self._resolve_gpu(cfg, all_resources)
-
+            
+            model_name = settings.TEXT_MODEL_PATHS_V2.get(template_name, "unknown")
             results.append({
-                "template": template_name,
+                "Model": model_name,
                 "tp": gpu_count,
                 "availability": compute_name,
             })
