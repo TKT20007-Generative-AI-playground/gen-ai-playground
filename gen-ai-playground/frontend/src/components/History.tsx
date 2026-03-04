@@ -97,7 +97,7 @@ export default function History() {
                   <Stack key={i} gap="xs" align="center">
                     <img
                       data-testid={`image-${item.prompt}-${item.model}`}
-                      src={`data:image/${item.image_type || "png"};base64,${item.image_data}`}
+                      src={`data:image/png;base64,${item.image_data}`}
                       alt={item.prompt}
                       style={{
                         width: "100%",

@@ -31,9 +31,9 @@ function App() {
           } />
           <Route path="/edit-image" element={
             <ProtectedRoute>
-              <ImageEditor />
-            </ProtectedRoute> 
-          } />
+              <ImageEditor /> 
+            </ProtectedRoute> } />
+            
           <Route path="/history" element={
             <ProtectedRoute>
               <History />

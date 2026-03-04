@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import base64
 import time
 import requests
+from bson import ObjectId
 
 from app.config import settings
 from app.database import get_database
@@ -58,12 +59,10 @@ def get_history(
         ).sort("timestamp", -1).limit(50))
 
         for item in history:
-            item["id"] = str(item["_id"])
-
-            if item.get("parent_image_id"):
-                item["parent_image_id"] = str(item["parent_image_id"])
-                
-            del item["_id"]
+            if "_id" in item:
+                del item["_id"]
+            if "parent_image_id" in item:
+                del item["parent_image_id"]
         
         return HistoryResponse(history=history)
     except Exception as e:
@@ -162,7 +161,8 @@ async def generate_image(
                     return_image_base64,
                     current_user,
                     image_type,
-                    user_base64_image=image_request.image_to_edit
+                    user_base64_image=image_request.image_to_edit,
+                    parent_image_id=parent_image_id
                 )
                 
                 return Response(
