@@ -281,9 +281,9 @@ export default function TextGenerator() {
             if (parsed.thinking) console.log("Thinking:", parsed.thinking)
             const label = modelOptions.find(m => m.value === modelValue)?.label ?? modelValue
             setMessages([...messagesWithUser, { role: "assistant", content: parsed.actualReply, modelLabel: label }])
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("chat error:", error)
-            const detail = error?.response?.data?.detail
+            const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
             setStatusMsg(detail || "Failed to reach the server.")
         } finally {
             setIsLoading(false)
