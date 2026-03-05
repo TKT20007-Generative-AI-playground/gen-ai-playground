@@ -65,7 +65,7 @@ export default function History() {
   if (loading)
     return (
       <Center mt="md">
-        <Loader />
+        <Loader data-testid="history-loader" />
       </Center>
     );
 

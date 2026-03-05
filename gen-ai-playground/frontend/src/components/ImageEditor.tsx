@@ -69,7 +69,7 @@ export default function ImageEditor() {
 
     replaceEditedUrl(null);
     setPrompt(""); 
-    setModel("");
+    setModel(null);
 
   }
 }, [imageToEdit]);

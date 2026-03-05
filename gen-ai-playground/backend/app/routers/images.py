@@ -334,6 +334,7 @@ def save_image_to_db(db: Database, prompt: str, model:
         
         if parent_image_id:
             image_record["parent_image_id"] = ObjectId(parent_image_id)
+    
                 
         db.images.insert_one(image_record)
         print(f"Saved image data to MongoDB for user: {current_user.username}")
