@@ -349,26 +349,6 @@ class VerdaService:
                     value_or_reference_to_secret="INFO",
                     type=EnvVarType.PLAIN,
                 ),
-                # EnvVar(
-                #     name="NCCL_IB_DISABLE",
-                #     value_or_reference_to_secret="1",
-                #     type=EnvVarType.PLAIN,
-                # ),
-                # EnvVar(
-                #     name="NCCL_P2P_DISABLE",
-                #     value_or_reference_to_secret="1",
-                #     type=EnvVarType.PLAIN,
-                # ),
-                # EnvVar(
-                #     name="NCCL_SHM_DISABLE",
-                #     value_or_reference_to_secret="0",
-                #     type=EnvVarType.PLAIN,
-                # ),
-                # EnvVar(
-                #     name="NCCL_NET_GDR_LEVEL",
-                #     value_or_reference_to_secret="0",
-                #     type=EnvVarType.PLAIN,
-                # ),
             ],
             # for bigger models->
             volume_mounts=[VolumeMount(

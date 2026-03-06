@@ -142,7 +142,7 @@ def _deploy_model_internal(model_key: str) -> dict:
     Internal helper to deploy a model by key.
     Used by the admin /deploy endpoint.
     """
-    # Check V2 templates first
+    # Check V2 templates 
     template = _resolve_template_name(model_key)
     if template:
         return verda_service.deploy_from_template(template_json=template)
