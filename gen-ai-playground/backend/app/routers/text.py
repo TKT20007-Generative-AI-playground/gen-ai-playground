@@ -114,13 +114,8 @@ def connect_to_deployment(
         raise HTTPException(status_code=500, detail=str(e))
     
 def choose_text_model_path(model: str) -> str:
+    """Map a user-friendly model key to the actual model path used for deployment."""
     model = model.strip()
-
-    # Try TEXT_MODEL_PATHS first (legacy keys)
-    if model in settings.TEXT_MODEL_PATHS:
-        return settings.TEXT_MODEL_PATHS[model]
-
-    # V2 fallback: find template by display name, parse HF model path from it
     for template_name, display_name in settings.TEXT_MODEL_PATHS_V2.items():
         if display_name == model:
             cfg = verda_service._parse_and_validate_template(template_name)
@@ -129,7 +124,7 @@ def choose_text_model_path(model: str) -> str:
     raise HTTPException(
         status_code=400,
         detail=f"Unsupported model: {model}. "
-               f"Supported models: {list(settings.TEXT_MODEL_PATHS.keys()) + list(settings.TEXT_MODEL_PATHS_V2.values())}"
+               f"Supported models: {list(settings.TEXT_MODEL_PATHS_V2.values())}"
     )
 
 
@@ -151,18 +146,9 @@ def _deploy_model_internal(model_key: str) -> dict:
     template = _resolve_template_name(model_key)
     if template:
         return verda_service.deploy_from_template(template_json=template)
-
-    # Legacy 
-    model_path = choose_text_model_path(model_key)
-
-    if model_path == "deepseek-ai/deepseek-llm-7b-chat":
-        return verda_service.deploy_model(model_path=model_path)
-    elif model_path == "Qwen/Qwen3-8B":
-        return verda_service.deploy_from_template(template_json="qwen3-sglang.json")
-    elif model_path == "Qwen/Qwen3-32B":
-        return verda_service.deploy_from_template(template_json="qwen3-sglang-think.json")
     else:
-        return verda_service.deploy_model(model_path=model_path)
+        return {"error": f"Model '{model_key}' not found in available templates."}
+
 
 
 @router.get("/status", response_model=DeploymentStatusResponse)
@@ -212,7 +198,7 @@ def get_model_statuses(
         deployments = client.containers.get_deployments()
     except Exception:
         # If we can't reach Verda, everything is offline
-        return {key: "offline" for key in settings.TEXT_MODEL_PATHS}
+        return {key: "offline" for key in settings.TEXT_MODEL_PATHS_V2.values()}
 
     # Build a lookup: deployment_name (lower) -> status string
     dep_statuses: dict[str, str] = {}
@@ -224,23 +210,8 @@ def get_model_statuses(
             dep_statuses[d.name.lower()] = "unknown"
 
     result: dict[str, str] = {}
-    #Legacy
-    for model_key, model_path in settings.TEXT_MODEL_PATHS.items():
-        slug = _sanitize_slug(model_path)
-        matched_status = "offline"
-        for dep_name, st in dep_statuses.items():
-            if slug in dep_name:
-                if st == "healthy":
-                    matched_status = "live"
-                elif st == "unknown":
-                    # "unknown" means the container is shutting down — treat as offline
-                    matched_status = "offline"
-                else:
-                    matched_status = "starting"
-                break
-        result[model_key] = matched_status
-
-    # Also include V2 template models 
+    
+    #V2 template models 
     for template_name, v2_name in settings.TEXT_MODEL_PATHS_V2.items():
         if v2_name in result:
             continue
@@ -316,10 +287,14 @@ def generate_text(
                 if dep_status == ContainerDeploymentStatus.HEALTHY:
                     deployment_name = d["name"]
                     # Try to infer model path from deployment name
-                    for mp in settings.TEXT_MODEL_PATHS.values():
-                        if _sanitize_slug(mp) in d["name"].lower():
-                            used_model_path = mp
-                            break
+                    for tpl in settings.TEXT_MODEL_PATHS_V2:
+                        try:
+                            cfg = verda_service._parse_and_validate_template(tpl)
+                            if _sanitize_slug(cfg.model) in d["name"].lower():
+                                used_model_path = cfg.model
+                                break
+                        except Exception:
+                            continue
                     break
             except Exception:
                 continue
