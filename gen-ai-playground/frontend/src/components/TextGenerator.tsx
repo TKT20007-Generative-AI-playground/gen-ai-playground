@@ -1,431 +1,478 @@
 import axios from "axios"
 import { useAuth } from "../context/AuthContext"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
 
 import {
-    Button,
-    MultiSelect,
-    Paper,
-    Text,
-    ScrollArea,
-    TextInput
-} from '@mantine/core'
+  Alert,
+  Button,
+  MultiSelect,
+  Paper,
+  Text,
+  ScrollArea,
+  TextInput,
+} from "@mantine/core"
 
 type ModelOption = {
-    value: string
-    label: string
-    slug: string
+  value: string
+  label: string
+  slug: string
 }
 
 type Message = {
-    role: "user" | "assistant" | "system"
-    content: string
+  id: string
+  role: "user" | "assistant"
+  content: string
+  modelLabel?: string
 }
 
-type Deployment = {
-    name: string
+type ModelStatus = "live" | "starting" | "offline" | "unknown"
+
+const makeMessageId = () => {
+  // Prefer crypto.randomUUID when available; fall back for older browsers.
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return (crypto as Crypto).randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
+
+const MAX_MODELS = 4
 
 const modelOptions: ModelOption[] = [
-    {
-        value: "deepseek-llm-7b",
-        label: "DeepSeek LLM 7B",
-        slug: "deepseek-llm-7b-chat"
-    },
-    {
-        value: "Qwen3-8B",
-        label: "Qwen 3 8B",
-        slug: "qwen3-8b"
-    },
-    {
-        value: "Qwen3-32B",
-        label: "Qwen 3 32B",
-        slug: "qwen3-32b"
-    },
-    {
-        value: "Llama-3.1-8B",
-        label: "Llama 3.1 8B",
-        slug: "llama-3.1-8b-instruct"
-    }
+  {
+    value: "deepseek-llm-7b",
+    label: "DeepSeek LLM 7B",
+    slug: "deepseek-llm-7b-chat",
+  },
+  {
+    value: "Qwen3-8B",
+    label: "Qwen 3 8B",
+    slug: "qwen3-8b",
+  },
+  {
+    value: "Qwen3-32B",
+    label: "Qwen 3 32B",
+    slug: "qwen3-32b",
+  },
+  {
+    value: "Llama-3.1-8B",
+    label: "Llama 3.1 8B",
+    slug: "llama-3.1-8b-instruct",
+  },
 ]
 
 function parseModelReply(rawReply: string): {
-    thinking: string | null
-    actualReply: string
+  thinking: string | null
+  actualReply: string
 } {
-    const thinkingMatch = rawReply.match(/<think>([\s\S]*?)<\/think>/)
+  const thinkingMatch = rawReply.match(/<think>([\s\S]*?)<\/think>/)
+  if (thinkingMatch) {
+    const thinking = thinkingMatch[1].trim()
+    const actualReply = rawReply.replace(/<think>[\s\S]*?<\/think>/, "").trim()
+    return { thinking, actualReply }
+  }
+  return { thinking: null, actualReply: rawReply.trim() }
+}
 
-    if (thinkingMatch) {
-        const thinking = thinkingMatch[1].trim()
-        const actualReply = rawReply.replace(/<think>[\s\S]*?<\/think>/, "").trim()
-        return { thinking, actualReply }
+// Build dropdown data with colored status dots; disable non-live models
+function buildDropdownData(statuses: Record<string, ModelStatus>) {
+  return modelOptions.map((m) => {
+    const st = statuses[m.value]
+    const isLive = st === "live"
+    const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
+    return {
+      value: m.value,
+      label: `${emoji} ${m.label}`,
+      disabled: !isLive,
     }
-
-    return { thinking: null, actualReply: rawReply.trim() }
+  })
 }
 
 // --- Chat panel (display only) ---
 
 type ChatPanelProps = {
-    panelId: 1 | 2
-    backendUrl: string
-    getAuthHeaders: () => Record<string, string>
-    selectedModel: string | null
-    onModelChange: (model: string | null) => void
-    messages: Message[]
-    onClearMessages: () => void
-    isLoading: boolean
+  modelValue: string
+  modelLabel: string
+  messages: Message[]
+  onClearMessages: () => void
+  isLoading: boolean
+  isBusy: boolean
+  modelStatus: ModelStatus
+  statusMessage: string | null
 }
 
 function ChatPanel({
-    panelId,
-    backendUrl,
-    getAuthHeaders,
-    selectedModel,
-    onModelChange,
-    messages,
-    onClearMessages,
-    isLoading
+  modelLabel,
+  messages,
+  onClearMessages,
+  isLoading,
+  isBusy,
+  modelStatus,
+  statusMessage,
 }: ChatPanelProps) {
-    const bottomRef = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
 
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-    }, [messages, isLoading])
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages, isLoading])
 
-    const findSelectedModel = () =>
-        modelOptions.find((m) => m.value === selectedModel) ?? null
+  return (
+    <div
+      style={{
+        minWidth: 0,
+        width: "100%",
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <Text fw={700} mb={8}>
+        {modelLabel}
+      </Text>
 
-    const deployContainer = async () => {
-        if (!selectedModel) return
-        const selected = findSelectedModel()
-        if (!selected) return
+      {modelStatus && modelStatus !== "live" && (
+        <Alert
+          color={modelStatus === "starting" ? "yellow" : "gray"}
+          variant="light"
+          mb={8}
+          p="xs"
+          styles={{ message: { fontSize: 13 } }}
+        >
+          {statusMessage
+            ? statusMessage
+            : modelStatus === "starting"
+              ? "This model is starting up. It usually takes about 2 minutes."
+              : "This model is not deployed. Ask an admin to deploy it from the dashboard."}
+        </Alert>
+      )}
 
-        try {
-            const deploymentsResponse = await axios.get(
-                `${backendUrl}/text/deployments`,
-                { headers: getAuthHeaders() }
-            )
-            const deployments = deploymentsResponse.data || []
+      {modelStatus === "live" && statusMessage && (
+        <Alert color="green" variant="light" mb={8} p="xs" styles={{ message: { fontSize: 13 } }}>
+          {statusMessage}
+        </Alert>
+      )}
 
-            console.log(deployments)
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+        <Button size="xs" color="orange" onClick={onClearMessages} disabled={isBusy}>
+          Clear
+        </Button>
+      </div>
 
-            const existingContainer = deployments.find((d: Deployment) => {
-                const name = typeof d?.name === "string" ? d.name.toLowerCase() : ""
-                return name.includes(selected.slug.toLowerCase())
-            })
-
-            if (existingContainer) {
-                console.log("Found existing container for model:", existingContainer.name)
-
-                const connectResponse = await axios.post(
-                    `${backendUrl}/text/connect`,
-                    { deployment_name: existingContainer.name, model_path: selectedModel },
-                    { headers: getAuthHeaders() }
-                )
-                console.log(`Panel ${panelId}: Connected to existing container:`, connectResponse.data)
-                return connectResponse.data
-            }
-
-            console.log("No deployment found for model, creating new one...")
-
-            const response = await axios.post(
-                `${backendUrl}/text/deploy`,
-                { model_path: selectedModel },
-                { headers: getAuthHeaders() }
-            )
-            console.log(`Panel ${panelId}: Created new deployment:`, response.data)
-            return response.data
-        } catch (error) {
-            console.error(`Panel ${panelId} deploy error:`, error)
-        }
-    }
-
-    const deleteContainer = async () => {
-        try {
-            const response = await axios.delete(`${backendUrl}/text/deploy`, {
-                headers: getAuthHeaders()
-            })
-            console.log(`Panel ${panelId} delete:`, response.data)
-        } catch (error) {
-            console.error(`Panel ${panelId} delete error:`, error)
-        }
-    }
-
-    const checkContainerStatus = async () => {
-        try {
-            const response = await axios.get(`${backendUrl}/text/status`, {
-                headers: getAuthHeaders()
-            })
-            console.log(`Panel ${panelId} status:`, response.data)
-        } catch (error) {
-            console.error(`Panel ${panelId} status error:`, error)
-        }
-    }
-
-    return (
-        <div style={{ flex: "1 1 calc(50% - 10px)", minWidth: "320px", maxWidth: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>
-            <Text fw={700} mb={8}>Model {panelId}</Text>
-
-            <MultiSelect
-                label="Select model"
-                placeholder="Select model"
-                data={modelOptions}
-                maxValues={1}
-                value={selectedModel ? [selectedModel] : []}
-                onChange={(value) => onModelChange(value[0] ?? null)}
-                mb={8}
-            />
-
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-                <Button size="xs" onClick={deployContainer} disabled={!selectedModel}>
-                    Deploy
-                </Button>
-                <Button size="xs" onClick={checkContainerStatus}>
-                    Status
-                </Button>
-                <Button size="xs" color="red" onClick={deleteContainer}>
-                    Delete
-                </Button>
-                <Button size="xs" color="orange" onClick={onClearMessages}>
-                    Clear
-                </Button>
-            </div>
-
-            <ScrollArea
+      <ScrollArea
+        style={{
+          flex: 1,
+          minHeight: "300px",
+          maxHeight: "65vh",
+          border: "1px solid #ddd",
+          borderRadius: "8px",
+          padding: "12px",
+        }}
+      >
+        {messages.length === 0 ? (
+          <Text c="dimmed" ta="center" size="sm">
+            No messages yet.
+          </Text>
+        ) : (
+          <>
+            {messages.map((message) => (
+              <Paper
+                key={message.id}
+                p="sm"
+                mb="xs"
                 style={{
-                    flex: 1,
-                    minHeight: "300px",
-                    maxHeight: "65vh",
-                    border: "1px solid #ddd",
-                    borderRadius: "8px",
-                    padding: "12px",
+                  backgroundColor: message.role === "user" ? "#e3f2fd" : "#f5f5f5",
+                  marginLeft: message.role === "user" ? "15%" : "0",
+                  marginRight: message.role === "user" ? "0" : "15%",
                 }}
-            >
-                {messages.length === 0 ? (
-                    <Text c="dimmed" ta="center" size="sm">No messages yet.</Text>
-                ) : (
-                    messages.map((message, index) => (
-                        <Paper
-                            key={index}
-                            p="sm"
-                            mb="xs"
-                            style={{
-                                backgroundColor: message.role === "user" ? "#e3f2fd" : "#f5f5f5",
-                                marginLeft: message.role === "user" ? "15%" : "0",
-                                marginRight: message.role === "user" ? "0" : "15%",
-                            }}
-                        >
-                            <Text fw={700} size="xs" mb={4}>
-                                {message.role === "user" ? "You" : selectedModel ?? "Assistant"}
-                            </Text>
-                            <Text size="sm" style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}>
-                                {message.content}
-                            </Text>
-                        </Paper>
-                    ))
-                )}
-                {isLoading && (
-                    <Text c="dimmed" size="sm" ta="center">Generating...</Text>
-                )}
-                <div ref={bottomRef} />
-            </ScrollArea>
-        </div>
-    )
+              >
+                <Text fw={700} size="xs" mb={4}>
+                  {message.role === "user" ? "You" : message.modelLabel ?? modelLabel}
+                </Text>
+                <Text
+                  size="sm"
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    overflowWrap: "break-word",
+                  }}
+                >
+                  {message.content}
+                </Text>
+              </Paper>
+            ))}
+            {isLoading && (
+              <Text c="dimmed" size="sm" ta="center">
+                Generating...
+              </Text>
+            )}
+          </>
+        )}
+        <div ref={bottomRef} />
+      </ScrollArea>
+    </div>
+  )
 }
 
 // --- Main component ---
 
 export default function TextGenerator() {
-    const { isLoggedIn } = useAuth()
-    const backendUrl = import.meta.env.VITE_API_URL
+  const { isLoggedIn } = useAuth()
+  const backendUrl = import.meta.env.VITE_API_URL
 
-    const [prompt, setPrompt] = useState("")
+  const [prompt, setPrompt] = useState("")
+  const [selectedModels, setSelectedModels] = useState<string[]>([])
+  const [messagesByModel, setMessagesByModel] = useState<Record<string, Message[]>>({})
+  const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
 
-    const [selectedModel1, setSelectedModel1] = useState<string | null>(null)
-    const [selectedModel2, setSelectedModel2] = useState<string | null>(null)
+  // Keep a ref so async loops always see the latest messages.
+  const messagesByModelRef = useRef<Record<string, Message[]>>({})
 
-    const [messages1, setMessages1] = useState<Message[]>([])
-    const [messages2, setMessages2] = useState<Message[]>([])
+  const setMessagesForModel = (modelValue: string, next: Message[]) => {
+    messagesByModelRef.current = { ...messagesByModelRef.current, [modelValue]: next }
+    setMessagesByModel((prev) => ({ ...prev, [modelValue]: next }))
+  }
 
-    const [isLoading1, setIsLoading1] = useState(false)
-    const [isLoading2, setIsLoading2] = useState(false)
+  const clearMessagesForModel = (modelValue: string) => {
+    setMessagesForModel(modelValue, [])
+  }
 
-    const getAuthHeaders = () => {
-        const token = localStorage.getItem("token")
-        if (!token) throw new Error("Token puuttuu")
-        return {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json"
-        }
+  const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
+  const [statusMsgs, setStatusMsgs] = useState<Record<string, string | null>>({})
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("token")
+    if (!token) throw new Error("Token puuttuu")
+    return {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    }
+  }
+
+  // Poll model statuses (background, for dropdown indicators)
+  const fetchStatuses = useCallback(async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/text/model-statuses`, {
+        headers: getAuthHeaders(),
+      })
+      setModelStatuses(res.data)
+    } catch {
+      // silent
+    }
+  }, [backendUrl])
+
+  useEffect(() => {
+    if (!isLoggedIn) return
+    fetchStatuses()
+    const id = setInterval(fetchStatuses, 30000)
+    return () => clearInterval(id)
+  }, [fetchStatuses, isLoggedIn])
+
+  const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
+  const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
+
+  /**
+   * Send message to a single model panel.
+   * Only works with live/healthy models (dropdown enforces this).
+   */
+  const sendToPanel = async (
+    modelValue: string,
+    messagesWithUser: Message[],
+  ) => {
+    setLoadingByModel((prev) => ({ ...prev, [modelValue]: true }))
+
+    try {
+      const response = await axios.post(
+        `${backendUrl}/text/chat`,
+        {
+          model_path: modelValue,
+          messages: messagesWithUser,
+          max_tokens: 256,
+          temperature: 0.7,
+          top_p: 0.9,
+        },
+        { headers: getAuthHeaders() }
+      )
+
+      const result = response.data
+      const parsed = parseModelReply(result.reply)
+      if (parsed.thinking) console.log("Thinking:", parsed.thinking)
+      const label = getModelLabel(modelValue)
+      const withReply = messagesWithUser.concat({
+        id: makeMessageId(),
+        role: "assistant",
+        content: parsed.actualReply,
+        modelLabel: label,
+      })
+      setMessagesForModel(modelValue, withReply)
+    } catch (error: unknown) {
+      console.error("chat error:", error)
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setStatusMsgs((prev) => ({ ...prev, [modelValue]: detail || "Failed to reach the server." }))
+    } finally {
+      setLoadingByModel((prev) => ({ ...prev, [modelValue]: false }))
+    }
+  }
+
+  const generateText = async () => {
+    if (!prompt.trim()) return
+    if (selectedModels.length === 0) return
+
+    const currentPrompt = prompt
+    setPrompt("")
+    const userMessage: Message = { id: makeMessageId(), role: "user", content: currentPrompt }
+
+    // Launch all selected panels in parallel
+    const promises: Promise<void>[] = []
+
+    for (const modelValue of selectedModels) {
+      const existingMessages = messagesByModelRef.current[modelValue] ?? []
+      const updatedMessages = existingMessages.concat(userMessage)
+      setMessagesForModel(modelValue, updatedMessages)
+      promises.push(sendToPanel(modelValue, updatedMessages))
     }
 
-    const connectToModel = async (modelValue: string): Promise<boolean> => {
-        const selected = modelOptions.find((m) => m.value === modelValue)
-        if (!selected) return false
+    await Promise.all(promises)
+  }
 
-        try {
-            const deploymentsResponse = await axios.get(
-                `${backendUrl}/text/deployments`,
-                { headers: getAuthHeaders() }
-            )
-            const deployments = deploymentsResponse.data || []
-            const existingContainer = deployments.find((d: Deployment) => {
-                const name = typeof d?.name === "string" ? d.name.toLowerCase() : ""
-                return name.includes(selected.slug.toLowerCase())
-            })
-
-            if (!existingContainer) {
-                console.error("No running deployment found for model:", modelValue)
-                return false
-            }
-
-            await axios.post(
-                `${backendUrl}/text/connect`,
-                { deployment_name: existingContainer.name, model_path: modelValue },
-                { headers: getAuthHeaders() }
-            )
-            console.log("Connected to deployment:", existingContainer.name)
-            return true
-        } catch (error) {
-            console.error("Error connecting to model:", error)
-            return false
-        }
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      generateText()
     }
+  }
 
-    const chatWithCurrentModel = async (messages: Message[]): Promise<string | null> => {
-        try {
-            const response = await axios.post(
-                `${backendUrl}/text/chat`,
-                {
-                    messages,
-                    max_tokens: 256,
-                    temperature: 0.7,
-                    top_p: 0.9
-                },
-                { headers: getAuthHeaders() }
-            )
-            const parsed = parseModelReply(response.data.reply)
-            if (parsed.thinking) {
-                console.log("Model thinking:", parsed.thinking)
-            }
-            return parsed.actualReply
-        } catch (error) {
-            console.error("Error during chat:", error)
-            return null
-        }
-    }
-
-    const generateText = async () => {
-        if (!prompt.trim()) return
-
-        const currentPrompt = prompt
-        setPrompt("")
-
-        const userMessage: Message = { role: "user", content: currentPrompt }
-
-        // --- Model 1 ---
-        if (selectedModel1) {
-            const updatedMessages1 = [...messages1, userMessage]
-            setMessages1(updatedMessages1)
-            setIsLoading1(true)
-
-            const connected = await connectToModel(selectedModel1)
-            if (connected) {
-                const reply = await chatWithCurrentModel(updatedMessages1)
-                if (reply) {
-                    setMessages1([...updatedMessages1, { role: "assistant", content: reply }])
-                }
-            }
-
-            setIsLoading1(false)
-        }
-
-        // --- Model 2 ---
-        if (selectedModel2) {
-            const updatedMessages2 = [...messages2, userMessage]
-            setMessages2(updatedMessages2)
-            setIsLoading2(true)
-
-            const connected = await connectToModel(selectedModel2)
-            if (connected) {
-                const reply = await chatWithCurrentModel(updatedMessages2)
-                if (reply) {
-                    setMessages2([...updatedMessages2, { role: "assistant", content: reply }])
-                }
-            }
-
-            setIsLoading2(false)
-        }
-    }
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault()
-            generateText()
-        }
-    }
-
-    if (!isLoggedIn) {
-        return (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", textAlign: "center", padding: 40 }}>
-                <p>You must be logged in to generate text.</p>
-            </div>
-        )
-    }
-
-    const isLoading = isLoading1 || isLoading2
-
+  if (!isLoggedIn) {
     return (
-        <div style={{ display: "flex", flexDirection: "column", maxWidth: "1000px", margin: "0 auto", padding: "20px", boxSizing: "border-box", overflowX: "hidden" }}>
-
-            <div style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "20px",
-                marginBottom: "16px",
-                alignItems: "stretch",
-            }}>
-                <ChatPanel
-                    panelId={1}
-                    backendUrl={backendUrl}
-                    getAuthHeaders={getAuthHeaders}
-                    selectedModel={selectedModel1}
-                    onModelChange={setSelectedModel1}
-                    messages={messages1}
-                    onClearMessages={() => setMessages1([])}
-                    isLoading={isLoading1}
-                />
-                <ChatPanel
-                    panelId={2}
-                    backendUrl={backendUrl}
-                    getAuthHeaders={getAuthHeaders}
-                    selectedModel={selectedModel2}
-                    onModelChange={setSelectedModel2}
-                    messages={messages2}
-                    onClearMessages={() => setMessages2([])}
-                    isLoading={isLoading2}
-                />
-            </div>
-
-            {/* Shared input */}
-            <div style={{ display: "flex", gap: "10px" }}>
-                <TextInput
-                    style={{ flex: 1, minWidth: 0 }}
-                    placeholder="Type your message to send to both models..."
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    disabled={isLoading}
-                />
-                <Button
-                    onClick={generateText}
-                    disabled={!prompt.trim() || isLoading}
-                    loading={isLoading}
-                >
-                    Send to Both
-                </Button>
-            </div>
-        </div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          textAlign: "center",
+          padding: 40,
+        }}
+      >
+        <p>You must be logged in to generate text.</p>
+      </div>
     )
+  }
+
+  const isBreakout = selectedModels.length > 2
+  const dropdownData = buildDropdownData(modelStatuses)
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        maxWidth: isBreakout ? "none" : "1100px",
+        margin: "0 auto",
+        padding: "20px",
+        boxSizing: "border-box",
+        overflowX: "visible",
+        gap: "16px",
+      }}
+    >
+      <Text c="dimmed" size="sm" mb={6}>
+        Select up to {MAX_MODELS} models for text generation.
+      </Text>
+
+      <MultiSelect
+        label="Models"
+        placeholder={selectedModels.length > 0 ? "" : "Select models"}
+        data={dropdownData}
+        value={selectedModels}
+        onChange={setSelectedModels}
+        maxValues={MAX_MODELS}
+        searchable
+        clearable
+        disabled={isAnyLoading}
+      />
+
+      {selectedModels.length > 0 && (
+        <>
+          {/* Panels */}
+          {isBreakout ? (
+            // 3–4 models: allow full-width layout and wrap panels instead of cramping.
+            <div style={{ width: "100vw", marginLeft: "calc(50% - 50vw)" }}>
+              <div
+                style={{
+                  maxWidth: "1800px",
+                  margin: "0 auto",
+                  padding: "0 16px",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "20px",
+                    width: "100%",
+                    alignItems: "stretch",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+                  }}
+                >
+                  {selectedModels.map((modelValue) => (
+                    <ChatPanel
+                      key={modelValue}
+                      modelValue={modelValue}
+                      modelLabel={getModelLabel(modelValue)}
+                      messages={messagesByModel[modelValue] ?? []}
+                      onClearMessages={() => clearMessagesForModel(modelValue)}
+                      isLoading={loadingByModel[modelValue] ?? false}
+                      isBusy={isAnyLoading}
+                      modelStatus={modelStatuses[modelValue] ?? "unknown"}
+                      statusMessage={statusMsgs[modelValue] ?? null}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            // 1–2 models: keep the compact layout.
+            <div
+              style={{
+                display: "grid",
+                gap: "20px",
+                gridTemplateColumns:
+                  selectedModels.length === 1 ? "minmax(320px, 1fr)" : "repeat(2, minmax(320px, 1fr))",
+                width: "100%",
+                margin: "0 auto",
+                alignItems: "stretch",
+              }}
+            >
+              {selectedModels.map((modelValue) => (
+                <ChatPanel
+                  key={modelValue}
+                  modelValue={modelValue}
+                  modelLabel={getModelLabel(modelValue)}
+                  messages={messagesByModel[modelValue] ?? []}
+                  onClearMessages={() => clearMessagesForModel(modelValue)}
+                  isLoading={loadingByModel[modelValue] ?? false}
+                  isBusy={isAnyLoading}
+                  modelStatus={modelStatuses[modelValue] ?? "unknown"}
+                  statusMessage={statusMsgs[modelValue] ?? null}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Shared input */}
+          <div style={{ display: "flex", gap: "10px" }}>
+            <TextInput
+              style={{ flex: 1, minWidth: 0 }}
+              placeholder="Type your message to send to selected models..."
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={isAnyLoading}
+            />
+            <Button onClick={generateText} disabled={!prompt.trim() || isAnyLoading} loading={isAnyLoading}>
+              Send
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  )
 }
