@@ -42,9 +42,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Logout calls backend to clear httpOnly cookie
   const logout = async () => {
     try {
+      const csrfToken = document.cookie
+        .split("; ")
+        .find((c) => c.startsWith("csrf_token="))
+        ?.split("=")[1] ?? ""
       await fetch(`${backendUrl}/logout`, {
         method: "POST",
-        credentials: "include", // include cookie
+        credentials: "include",
+        headers: { "X-CSRF-Token": csrfToken },
       });
     } finally {
       setUsername(null); // clear frontend state

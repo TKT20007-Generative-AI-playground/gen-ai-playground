@@ -11,7 +11,7 @@ from typing import Optional
 
 
 from app.database import get_database
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, validate_csrf_token
 from app.models import (
     TextGenerateRequest,
     TextGenerateResponse,
@@ -36,6 +36,7 @@ router = APIRouter(
 def deploy_model(
     request: DeployModelRequest,
     current_user: UserInfo = Depends(get_current_user),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Deploy an LLM model on Verda Cloud using SGLang.
@@ -90,6 +91,7 @@ def deploy_model(
 def connect_to_deployment(
     request: ConnectDeploymentRequest,
     current_user: UserInfo = Depends(get_current_user),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Connect to an already-running Verda deployment.
@@ -168,6 +170,7 @@ def generate_text(
     request: TextGenerateRequest,
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Generate text using the deployed LLM model.
@@ -243,6 +246,7 @@ def chat_with_model(
     request: ChatRequest,
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Chat with the deployed LLM using the OpenAI-compatible chat completions API.
@@ -307,6 +311,7 @@ def chat_with_model(
 @router.delete("/deploy")
 def delete_deployment(
     current_user: UserInfo = Depends(get_current_user),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Delete the active deployment and clean up resources.

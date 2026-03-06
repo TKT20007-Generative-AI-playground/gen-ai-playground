@@ -10,6 +10,7 @@ import os
 # Import the app and models
 from server import app
 from app.models import RegisterRequest, LoginRequest
+from app.dependencies import validate_csrf_token
 
 
 @pytest.fixture
@@ -23,9 +24,11 @@ def mock_db():
 @pytest.fixture
 def client(mock_db):
     """Create a test client with mocked database"""
+    app.dependency_overrides[validate_csrf_token] = lambda: None
     with patch('app.database.db_manager.db', mock_db):
         with patch('app.database.get_database', return_value=mock_db):
             yield TestClient(app)
+    app.dependency_overrides.pop(validate_csrf_token, None)
 
 
 @pytest.fixture
@@ -36,6 +39,22 @@ def test_user_data():
         "password": "SecurePassword123!",
         "invitation_code": os.getenv("INVITATION_CODE")
     }
+
+
+@pytest.fixture
+def auth_token(test_user_data):
+    """Generate a valid JWT token for testing."""
+    secret_key = "dev-secret-key-for-local-development"
+    payload = {
+        "username": test_user_data["username"],
+        "exp": datetime.utcnow() + timedelta(hours=24),
+    }
+    return jwt.encode(payload, secret_key, algorithm="HS256")
+
+
+@pytest.fixture
+def auth_headers(auth_token):
+    return {"Authorization": f"Bearer {auth_token}"}
 
 
 @pytest.fixture
@@ -340,3 +359,46 @@ class TestAuthIntegration:
         me_response = client.get("/me")
         assert me_response.status_code == 401
         assert "Not authenticated" in me_response.json()["detail"]
+
+
+class TestCSRFProtection:
+    """Verify CSRF validation is enforced on state-changing endpoints."""
+
+    def test_post_without_csrf_returns_403(self, client, registered_user, auth_headers):
+        """POST with no CSRF cookie or header should return 403."""
+        app.dependency_overrides.pop(validate_csrf_token, None)
+        try:
+            response = client.post("/logout", headers=auth_headers)
+            assert response.status_code == 403
+            assert "Invalid CSRF token" in response.json()["detail"]
+        finally:
+            app.dependency_overrides[validate_csrf_token] = lambda: None
+
+    def test_post_with_mismatched_csrf_returns_403(self, client, registered_user, auth_headers):
+        """POST with mismatched CSRF cookie and header should return 403."""
+        app.dependency_overrides.pop(validate_csrf_token, None)
+        try:
+            client.cookies.set("csrf_token", "correct-token")
+            response = client.post(
+                "/logout",
+                headers={**auth_headers, "X-CSRF-Token": "wrong-token"},
+            )
+            assert response.status_code == 403
+            assert "Invalid CSRF token" in response.json()["detail"]
+        finally:
+            client.cookies.clear()
+            app.dependency_overrides[validate_csrf_token] = lambda: None
+
+    def test_post_with_valid_csrf_succeeds(self, client, registered_user, auth_headers):
+        """POST with matching CSRF cookie and header should succeed."""
+        app.dependency_overrides.pop(validate_csrf_token, None)
+        try:
+            client.cookies.set("csrf_token", "valid-token")
+            response = client.post(
+                "/logout",
+                headers={**auth_headers, "X-CSRF-Token": "valid-token"},
+            )
+            assert response.status_code == 200
+        finally:
+            client.cookies.clear()
+            app.dependency_overrides[validate_csrf_token] = lambda: None

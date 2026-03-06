@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react"
 import { PromptTextBox } from "./PromptTextBox"
 import axios from "axios"
+
+function getCsrfToken(): string {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; csrf_token=`)
+  if (parts.length === 2) return parts.pop()!.split(";").shift()!
+  return ""
+}
 import type { AxiosResponse } from "axios"
 import { Text, SimpleGrid, Stack } from "@mantine/core"
 import { MODELS, getModelDisplayName } from "../constants/models"
@@ -89,7 +96,8 @@ export default function ImageGenerator() {
             { prompt: nextPrompt, model: model1 },
             {
               headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "X-CSRF-Token": getCsrfToken(),
               },
               withCredentials: true,
               responseType: "blob",
@@ -105,7 +113,8 @@ export default function ImageGenerator() {
             { prompt: nextPrompt, model: model2 },
             {
               headers: {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                "X-CSRF-Token": getCsrfToken(),
               },
               withCredentials: true,
               responseType: "blob",

@@ -12,12 +12,13 @@ from pymongo.database import Database
 from datetime import datetime, timedelta
 import bcrypt
 import jwt
+import secrets
 
 from app.config import settings
 from app.database import get_database
 from app.models import RegisterRequest, LoginRequest, RegisterResponse, LoginResponse
 from app.utils.validation import validate_password
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, validate_csrf_token
 
 router = APIRouter(
     tags=["authentication"]
@@ -154,6 +155,19 @@ def login(
             samesite="strict",
             max_age=settings.JWT_EXPIRY_HOURS * 3600
         )
+
+        # Generate CSRF token
+        csrf_token = secrets.token_urlsafe(32)
+
+        # Set CSRF cookie (not httponly)
+        response.set_cookie(
+        key="csrf_token",
+        value=csrf_token,
+        httponly=False,  # Must be False so frontend can read it
+        secure=settings.IS_PROD,
+        samesite="strict",
+        max_age=settings.JWT_EXPIRY_HOURS * 3600
+        )
         
         return LoginResponse(
             message="Login successful",
@@ -177,12 +191,19 @@ def me(current_user=Depends(get_current_user)):
     return {"username": current_user.username}
     
 @router.post("/logout")
-def logout(response: Response):
-    # Clear the cookie
+def logout(response: Response, _: None = Depends(validate_csrf_token)):
+    # Clear the access token cookie
     response.delete_cookie(
         key="access_token",
         httponly=True,
         samesite="strict",
-        secure=settings.IS_PROD  # True in production
+        secure=settings.IS_PROD
+    )
+    # Clear the CSRF token cookie
+    response.delete_cookie(
+        key="csrf_token",
+        httponly=False,
+        samesite="strict",
+        secure=settings.IS_PROD
     )
     return {"message": "Logged out successfully"}

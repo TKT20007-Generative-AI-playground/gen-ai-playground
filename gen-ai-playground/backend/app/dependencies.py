@@ -70,3 +70,16 @@ def get_current_user(
             status_code=401,
             detail=f"Authentication failed: {str(e)}"
         )
+
+
+def validate_csrf_token(
+    csrf_cookie: str = Cookie(None, alias="csrf_token"),
+    csrf_header: str = Header(None, alias="X-CSRF-Token")
+):
+    """
+    Dependency to validate CSRF token.
+    Compares the csrf_token cookie (readable by JS) against
+    the X-CSRF-Token request header. Raises 403 if they don't match.
+    """
+    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+        raise HTTPException(status_code=403, detail="Invalid CSRF token")

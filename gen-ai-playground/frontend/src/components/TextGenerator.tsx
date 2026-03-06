@@ -104,8 +104,9 @@ function ChatPanel({
         try {
             const deploymentsResponse = await axios.get(
                 `${backendUrl}/text/deployments`,
-                { headers: getAuthHeaders(),
-                withCredentials: true    
+                {
+                    headers: getAuthHeaders(),
+                    withCredentials: true
                 }
             )
             const deployments = deploymentsResponse.data || []
@@ -255,8 +256,15 @@ export default function TextGenerator() {
     const [isLoading1, setIsLoading1] = useState(false)
     const [isLoading2, setIsLoading2] = useState(false)
 
+    const getCsrfToken = (): string => {
+        const value = `; ${document.cookie}`
+        const parts = value.split(`; csrf_token=`)
+        if (parts.length === 2) return parts.pop()!.split(";").shift()!
+        return ""
+    }
+
     const getAuthHeaders = () => {
-        return { "Content-Type": "application/json" }
+        return { "Content-Type": "application/json", "X-CSRF-Token": getCsrfToken() }
     }
 
     const connectToModel = async (modelValue: string): Promise<boolean> => {
@@ -266,8 +274,9 @@ export default function TextGenerator() {
         try {
             const deploymentsResponse = await axios.get(
                 `${backendUrl}/text/deployments`,
-                { headers: getAuthHeaders(),
-                  withCredentials: true
+                {
+                    headers: getAuthHeaders(),
+                    withCredentials: true
                 }
             )
             const deployments = deploymentsResponse.data || []

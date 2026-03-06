@@ -13,6 +13,7 @@ from unittest.mock import patch, MagicMock
 import os
 
 from server import app
+from app.dependencies import validate_csrf_token
 
 
 # ---------------------------------------------------------------------------
@@ -30,9 +31,11 @@ def mock_db():
 @pytest.fixture
 def client(mock_db):
     """Create a test client with mocked database."""
+    app.dependency_overrides[validate_csrf_token] = lambda: None
     with patch('app.database.db_manager.db', mock_db):
         with patch('app.database.get_database', return_value=mock_db):
             yield TestClient(app)
+    app.dependency_overrides.pop(validate_csrf_token, None)
 
 
 @pytest.fixture
