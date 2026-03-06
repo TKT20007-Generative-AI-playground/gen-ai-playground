@@ -252,7 +252,6 @@ class VerdaService:
         except Exception as e:
             raise RuntimeError(f"Invalid template config: {e}")
         
-        print(f"Parsed template config: {cfg}")
         return cfg
     
     def _resolve_gpu(self, cfg, resources=None):
