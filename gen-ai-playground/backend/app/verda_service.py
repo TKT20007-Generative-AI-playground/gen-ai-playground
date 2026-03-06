@@ -772,7 +772,11 @@ class VerdaService:
         if isinstance(result, dict) and "choices" in result:
             if result["choices"]:
                 message = result["choices"][0].get("message", {})
-                assistant_message = message.get("content", "")
+                assistant_message = message.get("content") or ""
+                # If model returned reasoning content (eg Nemotron)
+                reasoning = message.get("reasoning_content")
+                if reasoning and not assistant_message:
+                    assistant_message = reasoning
 
         return {
             "reply": assistant_message,
