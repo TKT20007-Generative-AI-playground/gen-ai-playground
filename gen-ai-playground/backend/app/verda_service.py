@@ -129,8 +129,7 @@ class VerdaService:
 
         elif cfg.engine == "vllm":
             cmd = [
-                "python3", "-m", "vllm.entrypoints.openai.api_server",
-                "--model", cfg.model,
+                cfg.model,
                 "--host", host,
                 "--port", str(port),
             ]
@@ -195,7 +194,9 @@ class VerdaService:
             
             model_name = settings.TEXT_MODEL_PATHS_V2.get(template_name, "unknown")
             results.append({
-                "Model": model_name,
+                "value": model_name,
+                "label": model_name,
+                "template": template_name,
                 "tp": gpu_count,
                 "availability": compute_name,
             })
@@ -285,7 +286,6 @@ class VerdaService:
         Args:
             template_json: JSON string matching TemplateConfig schema.
             deployment_name: Custom deployment name. Auto-generated if not provided.
-            gpu_type: Override GPU type (e.g. 'L40S'). Uses template gpu_types or DEFAULT_COMPUTE.
 
         Returns:
             dict with deployment info (name, status, model)
@@ -302,14 +302,11 @@ class VerdaService:
             cfg.port = APP_PORT
 
         client = self._get_client()
-        self._model_path = cfg.model
 
         # Generate deployment name if not provided
         if deployment_name is None:
             model_slug = cfg.model.split("/")[-1].lower()
-            deployment_name = model_slug.strip()
-        self._deployment_name = deployment_name
-        
+            deployment_name = model_slug.replace(".", "-").strip()      
         # ensure hf secret exists
         self._ensure_hf_secret()
         
@@ -760,8 +757,9 @@ class VerdaService:
             "max_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
-            "chat_template_kwargs": {"enable_thinking": enable_thinking},
         }
+        if enable_thinking:
+            chat_data["chat_template_kwargs"] = {"enable_thinking": True}
 
         response = deployment.run_sync(
             chat_data,

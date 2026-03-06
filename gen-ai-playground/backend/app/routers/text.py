@@ -26,6 +26,10 @@ from app.verda_service import verda_service
 from app.config import settings
 from verda.containers import ContainerDeploymentStatus
 
+def _sanitize_slug(model_path: str) -> str:
+    """Convert a model path to a deployment-name-compatible slug."""
+    return model_path.split("/")[-1].lower().replace(".", "-")
+
 
 router = APIRouter(
     prefix="/text",
@@ -112,14 +116,30 @@ def connect_to_deployment(
 def choose_text_model_path(model: str) -> str:
     model = model.strip()
 
-    try:
+    # Try TEXT_MODEL_PATHS first (legacy keys)
+    if model in settings.TEXT_MODEL_PATHS:
         return settings.TEXT_MODEL_PATHS[model]
-    except KeyError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported model: {model}. "
-                   f"Supported models: {list(settings.TEXT_MODEL_PATHS.keys())}" # for better debugging and user feedback
-        )
+
+    # V2 fallback: find template by display name, parse HF model path from it
+    for template_name, display_name in settings.TEXT_MODEL_PATHS_V2.items():
+        if display_name == model:
+            cfg = verda_service._parse_and_validate_template(template_name)
+            return cfg.model
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"Unsupported model: {model}. "
+               f"Supported models: {list(settings.TEXT_MODEL_PATHS.keys()) + list(settings.TEXT_MODEL_PATHS_V2.values())}"
+    )
+
+
+def _resolve_template_name(model: str) -> str | None:
+    """Resolve a model key/display name to a V2 template filename, or None if legacy."""
+    model = model.strip()
+    for template_name, display_name in settings.TEXT_MODEL_PATHS_V2.items():
+        if display_name == model:
+            return template_name
+    return None
 
 
 def _deploy_model_internal(model_key: str) -> dict:
@@ -127,6 +147,12 @@ def _deploy_model_internal(model_key: str) -> dict:
     Internal helper to deploy a model by key.
     Used by the admin /deploy endpoint.
     """
+    # Check V2 templates first
+    template = _resolve_template_name(model_key)
+    if template:
+        return verda_service.deploy_from_template(template_json=template)
+
+    # Legacy 
     model_path = choose_text_model_path(model_key)
 
     if model_path == "deepseek-ai/deepseek-llm-7b-chat":
@@ -198,8 +224,9 @@ def get_model_statuses(
             dep_statuses[d.name.lower()] = "unknown"
 
     result: dict[str, str] = {}
+    #Legacy
     for model_key, model_path in settings.TEXT_MODEL_PATHS.items():
-        slug = model_path.split("/")[-1].lower()
+        slug = _sanitize_slug(model_path)
         matched_status = "offline"
         for dep_name, st in dep_statuses.items():
             if slug in dep_name:
@@ -212,6 +239,28 @@ def get_model_statuses(
                     matched_status = "starting"
                 break
         result[model_key] = matched_status
+
+    # Also include V2 template models 
+    for template_name, v2_name in settings.TEXT_MODEL_PATHS_V2.items():
+        if v2_name in result:
+            continue
+        try:
+            cfg = verda_service._parse_and_validate_template(template_name)
+            slug = _sanitize_slug(cfg.model)
+        except Exception:
+            result[v2_name] = "offline"
+            continue
+        matched_status = "offline"
+        for dep_name, st in dep_statuses.items():
+            if slug in dep_name:
+                if st == "healthy":
+                    matched_status = "live"
+                elif st == "unknown":
+                    matched_status = "offline"
+                else:
+                    matched_status = "starting"
+                break
+        result[v2_name] = matched_status
 
     return result
 
@@ -253,7 +302,7 @@ def generate_text(
     used_model_path = model_path
 
     if model_path:
-        model_slug = model_path.split("/")[-1].lower()
+        model_slug = _sanitize_slug(model_path)
         for d in deployments:
             if model_slug in d.get("name", "").lower():
                 deployment_name = d["name"]
@@ -268,7 +317,7 @@ def generate_text(
                     deployment_name = d["name"]
                     # Try to infer model path from deployment name
                     for mp in settings.TEXT_MODEL_PATHS.values():
-                        if mp.split("/")[-1].lower() in d["name"].lower():
+                        if _sanitize_slug(mp) in d["name"].lower():
                             used_model_path = mp
                             break
                     break
@@ -365,7 +414,7 @@ def chat_with_model(
     """
     model_key = request.model_path
     model_path = choose_text_model_path(model_key)
-    model_slug = model_path.split("/")[-1].lower()
+    model_slug = _sanitize_slug(model_path)
 
     print(f"Chat request from user: {current_user.username}, model: {model_key}")
 
@@ -442,8 +491,12 @@ def chat_with_model(
         )
 
     except RuntimeError as e:
+        print(f"Chat RuntimeError: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Chat unexpected error: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Chat failed: {str(e)}",

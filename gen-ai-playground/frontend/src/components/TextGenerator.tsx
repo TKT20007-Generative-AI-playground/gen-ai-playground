@@ -15,7 +15,6 @@ import {
 type ModelOption = {
   value: string
   label: string
-  slug: string
 }
 
 type Message = {
@@ -37,29 +36,6 @@ const makeMessageId = () => {
 
 const MAX_MODELS = 4
 
-const modelOptions: ModelOption[] = [
-  {
-    value: "deepseek-llm-7b",
-    label: "DeepSeek LLM 7B",
-    slug: "deepseek-llm-7b-chat",
-  },
-  {
-    value: "Qwen3-8B",
-    label: "Qwen 3 8B",
-    slug: "qwen3-8b",
-  },
-  {
-    value: "Qwen3-32B",
-    label: "Qwen 3 32B",
-    slug: "qwen3-32b",
-  },
-  {
-    value: "Llama-3.1-8B",
-    label: "Llama 3.1 8B",
-    slug: "llama-3.1-8b-instruct",
-  },
-]
-
 function parseModelReply(rawReply: string): {
   thinking: string | null
   actualReply: string
@@ -74,7 +50,7 @@ function parseModelReply(rawReply: string): {
 }
 
 // Build dropdown data with colored status dots; disable non-live models
-function buildDropdownData(statuses: Record<string, ModelStatus>) {
+function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string, ModelStatus>) {
   return modelOptions.map((m) => {
     const st = statuses[m.value]
     const isLive = st === "live"
@@ -223,6 +199,7 @@ export default function TextGenerator() {
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [messagesByModel, setMessagesByModel] = useState<Record<string, Message[]>>({})
   const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
 
   // Keep a ref so async loops always see the latest messages.
   const messagesByModelRef = useRef<Record<string, Message[]>>({})
@@ -247,6 +224,28 @@ export default function TextGenerator() {
       "Content-Type": "application/json",
     }
   }
+
+  // Fetch available models from backend
+  useEffect(() => {
+    if (!isLoggedIn) return
+    const fetchModels = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/text/models`, {
+          headers: getAuthHeaders(),
+        })
+        const models: ModelOption[] = (res.data.available_models ?? []).map(
+          (m: { value: string; label: string }) => ({
+            value: m.value,
+            label: m.label,
+          })
+        )
+        setModelOptions(models)
+      } catch {
+        // silent 
+      }
+    }
+    fetchModels()
+  }, [backendUrl, isLoggedIn])
 
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
@@ -279,6 +278,7 @@ export default function TextGenerator() {
     messagesWithUser: Message[],
   ) => {
     setLoadingByModel((prev) => ({ ...prev, [modelValue]: true }))
+    console.log(`Sending to ${modelValue}:`, messagesWithUser)
 
     try {
       const response = await axios.post(
@@ -358,7 +358,7 @@ export default function TextGenerator() {
   }
 
   const isBreakout = selectedModels.length > 2
-  const dropdownData = buildDropdownData(modelStatuses)
+  const dropdownData = buildDropdownData(modelOptions, modelStatuses)
 
   return (
     <div
