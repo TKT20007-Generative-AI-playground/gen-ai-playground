@@ -53,7 +53,7 @@ def deploy_model(
     current_user: UserInfo = Depends(get_admin_user),
 ):
     """
-    Deploy an LLM model on Verda Cloud using SGLang.
+    Deploy an LLM model on Verda Cloud using SGLang or vLLM.
     
     This creates a new serverless container deployment running the specified model.
     The deployment may take several minutes to become healthy while the model downloads.
