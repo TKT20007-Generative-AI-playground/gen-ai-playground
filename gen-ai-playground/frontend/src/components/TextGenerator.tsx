@@ -241,7 +241,7 @@ export default function TextGenerator() {
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem("token")
-    if (!token) throw new Error("Token puuttuu")
+    if (!token) throw new Error("Token is missing")
     return {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",

@@ -112,6 +112,23 @@ def choose_text_model_path(model: str) -> str:
         )
 
 
+def _check_deployment_health(deployment_name: str, label: str = "Deployment") -> None:
+    """Raise 503 if the deployment is not healthy."""
+    try:
+        client = verda_service._get_client()
+        dep_status = client.containers.get_deployment_status(deployment_name)
+        status_str = dep_status.value if hasattr(dep_status, 'value') else str(dep_status)
+        if status_str != "healthy":
+            raise HTTPException(
+                status_code=503,
+                detail=f"{label} is not healthy yet (status: {status_str}). Please wait and try again.",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
+
+
 def _deploy_model_internal(model_key: str) -> dict:
     """
     Internal helper to deploy a model by key.
@@ -271,21 +288,7 @@ def generate_text(
             detail="No suitable deployment found. Ask an admin to deploy a model.",
         )
 
-    # Check deployment health
-    try:
-        client = verda_service._get_client()
-        dep_status = client.containers.get_deployment_status(deployment_name)
-        status_str = dep_status.value if hasattr(dep_status, 'value') else str(dep_status)
-        if status_str != "healthy":
-            raise HTTPException(
-                status_code=503,
-                detail=f"Deployment is not healthy. Current status: {status_str}. "
-                       "Wait for the deployment to become healthy before generating text.",
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
+    _check_deployment_health(deployment_name)
 
     try:
         result = verda_service.generate_text(
@@ -380,24 +383,9 @@ def chat_with_model(
             detail=f"Model {model_key} is not deployed. Ask an admin to deploy it from the dashboard.",
         )
 
-    # Check deployment health without mutating singleton state
     deployment_name = existing["name"]
     print(f"Found deployment '{deployment_name}' for model_slug '{model_slug}'")
-    try:
-        client = verda_service._get_client()
-        dep_status = client.containers.get_deployment_status(deployment_name)
-        status_str = dep_status.value if hasattr(dep_status, 'value') else str(dep_status)
-        print(f"Deployment '{deployment_name}' status: {status_str}")
-        if status_str != "healthy":
-            raise HTTPException(
-                status_code=503,
-                detail=f"Model {model_key} is not healthy yet (status: {status_str}). Please wait and try again.",
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Failed to check deployment status for '{deployment_name}': {e}")
-        raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
+    _check_deployment_health(deployment_name, label=f"Model {model_key}")
 
     # Chat
     try:
