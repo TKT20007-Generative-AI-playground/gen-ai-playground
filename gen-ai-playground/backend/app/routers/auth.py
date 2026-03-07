@@ -134,8 +134,6 @@ def login(
             algorithm="HS256"
         )
 
-        print(token_payload)
-        
         return LoginResponse(
             message="Login successful",
             token=token,
@@ -160,8 +158,6 @@ def refresh_token(
         "username": user.username,
         "exp": token_expiry
     }
-
-    print(token_payload)
 
     token = jwt.encode(
         token_payload,
