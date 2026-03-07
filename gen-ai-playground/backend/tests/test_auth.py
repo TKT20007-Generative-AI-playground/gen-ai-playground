@@ -265,3 +265,73 @@ class TestAuthIntegration:
         
         assert login_response.status_code == 200
         assert "token" in login_response.json()
+
+
+class TestTokenExpiration:
+    """Tests for JWT token expiration handling"""
+
+    def _make_token(self, username: str, expired: bool = False) -> str:
+        """Helper to create a JWT token, optionally already expired."""
+        if expired:
+            exp = datetime.utcnow() - timedelta(seconds=1)
+        else:
+            exp = datetime.utcnow() + timedelta(hours=24)
+        return jwt.encode(
+            {"username": username, "exp": exp},
+            "dev-secret-key-for-local-development",
+            algorithm="HS256",
+        )
+
+    def test_expired_token_rejected_by_protected_endpoint(self, client, registered_user):
+        """An expired JWT should return 401 with 'Token has expired'"""
+        token = self._make_token(registered_user["username"], expired=True)
+
+        response = client.get(
+            "/images/history",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 401
+        assert "Token has expired" in response.json()["detail"]
+
+    def test_valid_token_accepted_by_protected_endpoint(self, client, registered_user):
+        """A valid (non-expired) JWT should not return 401 for auth reasons"""
+        token = self._make_token(registered_user["username"], expired=False)
+
+        response = client.get(
+            "/images/history",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        # Should not be an auth failure (may be 200 with empty history)
+        assert response.status_code != 401
+
+    def test_expired_token_from_login_endpoint(self, client, registered_user):
+        """Token obtained from /login should be valid immediately"""
+        login_data = {
+            "username": registered_user["username"],
+            "password": registered_user["password"],
+        }
+        login_response = client.post("/login", json=login_data)
+        assert login_response.status_code == 200
+
+        token = login_response.json()["token"]
+        decoded = jwt.decode(token, "dev-secret-key-for-local-development", algorithms=["HS256"])
+
+        # exp should be in the future
+        assert decoded["exp"] > datetime.utcnow().timestamp()
+
+    def test_missing_token_rejected(self, client):
+        """Request without Authorization header should be rejected"""
+        response = client.get("/images/history")
+
+        assert response.status_code in (401, 422)
+
+    def test_malformed_token_rejected(self, client):
+        """A garbage token should return 401"""
+        response = client.get(
+            "/images/history",
+            headers={"Authorization": "Bearer not.a.valid.token"},
+        )
+
+        assert response.status_code == 401
