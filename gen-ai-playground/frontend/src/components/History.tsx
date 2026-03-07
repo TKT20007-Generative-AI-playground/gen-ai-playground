@@ -27,19 +27,16 @@ interface PromptGroup {
 const backendUrl = import.meta.env.VITE_API_URL;
 
 export default function History() {
-  const { getAuthHeaders } = useAuth();
+  const { checkToken, getAuthHeaders } = useAuth();
+  const isValid = checkToken();
   const [history, setHistory] = useState<PromptGroup[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isValid);
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
 
   useEffect(() => {
-    let headers: Record<string, string>;
-    try {
-      headers = getAuthHeaders();
-    } catch {
-      setLoading(false);
-      return;
-    }
+    if (!isValid) return;
+
+    const headers = getAuthHeaders();
 
     fetch(`${backendUrl}/images/history`, {
       headers,
@@ -65,7 +62,7 @@ export default function History() {
         console.error("Failed to fetch history:", err);
         setLoading(false);
       });
-  }, []);
+  }, [isValid, getAuthHeaders]);
 
   if (loading)
     return (
