@@ -11,6 +11,7 @@ import os
 from server import app
 from app.models import RegisterRequest, LoginRequest
 from app.dependencies import validate_csrf_token
+from app.config import settings
 
 
 @pytest.fixture
@@ -44,7 +45,7 @@ def test_user_data():
 @pytest.fixture
 def auth_token(test_user_data):
     """Generate a valid JWT token for testing."""
-    secret_key = "dev-secret-key-for-local-development"
+    secret_key = settings.JWT_SECRET_KEY
     payload = {
         "username": test_user_data["username"],
         "exp": datetime.utcnow() + timedelta(hours=24),

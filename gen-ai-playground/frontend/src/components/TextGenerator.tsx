@@ -270,16 +270,16 @@ export default function TextGenerator() {
     setMessagesForModel(modelValue, [])
   }
 
-    const getCsrfToken = (): string => {
-        const value = `; ${document.cookie}`
-        const parts = value.split(`; csrf_token=`)
-        if (parts.length === 2) return parts.pop()!.split(";").shift()!
-        return ""
-    }
+  const getCsrfToken = (): string => {
+      const value = `; ${document.cookie}`
+      const parts = value.split(`; csrf_token=`)
+      if (parts.length === 2) return parts.pop()!.split(";").shift()!
+      return ""
+  }
 
-    const getAuthHeaders = () => {
-        return { "Content-Type": "application/json", "X-CSRF-Token": getCsrfToken() }
-    }
+  const getAuthHeaders = () => {
+      return { "Content-Type": "application/json", "X-CSRF-Token": getCsrfToken() }
+  }
 
   const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
   const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))

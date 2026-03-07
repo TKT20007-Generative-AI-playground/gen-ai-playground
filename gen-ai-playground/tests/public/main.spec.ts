@@ -9,11 +9,8 @@ test('main page has no console errors on load', async ({ page }) => {
     }
   });
 
-
-
   await page.goto('http://localhost:5173');
   await page.waitForTimeout(1000);
-
 
   // Filter out the expected unauthenticated /me 401 error
   const unexpectedErrors = consoleErrors.filter(

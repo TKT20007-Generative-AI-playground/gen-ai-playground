@@ -191,7 +191,9 @@ def me(current_user=Depends(get_current_user)):
     return {"username": current_user.username}
     
 @router.post("/logout")
-def logout(response: Response, _: None = Depends(validate_csrf_token)):
+def logout(
+    response: Response,
+    _: None = Depends(validate_csrf_token)):
     # Clear the access token cookie
     response.delete_cookie(
         key="access_token",

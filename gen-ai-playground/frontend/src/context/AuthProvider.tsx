@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const csrfToken = document.cookie
         .split("; ")
         .find((c) => c.startsWith("csrf_token="))
-        ?.split("=")[1] ?? ""
+        ?.split("=")[1] ?? "";
       await fetch(`${backendUrl}/logout`, {
         method: "POST",
         credentials: "include",
