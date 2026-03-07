@@ -161,12 +161,12 @@ def login(
 
         # Set CSRF cookie (not httponly)
         response.set_cookie(
-        key="csrf_token",
-        value=csrf_token,
-        httponly=False,  # Must be False so frontend can read it
-        secure=settings.IS_PROD,
-        samesite="strict",
-        max_age=settings.JWT_EXPIRY_HOURS * 3600
+            key="csrf_token",
+            value=csrf_token,
+            httponly=False,  # Must be False so frontend can read it
+            secure=settings.IS_PROD,
+            samesite="strict",
+            max_age=settings.JWT_EXPIRY_HOURS * 3600
         )
         
         return LoginResponse(

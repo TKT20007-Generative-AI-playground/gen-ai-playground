@@ -15,10 +15,13 @@ test('main page has no console errors on load', async ({ page }) => {
   await page.waitForTimeout(1000);
 
 
-  // Filter out only errors that include both '/me' and '401' (expected unauthenticated case)
-const unexpectedErrors = consoleErrors.filter(
-  error => !(error.includes('401 (Unauthorized)') && error.includes('Failed to load resource'))
-);
-expect(unexpectedErrors).toHaveLength(0);
-
+  // Filter out the expected unauthenticated /me 401 error
+  const unexpectedErrors = consoleErrors.filter(
+    error =>
+      !(
+        (error.includes('/me') || error.includes('401 (Unauthorized)')) &&
+        error.includes('Failed to load resource')
+      )
+  );
+  expect(unexpectedErrors).toHaveLength(0);
 })

@@ -73,13 +73,20 @@ def get_current_user(
 
 
 def validate_csrf_token(
+    authorization: str = Header(None),
     csrf_cookie: str = Cookie(None, alias="csrf_token"),
     csrf_header: str = Header(None, alias="X-CSRF-Token")
 ):
     """
     Dependency to validate CSRF token.
-    Compares the csrf_token cookie (readable by JS) against
-    the X-CSRF-Token request header. Raises 403 if they don't match.
+    Skipped when the request authenticates via Authorization: Bearer
+    (API/mobile clients) since CSRF attacks only apply to cookie-based auth.
+    Compares the csrf_token cookie against the X-CSRF-Token header for
+    browser-based (cookie) requests.
     """
+    # Bearer token clients are not vulnerable to CSRF — skip validation
+    if authorization and authorization.startswith("Bearer "):
+        return
+
     if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
         raise HTTPException(status_code=403, detail="Invalid CSRF token")

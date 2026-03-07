@@ -1,13 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { PromptTextBox } from "./PromptTextBox"
 import axios from "axios"
-
-function getCsrfToken(): string {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; csrf_token=`)
-  if (parts.length === 2) return parts.pop()!.split(";").shift()!
-  return ""
-}
 import type { AxiosResponse } from "axios"
 import { Text, SimpleGrid, Stack } from "@mantine/core"
 import { MODELS, getModelDisplayName } from "../constants/models"
@@ -16,6 +9,13 @@ import PhotoArea from "./PhotoArea"
 import GeneratingText from "./GeneratingText"
 
 type SelectedModels = [string | null, string | null]
+
+function getCsrfToken(): string {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; csrf_token=`)
+  if (parts.length === 2) return parts.pop()!.split(";").shift()!
+  return ""
+}
 
 export default function ImageGenerator() {
 
