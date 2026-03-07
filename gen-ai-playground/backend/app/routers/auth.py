@@ -10,6 +10,7 @@ import jwt
 from app.config import settings
 from app.database import get_database
 from app.models import RegisterRequest, LoginRequest, RegisterResponse, LoginResponse
+from app.dependencies import get_current_user, UserInfo
 
 
 router = APIRouter(
@@ -132,6 +133,8 @@ def login(
             settings.JWT_SECRET_KEY,
             algorithm="HS256"
         )
+
+        print(token_payload)
         
         return LoginResponse(
             message="Login successful",
@@ -145,3 +148,29 @@ def login(
             status_code=500,
             detail=f"Login failed: {str(e)}"
         )
+
+
+@router.post("/refresh", response_model=LoginResponse)
+def refresh_token(
+    user: UserInfo = Depends(get_current_user)
+):
+    token_expiry = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRY_HOURS)
+
+    token_payload = {
+        "username": user.username,
+        "exp": token_expiry
+    }
+
+    print(token_payload)
+
+    token = jwt.encode(
+        token_payload,
+        settings.JWT_SECRET_KEY,
+        algorithm="HS256"
+    )
+
+    return LoginResponse(
+        message="Token refreshed",
+        token=token,
+        username=user.username
+    )

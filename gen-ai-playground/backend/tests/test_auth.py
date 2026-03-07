@@ -192,7 +192,7 @@ class TestLoginEndpoint:
         exp_time = datetime.fromtimestamp(decoded["exp"])
         now = datetime.utcnow()
         time_diff = exp_time - now
-        assert timedelta(hours=23) < time_diff < timedelta(hours=25)
+        assert timedelta(hours=1) < time_diff < timedelta(hours=3)
     
     def test_invalid_username(self, client):
         """Test login with non-existent username"""
@@ -335,3 +335,113 @@ class TestTokenExpiration:
         )
 
         assert response.status_code == 401
+
+
+class TestRefreshEndpoint:
+    """Tests for /refresh endpoint"""
+
+    def _make_token(self, username: str, hours: float = 24) -> str:
+        """Helper to create a JWT token with a given lifetime."""
+        exp = datetime.utcnow() + timedelta(hours=hours)
+        return jwt.encode(
+            {"username": username, "exp": exp},
+            "dev-secret-key-for-local-development",
+            algorithm="HS256",
+        )
+
+    def test_refresh_returns_new_token(self, client, registered_user):
+        """A valid token should get a fresh token back from /refresh"""
+        token = self._make_token(registered_user["username"])
+
+        response = client.post(
+            "/refresh",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["message"] == "Token refreshed"
+        assert data["username"] == registered_user["username"]
+        assert "token" in data
+        assert data["token"] != ""
+
+    def test_refreshed_token_has_later_expiry(self, client, registered_user):
+        """The refreshed token should have an expiry further in the future than the original"""
+        import time
+
+        # Create a token that expires in 1 hour (simulating a partially used session)
+        original_token = self._make_token(registered_user["username"], hours=1)
+        original_decoded = jwt.decode(
+            original_token, "dev-secret-key-for-local-development", algorithms=["HS256"]
+        )
+
+        time.sleep(1)
+
+        response = client.post(
+            "/refresh",
+            headers={"Authorization": f"Bearer {original_token}"},
+        )
+
+        assert response.status_code == 200
+        new_token = response.json()["token"]
+        new_decoded = jwt.decode(
+            new_token, "dev-secret-key-for-local-development", algorithms=["HS256"]
+        )
+
+        # New expiry should be later than the original
+        assert new_decoded["exp"] > original_decoded["exp"]
+
+    def test_refreshed_token_is_usable(self, client, registered_user):
+        """The refreshed token should work on protected endpoints"""
+        original_token = self._make_token(registered_user["username"])
+
+        refresh_response = client.post(
+            "/refresh",
+            headers={"Authorization": f"Bearer {original_token}"},
+        )
+        assert refresh_response.status_code == 200
+
+        new_token = refresh_response.json()["token"]
+
+        # Use the new token on a protected endpoint
+        history_response = client.get(
+            "/images/history",
+            headers={"Authorization": f"Bearer {new_token}"},
+        )
+        assert history_response.status_code != 401
+
+    def test_refresh_with_expired_token_rejected(self, client, registered_user):
+        """An expired token should not be refreshable"""
+        expired_token = jwt.encode(
+            {"username": registered_user["username"], "exp": datetime.utcnow() - timedelta(seconds=1)},
+            "dev-secret-key-for-local-development",
+            algorithm="HS256",
+        )
+
+        response = client.post(
+            "/refresh",
+            headers={"Authorization": f"Bearer {expired_token}"},
+        )
+
+        assert response.status_code == 401
+        assert "Token has expired" in response.json()["detail"]
+
+    def test_refresh_without_token_rejected(self, client):
+        """Request to /refresh without Authorization header should fail"""
+        response = client.post("/refresh")
+
+        assert response.status_code in (401, 422)
+
+    def test_refresh_preserves_username(self, client, registered_user):
+        """The refreshed token should contain the same username"""
+        token = self._make_token(registered_user["username"])
+
+        response = client.post(
+            "/refresh",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+        assert response.status_code == 200
+        new_token = response.json()["token"]
+        decoded = jwt.decode(new_token, "dev-secret-key-for-local-development", algorithms=["HS256"])
+        assert decoded["username"] == registered_user["username"]

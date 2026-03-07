@@ -47,10 +47,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout()
       throw new Error('Token expired')
     }
-    return {
+    const headers = {
       Authorization: `Bearer ${stored}`,
       'Content-Type': 'application/json',
     }
+
+    const backendUrl = import.meta.env.VITE_API_URL
+    fetch(`${backendUrl}/refresh`, {
+      method: 'POST',
+      headers,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.token) {
+          localStorage.setItem('token', data.token)
+          setToken(data.token)
+        }
+      })
+      .catch(() => {})
+
+    return headers
   }, [logout])
 
   const login = (newToken: string, user: string) => {
