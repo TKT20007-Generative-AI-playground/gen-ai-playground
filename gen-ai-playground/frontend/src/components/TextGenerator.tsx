@@ -247,7 +247,7 @@ function ChatPanel({
 // --- Main component ---
 
 export default function TextGenerator() {
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, checkToken, getAuthHeaders } = useAuth()
   const backendUrl = import.meta.env.VITE_API_URL
 
   const [prompt, setPrompt] = useState("")
@@ -267,14 +267,7 @@ export default function TextGenerator() {
     setMessagesForModel(modelValue, [])
   }
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token")
-    if (!token) throw new Error("Token is missing")
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    }
-  }
+
 
   const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
   const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
@@ -335,6 +328,7 @@ export default function TextGenerator() {
   }
 
   const generateText = async () => {
+    if (!checkToken()) return
     if (!prompt.trim()) return
     if (selectedModels.length === 0) return
 

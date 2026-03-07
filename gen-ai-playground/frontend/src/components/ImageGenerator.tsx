@@ -7,10 +7,12 @@ import { MODELS, getModelDisplayName } from "../constants/models"
 import ModelSelector from "./ModelSelector"
 import PhotoArea from "./PhotoArea"
 import GeneratingText from "./GeneratingText"
+import { useAuth } from "../context/AuthContext"
 
 type SelectedModels = [string | null, string | null]
 
 export default function ImageGenerator() {
+  const { checkToken, getAuthHeaders } = useAuth()
 
   const [prompt, setPrompt] = useState("")
   const [imageUrl, setImageUrl] = useState<string | null>(null)
@@ -65,6 +67,8 @@ export default function ImageGenerator() {
   }
 
   async function fetchTwoGeneratedImages(nextPrompt: string) {
+    if (!checkToken()) return
+
     setPrompt(nextPrompt)
 
     // Clear previous results (this revokes old URLs too)
@@ -82,16 +86,15 @@ export default function ImageGenerator() {
     try {
       const promises: Promise<AxiosResponse<Blob>>[] = []
 
+      const headers = getAuthHeaders()
+
       if (model1) {
         promises.push(
           axios.post(
             `${backendUrl}/images/generate`,
             { prompt: nextPrompt, model: model1 },
             {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-                "Content-Type": "application/json",
-              },
+              headers,
               responseType: "blob",
             }
           )
@@ -104,10 +107,7 @@ export default function ImageGenerator() {
             `${backendUrl}/images/generate`,
             { prompt: nextPrompt, model: model2 },
             {
-              headers: {
-                Authorization: `Bearer ${localStorage.getItem("token")}`,
-                "Content-Type": "application/json",
-              },
+              headers,
               responseType: "blob",
             }
           )

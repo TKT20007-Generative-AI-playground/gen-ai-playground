@@ -6,8 +6,10 @@ import { EDIT_MODELS } from "../constants/models"
 import ModelSelector from "./ModelSelector"
 import PhotoArea from "./PhotoArea"
 import GeneratingText from "./GeneratingText"
+import { useAuth } from "../context/AuthContext"
 
 export default function ImageEditor() {
+  const { checkToken, getAuthHeaders } = useAuth()
 
   const [prompt, setPrompt] = useState("")
   const [userImage, setUserImage] = useState<File | null>(null)
@@ -58,6 +60,8 @@ export default function ImageEditor() {
   }
 
   async function editImage(nextPrompt: string) {
+    if (!checkToken()) return
+
     if (!userImage || !nextPrompt.trim() || !selectedModel) {
       alert("Please provide an image, a prompt, and select a model")
       return
@@ -72,9 +76,7 @@ export default function ImageEditor() {
         `${backendUrl}/images/edit-image`,
         { image: base64, prompt: nextPrompt, model: selectedModel },
         {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          headers: getAuthHeaders(),
           responseType: "blob",
         }
       )
@@ -98,6 +100,8 @@ export default function ImageEditor() {
   }
 
   function handleUpload(file: File | null) {
+    if (!checkToken()) return
+
     setUserImage(file)
 
     // Clear previous edited result when uploading a new image

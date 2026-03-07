@@ -5,6 +5,8 @@ interface AuthContextType {
   username: string | null
   login: (token: string, username: string) => void
   logout: () => void
+  checkToken: () => boolean
+  getAuthHeaders: () => Record<string, string>
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null)

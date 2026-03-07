@@ -3,11 +3,13 @@ import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
 import TextGenerator from "../components/TextGenerator"
 import { Select, Group } from "@mantine/core"
+import { useAuth } from "../context/AuthContext"
 
 /**
  * @returns playground page where you can choose whether to create or edit an image using AI models
  */
 export default function Playground() {
+  const { checkToken } = useAuth()
   const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const
   type Tab = (typeof tabs)[number]
 
@@ -27,6 +29,7 @@ export default function Playground() {
           data={tabs.map((tab) => ({ value: tab, label: tab }))}
           value={selectedComponent}
           onChange={(value) => {
+            if (!checkToken()) return
             if (value) setSelectedComponent(value as Tab)
           }}
           data-testid="playground-select"

@@ -9,6 +9,7 @@ import {
   Center,
   Modal
 } from "@mantine/core";
+import { useAuth } from "../context/AuthContext";
 
 interface ImageRecord {
   prompt: string;
@@ -26,16 +27,22 @@ interface PromptGroup {
 const backendUrl = import.meta.env.VITE_API_URL;
 
 export default function History() {
+  const { getAuthHeaders } = useAuth();
   const [history, setHistory] = useState<PromptGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
 
   useEffect(() => {
+    let headers: Record<string, string>;
+    try {
+      headers = getAuthHeaders();
+    } catch {
+      setLoading(false);
+      return;
+    }
+
     fetch(`${backendUrl}/images/history`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json",
-      },
+      headers,
     })
       .then((res) => res.json())
       .then((data) => {
