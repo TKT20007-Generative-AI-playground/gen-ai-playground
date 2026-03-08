@@ -15,17 +15,23 @@ def get_current_user(
     db: Database = Depends(get_database)
 ) -> UserInfo:
     """
-    Dependency to verify JWT token and extract user information
-    
+    Dependency to verify JWT token and extract user information.
+
     Args:
-        authorization: Bearer token from Authorization header
-        db: Database instance
-        
+        authorization: Optional. Bearer token from Authorization header. If present and starts with "Bearer ", this is used for authentication.
+        access_token: Optional. JWT token from access_token cookie. Used if Authorization header is not present.
+        db: Database instance.
+
     Returns:
-        UserInfo: Authenticated user information
-        
+        UserInfo: Authenticated user information.
+
     Raises:
-        HTTPException: If authentication fails
+        HTTPException: If authentication fails.
+
+    Selection logic:
+        - If Authorization header is present and starts with "Bearer ", use its value as the token.
+        - Else, if access_token cookie is present, use its value as the token.
+        - If neither is present, authentication fails.
     """
     token = None
 
