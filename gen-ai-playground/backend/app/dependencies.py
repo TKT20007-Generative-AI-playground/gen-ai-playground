@@ -29,9 +29,9 @@ def get_current_user(
         HTTPException: If authentication fails.
 
     Selection logic:
-        - If Authorization header is present and starts with "Bearer ", use its value as the token.
-        - Else, if access_token cookie is present, use its value as the token.
-        - If neither is present, authentication fails.
+        If Authorization header is present and starts with "Bearer ", use its value as the token.
+        Else, if access_token cookie is present, use its value as the token.
+        If neither is present, authentication fails.
     """
     token = None
 

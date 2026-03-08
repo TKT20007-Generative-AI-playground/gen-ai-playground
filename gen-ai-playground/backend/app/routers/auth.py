@@ -111,6 +111,10 @@ def login(
         
     Raises:
         HTTPException: If authentication fails
+    
+    Notes:
+        Sets an HTTPOnly access_token cookie for browser-based authentication.
+        Sets a non-HTTPOnly csrf_token cookie for CSRF protection.
     """
     try:
         # Find user by username
@@ -194,6 +198,23 @@ def me(current_user=Depends(get_current_user)):
 def logout(
     response: Response,
     _: None = Depends(validate_csrf_token)):
+    """
+    Logs out the current user by clearing authentication and CSRF cookies.
+
+    Args:
+        response: FastAPI Response object used to clear cookies.
+        _: Ensures CSRF protection is enforced via dependency.
+
+    Returns:
+        dict: A message indicating successful logout.
+
+    Raises:
+        HTTPException: 403 if CSRF validation fails.
+
+    Notes:
+        Requires a valid CSRF token for cookie-authenticated requests.
+        Works for both cookie and Bearer token authentication, but CSRF is only enforced for cookie auth.
+    """
     # Clear the access token cookie
     response.delete_cookie(
         key="access_token",

@@ -50,6 +50,9 @@ def deploy_model(
         
     Returns:
         Deployment status information
+
+    Notes:
+        Requires CSRF token validation for cookie-authenticated requests.
     """
     print(f"User {current_user.username} requesting model deployment: {request.model_path}")
     model_path = choose_text_model_path(request.model_path)
@@ -105,6 +108,9 @@ def connect_to_deployment(
         
     Returns:
         Deployment status information
+    
+    Notes:
+        Requires CSRF token validation for cookie-authenticated requests.
     """
     print(f"User {current_user.username} connecting to deployment: {request.deployment_name}")
     try:
@@ -185,6 +191,9 @@ def generate_text(
         
     Returns:
         Generated text and metadata
+    
+    Notes:
+        Requires CSRF token validation for cookie-authenticated requests.
     """
     print(f"Text generation for user: {current_user.username}, prompt: {request.prompt[:50]}...")
 
@@ -260,6 +269,9 @@ def chat_with_model(
         
     Returns:
         Assistant's reply and metadata
+    
+    Notes:
+        Requires CSRF token validation for cookie-authenticated requests.
     """
     print(f"Chat request from user: {current_user.username}")
 
@@ -320,6 +332,9 @@ def delete_deployment(
     
     Returns:
         Deletion status
+    
+    Notes:
+        Requires CSRF token validation for cookie-authenticated requests.
     """
     print(f"User {current_user.username} deleting deployment")
     result = verda_service.delete_deployment()
