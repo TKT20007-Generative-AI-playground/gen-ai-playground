@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('main page has no console errors on load', async ({ page }) => {
   const consoleErrors = [];
-  const failedRequests = [];
+  const errorResponses = [];
 
   page.on('console', msg => {
     if (msg.type() === 'error') {
@@ -10,26 +10,27 @@ test('main page has no console errors on load', async ({ page }) => {
     }
   });
 
-  page.on('requestfailed', request => {
-    failedRequests.push({
-      url: request.url(),
-      status: request.response() ? request.response().status() : null,
-      failure: request.failure()
-    });
+  page.on('response', response => {
+    if (response.status() >= 400) {
+      errorResponses.push({
+        url: response.url(),
+        status: response.status()
+      });
+    }
   });
 
   await page.goto('http://localhost:5173');
   await page.waitForTimeout(1000);
 
   // Ignore the expected unauthenticated /me 401 error
-  const unexpectedFailedRequests = failedRequests.filter(
-    req => !(req.url.endsWith('/me') && req.status === 401)
+  const unexpectedErrorResponses = errorResponses.filter(
+    res => !(res.url.endsWith('/me') && res.status === 401)
   );
 
-  expect(unexpectedFailedRequests).toHaveLength(0);
+  expect(unexpectedErrorResponses).toHaveLength(0);
   const unexpectedConsoleErrors = consoleErrors.filter(
     error => error !== 'Failed to load resource: the server responded with a status of 401 (Unauthorized)'
   );
-  
+
   expect(unexpectedConsoleErrors).toHaveLength(0);
 });
