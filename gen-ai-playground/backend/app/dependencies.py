@@ -75,15 +75,15 @@ def get_current_user(
 def validate_csrf_token(
     access_token: str = Cookie(None),
     csrf_cookie: str = Cookie(None, alias="csrf_token"),
-    csrf_header: str = Header(None, alias="X-CSRF-Token")
+    csrf_header: str = Header(None, alias="X-CSRF-Token"),
+    authorization: str = Header(None)
 ):
     """
     Dependency to validate CSRF token for cookie-authenticated requests.
-    CSRF attacks only apply to cookie-based auth, so validation is skipped
-    when no access_token cookie is present (i.e. the request uses Bearer auth
-    or is unauthenticated — get_current_user will handle those cases).
-    Compares the csrf_token cookie against the X-CSRF-Token header.
+    Skips CSRF validation if Authorization: Bearer is present.
     """
+    if authorization and authorization.startswith("Bearer "):
+        return
     # No session cookie → not a browser/cookie-based request; skip CSRF
     if not access_token:
         return
