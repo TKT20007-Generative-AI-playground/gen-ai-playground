@@ -1,11 +1,23 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { AuthContext } from './AuthContext'
+
+const REFRESH_THRESHOLD_MS = 10 * 60 * 1000 // refresh if <10 min until expiry
 
 function isTokenExpired(token: string): boolean {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]))
     if (!payload.exp) return false
     return payload.exp * 1000 < Date.now()
+  } catch {
+    return true
+  }
+}
+
+function isTokenNearExpiry(token: string): boolean {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    if (!payload.exp) return false
+    return payload.exp * 1000 - Date.now() < REFRESH_THRESHOLD_MS
   } catch {
     return true
   }
@@ -24,6 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [username, setUsername] = useState<string | null>(() =>
     localStorage.getItem('username')
   )
+  
+  const refreshPromiseRef = useRef<Promise<void> | null>(null)
 
   const logout = useCallback(() => {
     localStorage.removeItem('token')
@@ -52,19 +66,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       'Content-Type': 'application/json',
     }
 
-    const backendUrl = import.meta.env.VITE_API_URL
-    fetch(`${backendUrl}/refresh`, {
-      method: 'POST',
-      headers,
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.token) {
-          localStorage.setItem('token', data.token)
-          setToken(data.token)
-        }
+    if (isTokenNearExpiry(stored) && !refreshPromiseRef.current) {
+      const backendUrl = import.meta.env.VITE_API_URL
+      refreshPromiseRef.current = fetch(`${backendUrl}/refresh`, {
+        method: 'POST',
+        headers,
       })
-      .catch(() => {})
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.token) {
+            localStorage.setItem('token', data.token)
+            setToken(data.token)
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          refreshPromiseRef.current = null
+        })
+    }
 
     return headers
   }, [logout])

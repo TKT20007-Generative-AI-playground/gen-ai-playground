@@ -152,6 +152,16 @@ def login(
 def refresh_token(
     user: UserInfo = Depends(get_current_user)
 ):
+    """
+    Refresh the JWT token for an authenticated user
+    Args:
+        user: Authenticated user information provided by the get_current_user dependency
+    Returns:
+        LoginResponse: New JWT token and associated username
+    Raises:
+        HTTPException: If user authentication fails or token refresh cannot be completed
+    """
+    
     token_expiry = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRY_HOURS)
 
     token_payload = {
