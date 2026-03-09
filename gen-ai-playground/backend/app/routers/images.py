@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import base64
 import time
 import httpx
+import requests
 
 from app.config import settings
 from app.database import get_database
