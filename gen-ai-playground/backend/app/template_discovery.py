@@ -13,7 +13,7 @@ from app.template_models import TemplateConfig
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
-_SKIP_TEMPLATES = {"custom-engine.json"}
+_SKIP_TEMPLATES = {"custom-engine.json"} # not tested/validated, and not needed in the dropdowns
 
 
 def _display_name_from_filename(filename: str) -> str:
