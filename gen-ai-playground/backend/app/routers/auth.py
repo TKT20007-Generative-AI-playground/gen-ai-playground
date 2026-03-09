@@ -138,7 +138,7 @@ def login(
             )
         
         # Generate JWT token
-        token_expiry_delta = timedelta(seconds=settings.JWT_EXPIRY_HOURS)
+        token_expiry_delta = timedelta(hours=settings.JWT_EXPIRY_HOURS)
         token_expiry = datetime.utcnow() + token_expiry_delta
         
         is_admin = user.get("is_admin", False)
