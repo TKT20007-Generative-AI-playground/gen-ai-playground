@@ -11,7 +11,7 @@ import {
   Modal,
   Button
 } from "@mantine/core";
-import { EDIT_MODELS } from "../constants/models";
+import { EDIT_MODELS } from "../constants/models"
 
 interface ImageRecord {
   prompt: string;

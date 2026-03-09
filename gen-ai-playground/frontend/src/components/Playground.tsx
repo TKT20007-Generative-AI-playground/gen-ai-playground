@@ -1,51 +1,48 @@
+import { useLocation, useNavigate, useParams } from "react-router-dom"
+import { Select, Group } from "@mantine/core"
+import { useEffect } from "react"
+import type { ReactNode } from "react"
 
-import { useEffect, useState, type ReactNode } from "react";
-import ImageGenerator from "../components/ImageGenerator";
-import ImageEditor from "../components/ImageEditor";
-import TextGenerator from "../components/TextGenerator";
-import { Select, Group } from "@mantine/core";
-import { useNavigate, useParams } from "react-router-dom";
+import ImageGenerator from "../components/ImageGenerator"
+import ImageEditor from "../components/ImageEditor"
+import TextGenerator from "../components/TextGenerator"
 
-/**
- * @returns playground page where you can choose whether to create or edit an image using AI models
- */
 export default function Playground() {
-  const navigate = useNavigate();
-  const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const;
-  type Tab = (typeof tabs)[number];
+  const { tab } = useParams()
+  const navigate = useNavigate()
+  const location = useLocation()
 
-  const { tab } = useParams();
-  
+  const imageToEdit = location.state?.imageToEdit || null
 
-    const [selectedComponent, setSelectedComponent] = useState<Tab>(() => {
-    if (tab && tabs.includes(tab as Tab)) return tab as Tab;
-    return "ImageGenerator";
-    });
+  const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const
+  type Tab = (typeof tabs)[number]
 
-  //  Sync state with URL param
-  useEffect(() => {
-    if (tab && tabs.includes(tab as Tab)) {
-      setSelectedComponent(tab as Tab);
-    }
-  }, [tab]);
+  const selectedComponent: Tab =
+    tab && tabs.includes(tab as Tab) ? (tab as Tab) : "ImageGenerator"
 
   const componentsMap: Record<Tab, ReactNode> = {
     ImageGenerator: <ImageGenerator />,
-    ImageEditor: <ImageEditor />,
+    ImageEditor: <ImageEditor imageToEdit={imageToEdit} />,
     TextGenerator: <TextGenerator />,
-  };
+  }
+
+  // If tab is invalid, redirect to default
+  useEffect(() => {
+    if (!tab || !tabs.includes(tab as Tab)) {
+      navigate("/playground/ImageGenerator", { replace: true })
+    }
+  }, [tab, navigate])
 
   return (
     <>
       <Group gap="md" p="md">
         <Select
           label="Select playground component"
-          data={tabs.map((tab) => ({ value: tab, label: tab }))}
+          data={tabs.map((t) => ({ value: t, label: t }))}
           value={selectedComponent}
           onChange={(value) => {
-            if (value) navigate(`/playground/${value}`);
+            if (value) navigate(`/playground/${value}`)
           }}
-          data-testid="playground-select"
         />
       </Group>
 
@@ -55,5 +52,6 @@ export default function Playground() {
         </div>
       </div>
     </>
-  );
+  )
 }
+
