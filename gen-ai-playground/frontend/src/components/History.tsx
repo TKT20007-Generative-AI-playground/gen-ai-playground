@@ -11,6 +11,7 @@ import {
   Modal,
   Button
 } from "@mantine/core";
+import { EDIT_MODELS } from "../constants/models";
 
 interface ImageRecord {
   prompt: string;
@@ -167,13 +168,13 @@ export default function History() {
           const img = selectedImage;
           setSelectedImage(null);  
           setTimeout(() => {
-            navigate("/edit-image", {
+            navigate("/playground/ImageEditor", {
               state: {
                 imageToEdit: {
                   image_data: img.image_data,
                   image_type: img.image_type,
                   prompt: img.prompt,
-                  model: img.model
+                  model: img.model || EDIT_MODELS[0]
                 }
               }
             });

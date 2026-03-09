@@ -9,8 +9,14 @@ import GeneratingText from "./GeneratingText"
 import { useLocation } from "react-router-dom";
 
 
+
+
+
 export default function ImageEditor() {
+  console.log("ImageEditor RENDERÖITYY");
+
   const location = useLocation();
+
   const imageToEdit = location.state?.imageToEdit;
 
 
@@ -68,8 +74,8 @@ export default function ImageEditor() {
     setUserImage(file);
 
     replaceEditedUrl(null);
-    setPrompt(""); 
-    setModel(null);
+    setPrompt(imageToEdit.prompt || "");
+    setModel(imageToEdit.model || null);
 
   }
 }, [imageToEdit]);
@@ -132,13 +138,15 @@ export default function ImageEditor() {
   
   const FORM_WIDTH = 620
 
-  return (
-    <Stack align="center" w="100%" gap="md">
-      <div style={{ width: "100%", maxWidth: FORM_WIDTH }}>
-        <Text c="dimmed" size="sm">
-          Upload an image, select a model, and enter a prompt to enable editing.
-        </Text>
-      </div>
+return (
+  <Stack align="center" w="100%" gap="md">
+
+    <div style={{ width: "100%", maxWidth: FORM_WIDTH }}>
+      <Text c="dimmed" size="sm">
+        Upload an image, select a model, and enter a prompt to enable editing.
+      </Text>
+    </div>
+
 
       <div style={{ width: "100%", maxWidth: FORM_WIDTH }}>
         <ModelSelector

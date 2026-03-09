@@ -205,7 +205,7 @@ export default function ImageGenerator() {
                   onClick={async () => {
                     if (!blob1) return
                     const base64 = await blobToBase64(blob1)
-                    navigate("/edit-image", {
+                    navigate("/playground/ImageEditor", {
                       state: {
                         imageToEdit: {
                           image_data: base64,
@@ -236,7 +236,7 @@ export default function ImageGenerator() {
                   onClick={async () => {
                     if (!blob2) return
                     const base64 = await blobToBase64(blob2)
-                    navigate("/edit-image", {
+                    navigate("/playground/ImageEditor", {
                       state: {
                         imageToEdit: {
                           image_data: base64,
