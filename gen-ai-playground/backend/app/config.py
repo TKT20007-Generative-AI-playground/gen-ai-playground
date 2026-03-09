@@ -48,7 +48,6 @@ class Settings:
         "deepseek-llm-7b": "deepseek-ai/deepseek-llm-7b-chat",
         "Llama-3.1-8B": "meta-llama/Llama-3.1-8B-Instruct",
         "Qwen3-8B": "Qwen/Qwen3-8B",
-<<<<<<< templates
         "Qwen3-32B": "Qwen/Qwen3-32B"
     }
     TEXT_MODEL_PATHS_V2 = {
@@ -81,9 +80,6 @@ class Settings:
         "qwen3-30b-moe-sglang.json": "Qwen3-30B-MoE",
         "qwen3-sglang.json": "Qwen3-8B",
         "qwen3-thinking-sglang.json": "Qwen3-32B",
-=======
-        "Qwen3-32B": "Qwen/Qwen3-32B",
->>>>>>> main
     }
 
 

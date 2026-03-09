@@ -49,7 +49,6 @@ function parseModelReply(rawReply: string): {
   return { thinking: null, actualReply: rawReply.trim() }
 }
 
-<<<<<<< templates
 const modelStatusPriority: Record<ModelStatus, number> = {
   live: 0,
   starting: 1,
@@ -83,20 +82,6 @@ function buildDropdownData(
 
       return a.label.localeCompare(b.label)
     })
-=======
-// Build dropdown data with colored status dots; disable non-live models
-function buildDropdownData(statuses: Record<string, ModelStatus>) {
-  return modelOptions.map((m) => {
-    const st = statuses[m.value]
-    const isLive = st === "live"
-    const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
-    return {
-      value: m.value,
-      label: `${emoji} ${m.label}`,
-      disabled: !isLive,
-    }
-  })
->>>>>>> main
 }
 
 // --- Chat panel (display only) ---
@@ -261,7 +246,6 @@ export default function TextGenerator() {
     }
   }
 
-<<<<<<< templates
   // Fetch available models from backend
   useEffect(() => {
     if (!isLoggedIn) return
@@ -284,8 +268,6 @@ export default function TextGenerator() {
     fetchModels()
   }, [backendUrl, isLoggedIn])
 
-=======
->>>>>>> main
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
     try {
@@ -305,22 +287,9 @@ export default function TextGenerator() {
     return () => clearInterval(id)
   }, [fetchStatuses, isLoggedIn])
 
-<<<<<<< templates
   const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
   const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
 
-=======
-  // Auto-deselect models that are no longer live
-  useEffect(() => {
-    setSelectedModels((prev) =>
-      prev.filter((m) => modelStatuses[m] === "live")
-    )
-  }, [modelStatuses])
-
-  const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
-  const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
-
->>>>>>> main
   /**
    * Send message to a single model panel.
    * Only works with live/healthy models (dropdown enforces this).
@@ -330,10 +299,7 @@ export default function TextGenerator() {
     messagesWithUser: Message[],
   ) => {
     setLoadingByModel((prev) => ({ ...prev, [modelValue]: true }))
-<<<<<<< templates
     console.log(`Sending to ${modelValue}:`, messagesWithUser)
-=======
->>>>>>> main
 
     try {
       const response = await axios.post(
@@ -371,9 +337,6 @@ export default function TextGenerator() {
   const generateText = async () => {
     if (!prompt.trim()) return
     if (selectedModels.length === 0) return
-
-    // Refresh statuses before sending to catch models that went offline
-    await fetchStatuses()
 
     const currentPrompt = prompt
     setPrompt("")
@@ -416,11 +379,7 @@ export default function TextGenerator() {
   }
 
   const isBreakout = selectedModels.length > 2
-<<<<<<< templates
   const dropdownData = buildDropdownData(modelOptions, modelStatuses)
-=======
-  const dropdownData = buildDropdownData(modelStatuses)
->>>>>>> main
 
   return (
     <div
