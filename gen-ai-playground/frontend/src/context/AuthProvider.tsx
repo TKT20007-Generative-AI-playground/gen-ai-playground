@@ -5,6 +5,9 @@ const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(() =>
+    localStorage.getItem('isAdmin') === 'true'
+  );
 
   const isLoggedIn = !!username;
 
@@ -23,8 +26,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (res.ok) {
           const data = await res.json();
           setUsername(data.username || null);
+          setIsAdmin(data.is_admin || false);
         } else {
           setUsername(null);
+          setIsAdmin(false);
         }
       } catch {
         setUsername(null);
@@ -35,8 +40,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Login function - only updates state, cookie is set by backend
-  const login = (user: string) => {
+  const login = (user: string, admin: boolean) => {
     setUsername(user);
+    setIsAdmin(admin);
+    localStorage.setItem('isAdmin', String(admin));
   };
 
   // Logout calls backend to clear httpOnly cookie
@@ -52,12 +59,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { "X-CSRF-Token": csrfToken },
       });
     } finally {
-      setUsername(null); // clear frontend state
+      setUsername(null);
+      setIsAdmin(false);
+      localStorage.removeItem('isAdmin');
     }
   };
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, username, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, username, isAdmin, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

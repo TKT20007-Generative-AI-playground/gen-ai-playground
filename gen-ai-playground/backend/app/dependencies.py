@@ -63,7 +63,7 @@ def get_current_user(
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         
-        return UserInfo(username=username)
+        return UserInfo(username=username, is_admin=user.get("is_admin", False))
     
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
@@ -87,6 +87,15 @@ def validate_csrf_token(
     """
     Dependency to validate CSRF token for cookie-authenticated requests.
     Skips CSRF validation if Authorization: Bearer is present.
+
+    Args:
+        access_token: HTTPOnly JWT cookie. If absent, CSRF check is skipped.
+        csrf_cookie: Non-HTTPOnly CSRF token cookie set by the backend on login.
+        csrf_header: X-CSRF-Token header sent by the frontend on each request.
+        authorization: Optional Authorization header. If Bearer token is present, CSRF is skipped.
+
+    Raises:
+        HTTPException: 403 if CSRF cookie and header are present but do not match.
     """
     if authorization and authorization.startswith("Bearer "):
         return
@@ -96,3 +105,23 @@ def validate_csrf_token(
 
     if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
+
+
+def get_admin_user(
+    current_user: UserInfo = Depends(get_current_user)
+) -> UserInfo:
+    """
+    Dependency that ensures the current user is an admin.
+
+    Returns:
+        UserInfo: Admin user information
+
+    Raises:
+        HTTPException: If user is not an admin
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
+    return current_user

@@ -18,7 +18,7 @@ from app.config import settings
 from app.database import get_database
 from app.models import RegisterRequest, LoginRequest, RegisterResponse, LoginResponse
 from app.utils.validation import validate_password
-from app.dependencies import get_current_user, validate_csrf_token
+from app.dependencies import get_current_user, validate_csrf_token, get_admin_user
 
 router = APIRouter(
     tags=["authentication"]
@@ -74,6 +74,7 @@ def register(
         user_doc = {
             "username": user_data.username,
             "password": hashed_password,
+            "is_admin": False,
             "created_at": datetime.utcnow()
         }
         
@@ -139,8 +140,11 @@ def login(
         # Generate JWT token
         token_expiry = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRY_HOURS)
         
+        is_admin = user.get("is_admin", False)
+        
         token_payload = {
             "username": user["username"],
+            "is_admin": is_admin,
             "exp": token_expiry
         }
         
@@ -176,7 +180,8 @@ def login(
         return LoginResponse(
             message="Login successful",
             token=token,
-            username=user["username"]
+            username=user["username"],
+            is_admin=is_admin
         )
     except HTTPException:
         raise
@@ -189,10 +194,18 @@ def login(
 @router.get("/me")
 def me(current_user=Depends(get_current_user)):
     """
-    Return the current authenticated user's username.
-    Uses the same authentication logic as protected endpoints.
+    Return the current authenticated user's username and admin status.
+
+    Args:
+        current_user: User extracted from the JWT cookie or Bearer token.
+
+    Returns:
+        dict: username and is_admin flag for the authenticated user.
+
+    Raises:
+        HTTPException: 401 if not authenticated.
     """
-    return {"username": current_user.username}
+    return {"username": current_user.username, "is_admin": getattr(current_user, "is_admin", False)}
     
 @router.post("/logout")
 def logout(

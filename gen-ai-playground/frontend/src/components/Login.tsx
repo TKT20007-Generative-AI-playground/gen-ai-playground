@@ -44,7 +44,7 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
         return
       }
 
-      login(data.username)
+      login(data.username, data.is_admin || false)
       onClose()
     } catch {
       alert('Server unreachable')

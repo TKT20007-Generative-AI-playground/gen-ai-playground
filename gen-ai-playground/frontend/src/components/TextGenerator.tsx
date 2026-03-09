@@ -1,8 +1,16 @@
 import axios from "axios"
 import { useAuth } from "../context/AuthContext"
-import { useEffect, useRef, useState, type KeyboardEvent } from "react"
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
 
-import { Button, MultiSelect, Paper, ScrollArea, Text, TextInput } from "@mantine/core"
+import {
+  Alert,
+  Button,
+  MultiSelect,
+  Paper,
+  Text,
+  ScrollArea,
+  TextInput,
+} from "@mantine/core"
 
 type ModelOption = {
   value: string
@@ -12,13 +20,12 @@ type ModelOption = {
 
 type Message = {
   id: string
-  role: "user" | "assistant" | "system"
+  role: "user" | "assistant"
   content: string
+  modelLabel?: string
 }
 
-type Deployment = {
-  name?: string
-}
+type ModelStatus = "live" | "starting" | "offline" | "unknown"
 
 const makeMessageId = () => {
   // Prefer crypto.randomUUID when available; fall back for older browsers.
@@ -29,6 +36,18 @@ const makeMessageId = () => {
 }
 
 const MAX_MODELS = 4
+
+const getCsrfToken = (): string => {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; csrf_token=`)
+  if (parts.length === 2) return parts.pop()!.split(";").shift()!
+  return ""
+}
+
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  "X-CSRF-Token": getCsrfToken(),
+})
 
 const modelOptions: ModelOption[] = [
   {
@@ -66,102 +85,47 @@ function parseModelReply(rawReply: string): {
   return { thinking: null, actualReply: rawReply.trim() }
 }
 
-// --- Chat panel ---
+// Build dropdown data with colored status dots; disable non-live models
+function buildDropdownData(statuses: Record<string, ModelStatus>) {
+  return modelOptions.map((m) => {
+    const st = statuses[m.value]
+    const isLive = st === "live"
+    const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
+    return {
+      value: m.value,
+      label: `${emoji} ${m.label}`,
+      disabled: !isLive,
+    }
+  })
+}
+
+// --- Chat panel (display only) ---
 
 type ChatPanelProps = {
   modelValue: string
   modelLabel: string
-  backendUrl: string
-  getAuthHeaders: () => Record<string, string>
   messages: Message[]
   onClearMessages: () => void
   isLoading: boolean
   isBusy: boolean
+  modelStatus: ModelStatus
+  statusMessage: string | null
 }
 
 function ChatPanel({
-  modelValue,
   modelLabel,
-  backendUrl,
-  getAuthHeaders,
   messages,
   onClearMessages,
   isLoading,
   isBusy,
+  modelStatus,
+  statusMessage,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, isLoading])
-
-  const selected = modelOptions.find((m) => m.value === modelValue) ?? null
-
-  const deployContainer = async () => {
-    if (!selected) return
-    try {
-      const deploymentsResponse = await axios.get(`${backendUrl}/text/deployments`, {
-        headers: getAuthHeaders(),
-        withCredentials: true,
-      })
-      const deployments = deploymentsResponse.data || []
-
-      console.log("Deployments:", deployments)
-
-      const existingContainer = deployments.find((d: Deployment) => {
-        const name = typeof d?.name === "string" ? d.name.toLowerCase() : ""
-        return name.includes(selected.slug.toLowerCase())
-      })
-
-      if (existingContainer) {
-        console.log("Found existing container for model:", existingContainer.name)
-
-        const connectResponse = await axios.post(
-          `${backendUrl}/text/connect`,
-          { deployment_name: existingContainer.name, model_path: modelValue },
-          { headers: getAuthHeaders(), withCredentials: true }
-        )
-        console.log("Connected to existing container:", connectResponse.data)
-        return connectResponse.data
-      }
-
-      console.log("No deployment found for model, creating new one...")
-
-      const response = await axios.post(
-        `${backendUrl}/text/deploy`,
-        { model_path: modelValue },
-        { headers: getAuthHeaders(), withCredentials: true }
-      )
-      console.log("Created new deployment:", response.data)
-      return response.data
-    } catch (error) {
-      console.error(`Deploy error (${modelValue}):`, error)
-    }
-  }
-
-  const deleteContainer = async () => {
-    try {
-      const response = await axios.delete(`${backendUrl}/text/deploy`, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      console.log(`Delete (${modelValue}):`, response.data)
-    } catch (error) {
-      console.error(`Delete error (${modelValue}):`, error)
-    }
-  }
-
-  const checkContainerStatus = async () => {
-    try {
-      const response = await axios.get(`${backendUrl}/text/status`, {
-        headers: getAuthHeaders(),
-        withCredentials: true
-      })
-      console.log(`Status (${modelValue}):`, response.data)
-    } catch (error) {
-      console.error(`Status error (${modelValue}):`, error)
-    }
-  }
 
   return (
     <div
@@ -178,16 +142,29 @@ function ChatPanel({
         {modelLabel}
       </Text>
 
+      {modelStatus && modelStatus !== "live" && (
+        <Alert
+          color={modelStatus === "starting" ? "yellow" : "gray"}
+          variant="light"
+          mb={8}
+          p="xs"
+          styles={{ message: { fontSize: 13 } }}
+        >
+          {statusMessage
+            ? statusMessage
+            : modelStatus === "starting"
+              ? "This model is starting up. It usually takes about 2 minutes."
+              : "This model is not deployed. Ask an admin to deploy it from the dashboard."}
+        </Alert>
+      )}
+
+      {modelStatus === "live" && statusMessage && (
+        <Alert color="green" variant="light" mb={8} p="xs" styles={{ message: { fontSize: 13 } }}>
+          {statusMessage}
+        </Alert>
+      )}
+
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-        <Button size="xs" onClick={deployContainer} disabled={isBusy}>
-          Deploy
-        </Button>
-        <Button size="xs" onClick={checkContainerStatus} disabled={isBusy}>
-          Status
-        </Button>
-        <Button size="xs" color="red" onClick={deleteContainer} disabled={isBusy}>
-          Delete
-        </Button>
         <Button size="xs" color="orange" onClick={onClearMessages} disabled={isBusy}>
           Clear
         </Button>
@@ -208,38 +185,39 @@ function ChatPanel({
             No messages yet.
           </Text>
         ) : (
-          messages.map((message) => (
-            <Paper
-              key={message.id}
-              p="sm"
-              mb="xs"
-              style={{
-                backgroundColor: message.role === "user" ? "#e3f2fd" : "#f5f5f5",
-                marginLeft: message.role === "user" ? "15%" : "0",
-                marginRight: message.role === "user" ? "0" : "15%",
-              }}
-            >
-              <Text fw={700} size="xs" mb={4}>
-                {message.role === "user" ? "You" : modelLabel}
-              </Text>
-              <Text
-                size="sm"
+          <>
+            {messages.map((message) => (
+              <Paper
+                key={message.id}
+                p="sm"
+                mb="xs"
                 style={{
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                  overflowWrap: "break-word",
+                  backgroundColor: message.role === "user" ? "#e3f2fd" : "#f5f5f5",
+                  marginLeft: message.role === "user" ? "15%" : "0",
+                  marginRight: message.role === "user" ? "0" : "15%",
                 }}
               >
-                {message.content}
+                <Text fw={700} size="xs" mb={4}>
+                  {message.role === "user" ? "You" : message.modelLabel ?? modelLabel}
+                </Text>
+                <Text
+                  size="sm"
+                  style={{
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    overflowWrap: "break-word",
+                  }}
+                >
+                  {message.content}
+                </Text>
+              </Paper>
+            ))}
+            {isLoading && (
+              <Text c="dimmed" size="sm" ta="center">
+                Generating...
               </Text>
-            </Paper>
-          ))
-        )}
-
-        {isLoading && (
-          <Text c="dimmed" size="sm" ta="center">
-            Generating...
-          </Text>
+            )}
+          </>
         )}
         <div ref={bottomRef} />
       </ScrollArea>
@@ -270,60 +248,55 @@ export default function TextGenerator() {
     setMessagesForModel(modelValue, [])
   }
 
-  const getCsrfToken = (): string => {
-      const value = `; ${document.cookie}`
-      const parts = value.split(`; csrf_token=`)
-      if (parts.length === 2) return parts.pop()!.split(";").shift()!
-      return ""
-  }
+  const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
+  const [statusMsgs, setStatusMsgs] = useState<Record<string, string | null>>({})
 
-  const getAuthHeaders = () => {
-      return { "Content-Type": "application/json", "X-CSRF-Token": getCsrfToken() }
-  }
+  // Poll model statuses (background, for dropdown indicators)
+  const fetchStatuses = useCallback(async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/text/model-statuses`, {
+        headers: getAuthHeaders(),
+        withCredentials: true,
+      })
+      setModelStatuses(res.data)
+    } catch {
+      // silent
+    }
+  }, [backendUrl])
+
+  useEffect(() => {
+    if (!isLoggedIn) return
+    fetchStatuses()
+    const id = setInterval(fetchStatuses, 30000)
+    return () => clearInterval(id)
+  }, [fetchStatuses, isLoggedIn])
+
+  // Auto-deselect models that are no longer live
+  useEffect(() => {
+    setSelectedModels((prev) =>
+      prev.filter((m) => modelStatuses[m] === "live")
+    )
+  }, [modelStatuses])
 
   const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
   const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
 
-  const connectToModel = async (modelValue: string): Promise<boolean> => {
-    const selected = modelOptions.find((m) => m.value === modelValue)
-    if (!selected) return false
+  /**
+   * Send message to a single model panel.
+   * Only works with live/healthy models (dropdown enforces this).
+   */
+  const sendToPanel = async (
+    modelValue: string,
+    messagesWithUser: Message[],
+  ) => {
+    setLoadingByModel((prev) => ({ ...prev, [modelValue]: true }))
 
-    try {
-      const deploymentsResponse = await axios.get(`${backendUrl}/text/deployments`, {
-        headers: getAuthHeaders(),
-        withCredentials: true,
-      })
-      const deployments = deploymentsResponse.data || []
-
-      const existingContainer = deployments.find((d: Deployment) => {
-        const name = typeof d?.name === "string" ? d.name.toLowerCase() : ""
-        return name.includes(selected.slug.toLowerCase())
-      })
-
-      if (!existingContainer) {
-        console.error("No running deployment found for model:", modelValue)
-        return false
-      }
-
-      await axios.post(
-        `${backendUrl}/text/connect`,
-        { deployment_name: existingContainer.name, model_path: modelValue },
-        { headers: getAuthHeaders(), withCredentials: true }
-      )
-      console.log("Connected to deployment:", existingContainer.name)
-      return true
-    } catch (error) {
-      console.error("Error connecting to model:", error)
-      return false
-    }
-  }
-
-  const chatWithCurrentModel = async (messages: Message[]): Promise<string | null> => {
     try {
       const response = await axios.post(
         `${backendUrl}/text/chat`,
         {
-          messages,
+          model_path: modelValue,
+          messages: messagesWithUser,
           max_tokens: 256,
           temperature: 0.7,
           top_p: 0.9,
@@ -331,12 +304,23 @@ export default function TextGenerator() {
         { headers: getAuthHeaders(), withCredentials: true }
       )
 
-      const parsed = parseModelReply(response.data.reply)
-      if (parsed.thinking) console.log("Model thinking:", parsed.thinking)
-      return parsed.actualReply
-    } catch (error) {
-      console.error("Error during chat:", error)
-      return null
+      const result = response.data
+      const parsed = parseModelReply(result.reply)
+      if (parsed.thinking) console.log("Thinking:", parsed.thinking)
+      const label = getModelLabel(modelValue)
+      const withReply = messagesWithUser.concat({
+        id: makeMessageId(),
+        role: "assistant",
+        content: parsed.actualReply,
+        modelLabel: label,
+      })
+      setMessagesForModel(modelValue, withReply)
+    } catch (error: unknown) {
+      console.error("chat error:", error)
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setStatusMsgs((prev) => ({ ...prev, [modelValue]: detail || "Failed to reach the server." }))
+    } finally {
+      setLoadingByModel((prev) => ({ ...prev, [modelValue]: false }))
     }
   }
 
@@ -344,28 +328,24 @@ export default function TextGenerator() {
     if (!prompt.trim()) return
     if (selectedModels.length === 0) return
 
+    // Refresh statuses before sending to catch models that went offline
+    await fetchStatuses()
+
     const currentPrompt = prompt
     setPrompt("")
     const userMessage: Message = { id: makeMessageId(), role: "user", content: currentPrompt }
 
-    for (const modelValue of selectedModels) {
-      setLoadingByModel((prev) => ({ ...prev, [modelValue]: true }))
+    // Launch all selected panels in parallel
+    const promises: Promise<void>[] = []
 
+    for (const modelValue of selectedModels) {
       const existingMessages = messagesByModelRef.current[modelValue] ?? []
       const updatedMessages = existingMessages.concat(userMessage)
       setMessagesForModel(modelValue, updatedMessages)
-
-      const connected = await connectToModel(modelValue)
-      if (connected) {
-        const reply = await chatWithCurrentModel(updatedMessages)
-        if (reply) {
-          const withReply = updatedMessages.concat({ id: makeMessageId(), role: "assistant", content: reply })
-          setMessagesForModel(modelValue, withReply)
-        }
-      }
-
-      setLoadingByModel((prev) => ({ ...prev, [modelValue]: false }))
+      promises.push(sendToPanel(modelValue, updatedMessages))
     }
+
+    await Promise.all(promises)
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -392,6 +372,7 @@ export default function TextGenerator() {
   }
 
   const isBreakout = selectedModels.length > 2
+  const dropdownData = buildDropdownData(modelStatuses)
 
   return (
     <div
@@ -413,7 +394,7 @@ export default function TextGenerator() {
       <MultiSelect
         label="Models"
         placeholder={selectedModels.length > 0 ? "" : "Select models"}
-        data={modelOptions}
+        data={dropdownData}
         value={selectedModels}
         onChange={setSelectedModels}
         maxValues={MAX_MODELS}
@@ -450,12 +431,12 @@ export default function TextGenerator() {
                       key={modelValue}
                       modelValue={modelValue}
                       modelLabel={getModelLabel(modelValue)}
-                      backendUrl={backendUrl}
-                      getAuthHeaders={getAuthHeaders}
                       messages={messagesByModel[modelValue] ?? []}
                       onClearMessages={() => clearMessagesForModel(modelValue)}
                       isLoading={loadingByModel[modelValue] ?? false}
                       isBusy={isAnyLoading}
+                      modelStatus={modelStatuses[modelValue] ?? "unknown"}
+                      statusMessage={statusMsgs[modelValue] ?? null}
                     />
                   ))}
                 </div>
@@ -479,12 +460,12 @@ export default function TextGenerator() {
                   key={modelValue}
                   modelValue={modelValue}
                   modelLabel={getModelLabel(modelValue)}
-                  backendUrl={backendUrl}
-                  getAuthHeaders={getAuthHeaders}
                   messages={messagesByModel[modelValue] ?? []}
                   onClearMessages={() => clearMessagesForModel(modelValue)}
                   isLoading={loadingByModel[modelValue] ?? false}
                   isBusy={isAnyLoading}
+                  modelStatus={modelStatuses[modelValue] ?? "unknown"}
+                  statusMessage={statusMsgs[modelValue] ?? null}
                 />
               ))}
             </div>
