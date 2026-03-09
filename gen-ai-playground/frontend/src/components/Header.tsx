@@ -6,7 +6,7 @@ import { Group, Divider, Text, Button, Drawer } from "@mantine/core";
 import History from "./History";
 
 export default function Header() {
-  const { isLoggedIn, logout } = useAuth()
+  const { isLoggedIn, isAdmin, logout } = useAuth()
   const location = useLocation()
 
   const [loginOpened, setLoginOpened] = useState(false);
@@ -50,16 +50,20 @@ export default function Header() {
       <Group justify="space-between" p="md" bg="#2C4E87">
         <Group gap="md">
           <Text fw={500} c="white">Generative AI Playground </Text>
-          <Button
-            variant="white"
-            color="dark"
-            onClick={() => {
-              if (!isLoggedIn) return;
-              setHistoryOpened(true);
-            }}
-          >
-            History
-          </Button>
+          {isLoggedIn && (
+            <Button
+              variant="white"
+              color="dark"
+              onClick={() => setHistoryOpened(true)}
+            >
+              History
+            </Button>
+          )}
+          {isAdmin && (
+            <Button component={Link} to="/dashboard" variant="white" color="dark">
+              Dashboard
+            </Button>
+          )}
           <Button component={Link} to="/playground" variant="white" color="dark">
             Playground
           </Button>

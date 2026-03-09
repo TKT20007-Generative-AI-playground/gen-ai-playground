@@ -62,6 +62,16 @@ spec:
                 secretKeyRef:
                   name: hf-token-secret
                   key: HF_TOKEN
+            - name: ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: genai-admin-credentials
+                  key: ADMIN_USERNAME
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: genai-admin-credentials
+                  key: ADMIN_PASSWORD
                 
           resources:
             limits:

@@ -62,6 +62,7 @@ def register(
         user_doc = {
             "username": user_data.username,
             "password": hashed_password,
+            "is_admin": False,
             "created_at": datetime.utcnow()
         }
         
@@ -122,8 +123,11 @@ def login(
         # Generate JWT token
         token_expiry = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRY_HOURS)
         
+        is_admin = user.get("is_admin", False)
+        
         token_payload = {
             "username": user["username"],
+            "is_admin": is_admin,
             "exp": token_expiry
         }
         
@@ -136,7 +140,8 @@ def login(
         return LoginResponse(
             message="Login successful",
             token=token,
-            username=user["username"]
+            username=user["username"],
+            is_admin=is_admin
         )
     except HTTPException:
         raise

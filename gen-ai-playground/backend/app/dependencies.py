@@ -52,7 +52,7 @@ def get_current_user(
         if not user:
             raise HTTPException(status_code=401, detail="User not found")
         
-        return UserInfo(username=username)
+        return UserInfo(username=username, is_admin=user.get("is_admin", False))
     
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired")
@@ -65,3 +65,23 @@ def get_current_user(
             status_code=401,
             detail=f"Authentication failed: {str(e)}"
         )
+
+
+def get_admin_user(
+    current_user: UserInfo = Depends(get_current_user)
+) -> UserInfo:
+    """
+    Dependency that ensures the current user is an admin.
+    
+    Returns:
+        UserInfo: Admin user information
+        
+    Raises:
+        HTTPException: If user is not an admin
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin access required"
+        )
+    return current_user
