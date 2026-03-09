@@ -4,11 +4,11 @@ Verda Cloud service for deploying and managing AI model containers.
 Uses the Verda Python SDK to deploy SGLang-based LLM containers
 and run inference against them.
 """
-import time
-import json
 from datetime import datetime
 from typing import Optional
+import json
 from pathlib import Path
+
 
 from verda import VerdaClient
 from verda.containers import (
@@ -31,6 +31,7 @@ from verda.containers import (
 from verda.exceptions import APIException
 
 from app.config import settings
+from app.template_models import TemplateConfig
 
 
 # Default model configuration
@@ -43,6 +44,11 @@ HF_SECRET_NAME = "huggingface-token"
 APP_PORT = 30000
 DEFAULT_COMPUTE = "L40S"  # 48GB VRAM, good for 7B models
 
+class NoComputeResourcesError(Exception):
+    """Custom exception for no available GPU resources."""
+    def __init__(self, gpu_count: int):
+        super().__init__(f"No compute resources available for {gpu_count} GPUs")
+      
 
 class VerdaService:
     """
@@ -121,8 +127,7 @@ class VerdaService:
 
         elif cfg.engine == "vllm":
             cmd = [
-                "python3", "-m", "vllm.entrypoints.openai.api_server",
-                "--model", cfg.model,
+                cfg.model,
                 "--host", host,
                 "--port", str(port),
             ]
@@ -173,7 +178,96 @@ class VerdaService:
             return image
 
         raise RuntimeError(f"Cannot resolve image for engine: {cfg.engine}")
+    
+    def available_models(self) -> list[dict]:
+        """Return template name and availability from all JSON templates."""
+        from app.template_discovery import get_template_map
+        
+        # Fetch available resources once to avoid multiple api calls in the loop
+        all_resources = self.check_compute_resources(1)
 
+        results = []
+        for template_name, display_name in get_template_map().items():
+            cfg = self._parse_and_validate_template(template_name)
+            compute_name, gpu_count = self._resolve_gpu(cfg, all_resources)
+            
+            results.append({
+                "value": display_name,
+                "label": display_name,
+                "template": template_name,
+                "tp": gpu_count,
+                "availability": compute_name,
+            })
+        return results
+      
+    def check_compute_resources(self, size):
+        """Check available compute resources for the specified template config."""
+        client = self._get_client()
+        
+        #Temp workaround because client.containers.get_compute_resources() may contain a bug
+        
+        from verda.containers._containers import (
+            SERVERLESS_COMPUTE_RESOURCES_ENDPOINT,   #import endpoint and ComputeResource dataclass
+            ComputeResource,
+        )
+        
+        response = client.containers.client.get(SERVERLESS_COMPUTE_RESOURCES_ENDPOINT)
+    
+         
+        resources = []
+        for item in response.json():
+            if isinstance(item, list):
+                for item_in_items in item:
+                    resources.append(ComputeResource.from_dict(item_in_items))
+            elif isinstance(item, dict):
+                resources.append(ComputeResource.from_dict(item))
+                
+        available_resources = [r for r in resources if r.is_available and r.size >= size] # filter resources based on availability and size  
+        
+        return available_resources
+    
+    def _set_compute_name(self, cfg, available_gpu_types):
+        """Determine the compute resource name based on template config and available GPU types.
+        Selects cheapest option from cfg.gpu_types that is available
+        """
+        gpu_type_priority = ["l40s", "a100", "h100", "h200", "b200","b300"]
+        for gpu_type in gpu_type_priority:
+            if gpu_type in cfg.gpu_types and any(
+                name.startswith(gpu_type.upper()) for name in available_gpu_types
+            ):
+                return gpu_type.upper()
+        return "not available"
+            
+    def _parse_and_validate_template(self, template_json: str) -> TemplateConfig:
+        """Parse and validate the template JSON config."""
+        try:
+            template_path = Path(__file__).resolve().parent.parent / "templates" / template_json
+            cfg = TemplateConfig.model_validate_json(
+                template_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            raise RuntimeError(f"Invalid template config: {e}")
+        
+        return cfg
+    
+    def _resolve_gpu(self, cfg, resources=None):
+        """ Determine GPU count and compute resource name based on template config and available resources."""
+        gpu_count = 1
+        if cfg.engine == "sglang" and cfg.sglang and cfg.sglang.tp:
+            gpu_count = cfg.sglang.tp
+        elif cfg.engine == "vllm" and cfg.vllm and cfg.vllm.tensor_parallel_size:
+            gpu_count = cfg.vllm.tensor_parallel_size
+
+        
+        # resources can be passed in to avoid multiple api calls when checking all templates in available_models() 
+        if resources is None:
+            resources = self.check_compute_resources(gpu_count)
+            
+        available = [r for r in resources if r.is_available and r.size >= gpu_count]
+        available_gpu_types = {r.name for r in available}
+
+        compute_name = self._set_compute_name(cfg, available_gpu_types)
+        return compute_name, gpu_count
+    
     def deploy_from_template(
         self,
         template_json: str,
@@ -186,7 +280,6 @@ class VerdaService:
         Args:
             template_json: JSON string matching TemplateConfig schema.
             deployment_name: Custom deployment name. Auto-generated if not provided.
-            gpu_type: Override GPU type (e.g. 'L40S'). Uses template gpu_types or DEFAULT_COMPUTE.
 
         Returns:
             dict with deployment info (name, status, model)
@@ -194,44 +287,27 @@ class VerdaService:
         from app.template_models import TemplateConfig
 
         # Parse and validate template
-        try:
-            from pathlib import Path
-            template_path = Path(__file__).resolve().parent.parent / "templates" / template_json
-            cfg = TemplateConfig.model_validate_json(
-                template_path.read_text(encoding="utf-8"))
-        except Exception as e:
-            raise RuntimeError(f"Invalid template config: {e}")
-        
-        print(f"Parsed template config: {cfg}")
+        cfg = self._parse_and_validate_template(template_json)
 
+        
+        # Add host and port defaults, and model path 
         cfg.host = "0.0.0.0"
         if not cfg.port:
             cfg.port = APP_PORT
 
         client = self._get_client()
-        self._model_path = cfg.model
 
-        # Generate deployment name
+        # Generate deployment name from template filename
         if deployment_name is None:
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S").lower()
-            model_slug = cfg.model.split("/")[-1].lower()
-            deployment_name = f"{model_slug}-{timestamp}"
-        self._deployment_name = deployment_name
-
+            from app.template_discovery import _deployment_name_from_filename
+            deployment_name = _deployment_name_from_filename(template_json)      
+        # ensure hf secret exists
         self._ensure_hf_secret()
-
-        # Resolve GPU
-        gpu_count = 1
-        if cfg.engine == "sglang" and cfg.sglang and cfg.sglang.tp:
-            gpu_count = cfg.sglang.tp
-        elif cfg.engine == "vllm" and cfg.vllm and cfg.vllm.tensor_parallel_size:
-            gpu_count = cfg.vllm.tensor_parallel_size
-            
-        #L40S is good and cheap option 
-        if cfg.gpu_types and "l40s" in cfg.gpu_types:
-            compute_name = "L40S"
-        else:
-            compute_name = gpu_type or (cfg.gpu_types[0].upper() if cfg.gpu_types else DEFAULT_COMPUTE)
+        
+        # Check compute resources and determine compute name and GPU count
+        compute_name, gpu_count = self._resolve_gpu(cfg)
+        if compute_name == "not available":
+            raise NoComputeResourcesError(gpu_count)
 
         # Build launch command
         cmd = self._generate_command_from_template(cfg)
@@ -268,26 +344,6 @@ class VerdaService:
                     value_or_reference_to_secret="INFO",
                     type=EnvVarType.PLAIN,
                 ),
-                # EnvVar(
-                #     name="NCCL_IB_DISABLE",
-                #     value_or_reference_to_secret="1",
-                #     type=EnvVarType.PLAIN,
-                # ),
-                # EnvVar(
-                #     name="NCCL_P2P_DISABLE",
-                #     value_or_reference_to_secret="1",
-                #     type=EnvVarType.PLAIN,
-                # ),
-                # EnvVar(
-                #     name="NCCL_SHM_DISABLE",
-                #     value_or_reference_to_secret="0",
-                #     type=EnvVarType.PLAIN,
-                # ),
-                # EnvVar(
-                #     name="NCCL_NET_GDR_LEVEL",
-                #     value_or_reference_to_secret="0",
-                #     type=EnvVarType.PLAIN,
-                # ),
             ],
             # for bigger models->
             volume_mounts=[VolumeMount(
@@ -675,8 +731,9 @@ class VerdaService:
             "max_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
-            "chat_template_kwargs": {"enable_thinking": enable_thinking},
         }
+        if enable_thinking:
+            chat_data["chat_template_kwargs"] = {"enable_thinking": True}
 
         response = deployment.run_sync(
             chat_data,
@@ -690,7 +747,11 @@ class VerdaService:
         if isinstance(result, dict) and "choices" in result:
             if result["choices"]:
                 message = result["choices"][0].get("message", {})
-                assistant_message = message.get("content", "")
+                assistant_message = message.get("content") or ""
+                # If model returned reasoning content (eg Nemotron)
+                reasoning = message.get("reasoning_content")
+                if reasoning and not assistant_message:
+                    assistant_message = reasoning
 
         return {
             "reply": assistant_message,

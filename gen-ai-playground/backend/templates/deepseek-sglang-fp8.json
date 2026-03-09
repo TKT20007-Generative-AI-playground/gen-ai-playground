@@ -1,0 +1,17 @@
+{
+  "engine": "sglang",
+  "model": "deepseek-ai/DeepSeek-V3.2",
+  "explanation": "DeepSeek V3.2 with FP8 KV cache for memory efficiency on 8-way tensor parallelism. Uses 64-thread multithread loading for fast startup and includes both reasoning and tool calling parsers.",
+  "short_explanation": "DeepSeek V3.2 FP8 with 8-way TP",
+  "gpu_types": ["h200", "b200"],
+  "model_loader_extra_config": {
+    "enable_multithread_load": true,
+    "num_threads": 64
+  },
+  "sglang": {
+    "tp": 8,
+    "kv_cache_dtype": "fp8_e4m3",
+    "reasoning_parser": "deepseek-v3",
+    "tool_call_parser": "deepseekv32"
+  }
+}

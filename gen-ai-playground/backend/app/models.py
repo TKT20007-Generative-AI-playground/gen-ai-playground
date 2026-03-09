@@ -66,6 +66,7 @@ class UserInfo(BaseModel):
 class DeployModelRequest(BaseModel):
     """Request model for deploying a text model on Verda"""
     model_path: str
+    deployment_name: Optional[str] = None
 
 
 class ConnectDeploymentRequest(BaseModel):
