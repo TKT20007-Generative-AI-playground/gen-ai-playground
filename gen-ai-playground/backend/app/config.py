@@ -44,43 +44,7 @@ class Settings:
         "FLUX2_KLEIN_9B": "https://inference.datacrunch.io/flux2-klein-9b/generate",
         "FLUX2_KLEIN_4B": "https://inference.datacrunch.io/flux2-klein-4b/generate"
     }
-    TEXT_MODEL_PATHS = {
-        "deepseek-llm-7b": "deepseek-ai/deepseek-llm-7b-chat",
-        "Llama-3.1-8B": "meta-llama/Llama-3.1-8B-Instruct",
-        "Qwen3-8B": "Qwen/Qwen3-8B",
-        "Qwen3-32B": "Qwen/Qwen3-32B"
-    }
-    TEXT_MODEL_PATHS_V2 = {
-        # DeepSeek
-        "deepseek-7b-sglang.json": "deepSeek-7b",
-        "deepseek-r1-sglang.json": "deepseek-r1-0528",
-        "deepseek-sglang-fp8.json": "deepseek-v3.2-fp8",
-        "deepseek-sglang.json": "deepseek-v3.2",
-        # GLM
-        "glm46-sglang.json": "glm46",
-        # GPT-OSS
-        "gptoss-120b-b200-fp4-vllm.json": "gptoss-120b-b200",
-        "gptoss-120b-h200-fp4-vllm.json": "gptoss-120b-h200",
-        "gptoss-20b-h100-fp4-vllm.json": "gptoss-20b-h100",
-        # Kimi
-        "kimik2-sglang.json": "kimi-k2",
-        # Llama
-        "llama-awq-vllm.json": "Llama-3-70B-AWQ",
-        "llama-sglang-deploy.json": "Llama-3.1-8B-sglang",
-        "llama-sglang-optimized.json": "Llama-3.1-70B-sglang-opt",
-        "llama-sglang.json": "Llama-3.1-70B-sglang",
-        "llama-vllm-deploy-full.json": "Llama-3-70B-AWQ-vllm",
-        "llama-vllm.json": "Llama-3.1-8B",
-        # Mistral
-        "mistral-vllm.json": "Mistral-7B",
-        # Nemotron
-        "nemotron-sglang.json": "Nemotron-Nano-30B",
-        # Qwen
-        "qwen-vllm.json": "Qwen2.5-32B",
-        "qwen3-30b-moe-sglang.json": "Qwen3-30B-MoE",
-        "qwen3-sglang.json": "Qwen3-8B",
-        "qwen3-thinking-sglang.json": "Qwen3-32B",
-    }
+
 
 
 settings = Settings()
