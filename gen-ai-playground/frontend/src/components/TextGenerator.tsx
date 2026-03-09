@@ -267,6 +267,13 @@ export default function TextGenerator() {
     return () => clearInterval(id)
   }, [fetchStatuses, isLoggedIn])
 
+  // Auto-deselect models that are no longer live
+  useEffect(() => {
+    setSelectedModels((prev) =>
+      prev.filter((m) => modelStatuses[m] === "live")
+    )
+  }, [modelStatuses])
+
   const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
   const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
 
@@ -316,6 +323,9 @@ export default function TextGenerator() {
   const generateText = async () => {
     if (!prompt.trim()) return
     if (selectedModels.length === 0) return
+
+    // Refresh statuses before sending to catch models that went offline
+    await fetchStatuses()
 
     const currentPrompt = prompt
     setPrompt("")
