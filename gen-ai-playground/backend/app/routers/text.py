@@ -168,23 +168,6 @@ def _check_deployment_health(deployment_name: str, label: str = "Deployment") ->
         raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
 
 
-def _deploy_model_internal(model_key: str) -> dict:
-    """
-    Internal helper to deploy a model by key.
-    Used by the admin /deploy endpoint.
-    """
-    model_path = choose_text_model_path(model_key)
-
-    if model_path == "deepseek-ai/deepseek-llm-7b-chat":
-        return verda_service.deploy_model(model_path=model_path)
-    elif model_path == "Qwen/Qwen3-8B":
-        return verda_service.deploy_from_template(template_json="qwen3-sglang.json")
-    elif model_path == "Qwen/Qwen3-32B":
-        return verda_service.deploy_from_template(template_json="qwen3-sglang-think.json")
-    else:
-        return verda_service.deploy_model(model_path=model_path)
-
-
 @router.get("/status", response_model=DeploymentStatusResponse)
 def get_deployment_status(
     deployment_name: str = Query(..., description="Name of the deployment to check"),
