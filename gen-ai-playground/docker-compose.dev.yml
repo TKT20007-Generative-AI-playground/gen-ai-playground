@@ -10,6 +10,12 @@ services:
       - MONGO_DB_URL=mongodb://mongodb:27017
       - JWT_SECRET_KEY=dev-secret-key-for-local-development
       - INVITATION_CODE=local-invitation-code
+      - ADMIN_USERNAME=admin
+<<<<<<< templates
+      - ADMIN_PASSWORD=local-admin-password
+=======
+      - ADMIN_PASSWORD=Localadmin123!
+>>>>>>> main
     volumes:
       - ./backend:/app
     depends_on:

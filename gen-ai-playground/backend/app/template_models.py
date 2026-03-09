@@ -68,21 +68,26 @@ class CustomConfig(BaseModel):
 
 
 class TemplateConfig(BaseModel):
-    model: str
+    # Common Fields (All Engines)
     engine: Literal["vllm", "sglang", "custom"]
-    gpu_types: List[str] = Field(default_factory=list)
-    image_tag: Optional[str] = None
-
-    host: Optional[str] = None
-    port: Optional[int] = None
+    model: str
     trust_remote_code: Optional[bool] = None
-
+    quantization: Optional[str] = None
+    gpu_types: List[str] = Field(default_factory=list)
+    load_format: Optional[str] = None
     model_loader_extra_config: Optional[dict] = None
-
+    seed: Optional[int] = None
+    tokenizer: Optional[str] = None
+    image_tag: Optional[str] = None
+    
+    # Engine specific configs
     sglang: Optional[SGLangConfig] = None
     vllm: Optional[VLLMConfig] = None
     custom: Optional[CustomConfig] = None
-
+    
+    host: Optional[str] = None
+    port: Optional[int] = None
+    
     @model_validator(mode="after")
     def validate_engine_config(self):
         if self.engine == "sglang" and not self.sglang:

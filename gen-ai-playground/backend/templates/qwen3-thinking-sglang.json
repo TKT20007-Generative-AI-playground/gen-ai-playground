@@ -3,7 +3,7 @@
   "model": "Qwen/Qwen3-32B",
   "explanation": "Qwen3 32B Thinking model with reasoning and tool calling capabilities. Configured with Qwen3 reasoning parser and Qwen3 Coder tool parser for advanced problem-solving tasks.",
   "short_explanation": "Qwen3 32B Thinking with reasoning and tools",
-  "gpu_types": ["h100"],
+  "gpu_types": ["b200", "h100", "h200"],
   "model_loader_extra_config": {
     "enable_multithread_load": true,
     "num_threads": 8

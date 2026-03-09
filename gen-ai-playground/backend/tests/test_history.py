@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import bcrypt
 import jwt
 import mongomock
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 import os
 import base64
 
@@ -330,20 +330,23 @@ class TestGenerateImageWithAuth:
         assert response.status_code == 401
         assert "Invalid token" in response.json()["detail"]
     
-    @patch('app.routers.images.requests.post')
-    def test_generate_image_stores_with_username(self, mock_post, client, registered_user, 
+    @patch('app.routers.images.httpx.AsyncClient')
+    def test_generate_image_stores_with_username(self, mock_async_client_cls, client, registered_user, 
                                                   auth_token, mock_db, sample_image_data):
         """Test that generated image is stored with username"""
-        # Mock the external API response
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {
             "status": "COMPLETED",
             "output": {
                 "outputs": [sample_image_data]
             }
         }
-        mock_post.return_value = mock_response
+        mock_client_instance = AsyncMock()
+        mock_client_instance.__aenter__.return_value = mock_client_instance
+        mock_client_instance.post.return_value = mock_response
+        mock_async_client_cls.return_value = mock_client_instance
         
         image_request = {
             "prompt": "A beautiful sunset",
@@ -365,22 +368,26 @@ class TestGenerateImageWithAuth:
         assert "timestamp" in stored_image
         assert "image_size" in stored_image
     
-    @patch('app.routers.images.requests.post')
-    def test_generate_image_different_users_separate_storage(self, mock_post, client, 
+    @patch('app.routers.images.httpx.AsyncClient')
+    def test_generate_image_different_users_separate_storage(self, mock_async_client_cls, client, 
                                                               registered_user, registered_user2,
                                                               auth_token, auth_token2, 
                                                               mock_db, sample_image_data):
         """Test that images from different users are stored separately"""
-        # Mock the external API response
+        # Mock the httpx async client and its response
         mock_response = MagicMock()
         mock_response.status_code = 200
+        mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {
             "status": "COMPLETED",
             "output": {
                 "outputs": [sample_image_data]
             }
         }
-        mock_post.return_value = mock_response
+        mock_client_instance = AsyncMock()
+        mock_client_instance.__aenter__.return_value = mock_client_instance
+        mock_client_instance.post.return_value = mock_response
+        mock_async_client_cls.return_value = mock_client_instance
         
         with patch('app.config.settings.VERDA_API_KEY', "test-api-key"):
             # Generate image for user 1

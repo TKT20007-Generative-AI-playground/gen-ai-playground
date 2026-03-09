@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for /text/* endpoints (deploy, connect, status, generate, chat, delete).
 
 Mocks verda_service so no real Verda/network calls are made.
@@ -59,6 +59,23 @@ def registered_user(mock_db, test_user_data):
 
 
 @pytest.fixture
+def admin_registered_user(mock_db, test_user_data):
+    """Insert an admin user into the mock database so admin-gated endpoints work."""
+    hashed_password = bcrypt.hashpw(
+        test_user_data["password"].encode("utf-8"),
+        bcrypt.gensalt(),
+    )
+    mock_db.users.delete_many({"username": test_user_data["username"]})
+    mock_db.users.insert_one({
+        "username": test_user_data["username"],
+        "password": hashed_password,
+        "is_admin": True,
+        "created_at": datetime.utcnow(),
+    })
+    return test_user_data
+
+
+@pytest.fixture
 def auth_token(test_user_data):
     """Generate a valid JWT token."""
     secret_key = "dev-secret-key-for-local-development"
@@ -74,9 +91,21 @@ def auth_headers(auth_token):
     return {"Authorization": f"Bearer {auth_token}"}
 
 
+@pytest.fixture(autouse=True)
+def mock_template_map():
+    """Mock get_template_map for all tests so display names resolve correctly."""
+    with patch('app.routers.text.get_template_map', return_value=MOCK_TEMPLATE_MAP):
+        yield
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+# Mock template map used by all tests that reference display names
+MOCK_TEMPLATE_MAP = {"deepseek-7b-sglang.json": "Deepseek-7b-sglang"}
+TEST_DISPLAY_NAME = "Deepseek-7b-sglang"
+TEST_DEPLOYMENT_NAME = "deepseek-7b-sglang"
 
 def _healthy_status():
     return {"name": "test-deploy", "status": "healthy", "model": "m", "healthy": True}
@@ -84,6 +113,21 @@ def _healthy_status():
 
 def _unhealthy_status():
     return {"name": "test-deploy", "status": "deploying", "model": "m", "healthy": False}
+
+
+def _setup_deployment_discovery(mock_vs, healthy=True):
+    """Set up mocks for the deployment discovery flow used by generate and chat."""
+    mock_cfg = MagicMock()
+    mock_cfg.model = "deepseek-ai/deepseek-llm-7b-chat"
+    mock_vs._parse_and_validate_template.return_value = mock_cfg
+    mock_vs.list_deployments.return_value = [
+        {"name": TEST_DEPLOYMENT_NAME, "created_at": "2026-01-01", "endpoint_url": "https://example.com"}
+    ]
+    mock_client = MagicMock()
+    mock_status = MagicMock()
+    mock_status.value = "healthy" if healthy else "deploying"
+    mock_client.containers.get_deployment_status.return_value = mock_status
+    mock_vs._get_client.return_value = mock_client
 
 
 # ===========================================================================
@@ -97,11 +141,11 @@ class TestHealthGating:
     def test_generate_returns_503_when_unhealthy(
         self, mock_vs, client, registered_user, auth_headers
     ):
-        mock_vs.get_deployment_status.return_value = _unhealthy_status()
+        _setup_deployment_discovery(mock_vs, healthy=False)
 
         response = client.post(
             "/text/generate",
-            json={"deployment_name": "test-deploy", "prompt": "Hello"},
+            json={"prompt": "Hello", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -113,11 +157,11 @@ class TestHealthGating:
     def test_chat_returns_503_when_unhealthy(
         self, mock_vs, client, registered_user, auth_headers
     ):
-        mock_vs.get_deployment_status.return_value = _unhealthy_status()
+        _setup_deployment_discovery(mock_vs, healthy=False)
 
         response = client.post(
             "/text/chat",
-            json={"deployment_name": "test-deploy", "messages": [{"role": "user", "content": "Hi"}]},
+            json={"model_path": TEST_DISPLAY_NAME, "messages": [{"role": "user", "content": "Hi"}]},
             headers=auth_headers,
         )
 
@@ -129,16 +173,16 @@ class TestHealthGating:
     def test_generate_proceeds_when_healthy(
         self, mock_vs, client, registered_user, auth_headers
     ):
-        mock_vs.get_deployment_status.return_value = _healthy_status()
+        _setup_deployment_discovery(mock_vs, healthy=True)
         mock_vs.generate_text.return_value = {
             "generated_text": "world",
-            "model": "m",
+            "model": "deepseek-ai/deepseek-llm-7b-chat",
             "usage": {},
         }
 
         response = client.post(
             "/text/generate",
-            json={"deployment_name": "test-deploy", "prompt": "Hello"},
+            json={"prompt": "Hello", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -150,16 +194,16 @@ class TestHealthGating:
     def test_chat_proceeds_when_healthy(
         self, mock_vs, client, registered_user, auth_headers
     ):
-        mock_vs.get_deployment_status.return_value = _healthy_status()
+        _setup_deployment_discovery(mock_vs, healthy=True)
         mock_vs.chat.return_value = {
             "reply": "Hi there!",
-            "model": "m",
+            "model": "deepseek-ai/deepseek-llm-7b-chat",
             "usage": {},
         }
 
         response = client.post(
             "/text/chat",
-            json={"deployment_name": "test-deploy", "messages": [{"role": "user", "content": "Hi"}]},
+            json={"model_path": TEST_DISPLAY_NAME, "messages": [{"role": "user", "content": "Hi"}]},
             headers=auth_headers,
         )
 
@@ -177,13 +221,13 @@ class TestDeployErrors:
 
     @patch("app.routers.text.verda_service")
     def test_deploy_runtime_error_returns_500(
-        self, mock_vs, client, registered_user, auth_headers
+        self, mock_vs, client, admin_registered_user, auth_headers
     ):
-        mock_vs.deploy_model.side_effect = RuntimeError("SDK boom")
+        mock_vs.deploy_from_template.side_effect = RuntimeError("SDK boom")
 
         response = client.post(
             "/text/deploy",
-            json={"model_path": "some/model"},
+            json={"model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -192,13 +236,13 @@ class TestDeployErrors:
 
     @patch("app.routers.text.verda_service")
     def test_deploy_generic_exception_returns_500(
-        self, mock_vs, client, registered_user, auth_headers
+        self, mock_vs, client, admin_registered_user, auth_headers
     ):
-        mock_vs.deploy_model.side_effect = Exception("unexpected")
+        mock_vs.deploy_from_template.side_effect = Exception("unexpected")
 
         response = client.post(
             "/text/deploy",
-            json={"model_path": "some/model"},
+            json={"model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -207,18 +251,18 @@ class TestDeployErrors:
 
     @patch("app.routers.text.verda_service")
     def test_deploy_success_returns_200(
-        self, mock_vs, client, registered_user, auth_headers
+        self, mock_vs, client, admin_registered_user, auth_headers
     ):
-        mock_vs.deploy_model.return_value = {
+        mock_vs.deploy_from_template.return_value = {
             "name": "deploy-1",
             "status": "deploying",
-            "model": "some/model",
+            "model": "deepseek-ai/deepseek-llm-7b-chat",
             "message": "ok",
         }
 
         response = client.post(
             "/text/deploy",
-            json={"model_path": "some/model"},
+            json={"model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -233,6 +277,9 @@ class TestConnectErrors:
     def test_connect_not_found_returns_404(
         self, mock_vs, client, registered_user, auth_headers
     ):
+        mock_cfg = MagicMock()
+        mock_cfg.model = "deepseek-ai/deepseek-llm-7b-chat"
+        mock_vs._parse_and_validate_template.return_value = mock_cfg
         mock_vs.connect_to_existing.return_value = {
             "status": "error",
             "message": "Deployment not found",
@@ -240,7 +287,7 @@ class TestConnectErrors:
 
         response = client.post(
             "/text/connect",
-            json={"deployment_name": "ghost"},
+            json={"deployment_name": "ghost", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -251,11 +298,14 @@ class TestConnectErrors:
     def test_connect_unexpected_exception_returns_500(
         self, mock_vs, client, registered_user, auth_headers
     ):
+        mock_cfg = MagicMock()
+        mock_cfg.model = "deepseek-ai/deepseek-llm-7b-chat"
+        mock_vs._parse_and_validate_template.return_value = mock_cfg
         mock_vs.connect_to_existing.side_effect = Exception("network down")
 
         response = client.post(
             "/text/connect",
-            json={"deployment_name": "x"},
+            json={"deployment_name": "x", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -266,6 +316,9 @@ class TestConnectErrors:
     def test_connect_success_returns_200(
         self, mock_vs, client, registered_user, auth_headers
     ):
+        mock_cfg = MagicMock()
+        mock_cfg.model = "deepseek-ai/deepseek-llm-7b-chat"
+        mock_vs._parse_and_validate_template.return_value = mock_cfg
         mock_vs.connect_to_existing.return_value = {
             "name": "existing-deploy",
             "status": "healthy",
@@ -276,7 +329,7 @@ class TestConnectErrors:
 
         response = client.post(
             "/text/connect",
-            json={"deployment_name": "existing-deploy"},
+            json={"deployment_name": "existing-deploy", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -289,7 +342,7 @@ class TestDeleteErrors:
 
     @patch("app.routers.text.verda_service")
     def test_delete_error_returns_500(
-        self, mock_vs, client, registered_user, auth_headers
+        self, mock_vs, client, admin_registered_user, auth_headers
     ):
         mock_vs.delete_deployment.return_value = {
             "status": "error",
@@ -304,7 +357,7 @@ class TestDeleteErrors:
 
     @patch("app.routers.text.verda_service")
     def test_delete_no_deployment_returns_200(
-        self, mock_vs, client, registered_user, auth_headers
+        self, mock_vs, client, admin_registered_user, auth_headers
     ):
         mock_vs.delete_deployment.return_value = {
             "status": "no_deployment",
@@ -318,7 +371,7 @@ class TestDeleteErrors:
 
     @patch("app.routers.text.verda_service")
     def test_delete_success_returns_200(
-        self, mock_vs, client, registered_user, auth_headers
+        self, mock_vs, client, admin_registered_user, auth_headers
     ):
         mock_vs.delete_deployment.return_value = {
             "status": "deleted",
@@ -342,7 +395,7 @@ class TestTextHistoryInserts:
     def test_generate_inserts_history_record(
         self, mock_vs, client, mock_db, registered_user, auth_headers
     ):
-        mock_vs.get_deployment_status.return_value = _healthy_status()
+        _setup_deployment_discovery(mock_vs, healthy=True)
         mock_vs.generate_text.return_value = {
             "generated_text": "once upon a time",
             "model": "deepseek-ai/deepseek-llm-7b-chat",
@@ -351,7 +404,7 @@ class TestTextHistoryInserts:
 
         response = client.post(
             "/text/generate",
-            json={"deployment_name": "test-deploy", "prompt": "Tell me a story"},
+            json={"prompt": "Tell me a story", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -373,7 +426,7 @@ class TestTextHistoryInserts:
     def test_chat_inserts_history_record(
         self, mock_vs, client, mock_db, registered_user, auth_headers
     ):
-        mock_vs.get_deployment_status.return_value = _healthy_status()
+        _setup_deployment_discovery(mock_vs, healthy=True)
         mock_vs.chat.return_value = {
             "reply": "I'm fine, thanks!",
             "model": "deepseek-ai/deepseek-llm-7b-chat",
@@ -382,7 +435,7 @@ class TestTextHistoryInserts:
 
         response = client.post(
             "/text/chat",
-            json={"deployment_name": "test-deploy", "messages": [{"role": "user", "content": "How are you?"}]},
+            json={"model_path": TEST_DISPLAY_NAME, "messages": [{"role": "user", "content": "How are you?"}]},
             headers=auth_headers,
         )
 
@@ -404,10 +457,10 @@ class TestTextHistoryInserts:
         self, mock_vs, client, mock_db, registered_user, auth_headers
     ):
         """Even if MongoDB insert fails, the endpoint should still return generated text."""
-        mock_vs.get_deployment_status.return_value = _healthy_status()
+        _setup_deployment_discovery(mock_vs, healthy=True)
         mock_vs.generate_text.return_value = {
             "generated_text": "result",
-            "model": "m",
+            "model": "deepseek-ai/deepseek-llm-7b-chat",
             "usage": {},
         }
 
@@ -415,7 +468,7 @@ class TestTextHistoryInserts:
         with patch.object(mock_db.text_generations, "insert_one", side_effect=Exception("db down")):
             response = client.post(
                 "/text/generate",
-                json={"deployment_name": "test-deploy", "prompt": "go"},
+                json={"prompt": "go", "model_path": TEST_DISPLAY_NAME},
                 headers=auth_headers,
             )
 
@@ -427,17 +480,17 @@ class TestTextHistoryInserts:
         self, mock_vs, client, mock_db, registered_user, auth_headers
     ):
         """Even if MongoDB insert fails, the chat endpoint should still return the reply."""
-        mock_vs.get_deployment_status.return_value = _healthy_status()
+        _setup_deployment_discovery(mock_vs, healthy=True)
         mock_vs.chat.return_value = {
             "reply": "hi",
-            "model": "m",
+            "model": "deepseek-ai/deepseek-llm-7b-chat",
             "usage": {},
         }
 
         with patch.object(mock_db.text_generations, "insert_one", side_effect=Exception("db down")):
             response = client.post(
                 "/text/chat",
-                json={"deployment_name": "test-deploy", "messages": [{"role": "user", "content": "hey"}]},
+                json={"model_path": TEST_DISPLAY_NAME, "messages": [{"role": "user", "content": "hey"}]},
                 headers=auth_headers,
             )
 
@@ -480,7 +533,7 @@ class TestStatusEndpoint:
 
 
 # ===========================================================================
-# 5. Auth gating – endpoints should require valid JWT
+# 5. Auth gating â€“ endpoints should require valid JWT
 # ===========================================================================
 
 class TestAuthRequired:
@@ -499,16 +552,42 @@ class TestAuthRequired:
         assert response.status_code == 422
 
     def test_generate_requires_auth(self, client):
-        response = client.post("/text/generate", json={"deployment_name": "x", "prompt": "hi"})
+        response = client.post("/text/generate", json={"prompt": "hi", "model_path": "deepseek-llm-7b"})
         assert response.status_code == 422
 
     def test_chat_requires_auth(self, client):
         response = client.post(
             "/text/chat",
-            json={"deployment_name": "x", "messages": [{"role": "user", "content": "hi"}]},
+            json={"model_path": "deepseek-llm-7b", "messages": [{"role": "user", "content": "hi"}]},
         )
         assert response.status_code == 422
 
     def test_delete_requires_auth(self, client):
         response = client.delete("/text/deploy?deployment_name=x")
         assert response.status_code == 422
+        
+class TestTemplateFiles:
+    """Test that the command generation from templates works as expected."""
+    
+    def test_cmd_generation_from_template(self):
+        from app.verda_service import VerdaService
+        from app.template_models import TemplateConfig
+        from pathlib import Path
+        
+        verda_service = VerdaService()
+        
+        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        templates_dir = Path(backend_dir) / "templates"
+        
+        template_files = [f for f in templates_dir.iterdir() if f.suffix == ".json"]
+        assert len(template_files) > 0, "No template files found"
+        
+        for template_file in template_files:
+            try:
+                cfg = TemplateConfig.model_validate_json(
+                    template_file.read_text(encoding="utf-8"))
+            except Exception as e:
+                pytest.fail(f"Invalid template config {template_file.name}: {e}")
+            
+
+        

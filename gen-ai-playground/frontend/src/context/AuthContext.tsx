@@ -3,7 +3,8 @@ import { createContext, useContext } from 'react'
 interface AuthContextType {
   isLoggedIn: boolean
   username: string | null
-  login: (token: string, username: string) => void
+  isAdmin: boolean
+  login: (token: string, username: string, isAdmin: boolean) => void
   logout: () => void
 }
 

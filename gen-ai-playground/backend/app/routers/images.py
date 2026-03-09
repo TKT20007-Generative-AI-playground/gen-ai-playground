@@ -9,8 +9,7 @@ from pymongo.database import Database
 from datetime import datetime, timezone
 import base64
 import time
-import requests
-from bson import ObjectId
+import httpx
 
 from app.config import settings
 from app.database import get_database
@@ -132,10 +131,14 @@ async def generate_image(
 
     # Call Verda API
     resp = requests.post(url, headers=headers, json=data)
+    data = build_request_data(model, prompt)
+ 
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.post(url, headers=headers, json=data)
     
     try:
         resp.raise_for_status()
-    except requests.exceptions.HTTPError:
+    except httpx.HTTPError:
         raise HTTPException(
             status_code=resp.status_code,
             detail=f"Image generation failed: {resp.text}"
@@ -230,8 +233,9 @@ async def edit_image(
     }
 
     data = build_request_data(model, prompt, image_base64)
-    # call Verda API
-    resp = requests.post(url, headers=headers, json=data)
+    
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.post(url, headers=headers, json=data)
     try:
         resp.raise_for_status()
         print(f"Response status: {resp.status_code}")
@@ -278,10 +282,7 @@ async def edit_image(
                     status_code=500, 
                     detail=f"Image not ready or missing outputs. status: {resp_data.get('status')}"
                 )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
+    except httpx.HTTPError as e:
         print("Full error traceback:\n", traceback.format_exc())
         raise HTTPException(
             status_code=500,
