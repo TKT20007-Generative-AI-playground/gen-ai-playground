@@ -49,18 +49,39 @@ function parseModelReply(rawReply: string): {
   return { thinking: null, actualReply: rawReply.trim() }
 }
 
+const modelStatusPriority: Record<ModelStatus, number> = {
+  live: 0,
+  starting: 1,
+  unknown: 2,
+  offline: 3,
+}
+
 // Build dropdown data with colored status dots; disable non-live models
-function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string, ModelStatus>) {
-  return modelOptions.map((m) => {
-    const st = statuses[m.value]
-    const isLive = st === "live"
-    const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
-    return {
-      value: m.value,
-      label: `${emoji} ${m.label}`,
-      disabled: !isLive,
-    }
-  })
+function buildDropdownData(
+  modelOptions: ModelOption[],
+  statuses: Record<string, ModelStatus>
+) {
+  return modelOptions
+    .map((m) => {
+      const st = statuses[m.value]
+      const isLive = st === "live"
+      const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
+
+      return {
+        value: m.value,
+        label: `${emoji} ${m.label}`,
+        disabled: !isLive,
+      }
+    })
+    .sort((a, b) => {
+      const statusDiff =
+        modelStatusPriority[statuses[a.value]] -
+        modelStatusPriority[statuses[b.value]]
+
+      if (statusDiff !== 0) return statusDiff
+
+      return a.label.localeCompare(b.label)
+    })
 }
 
 // --- Chat panel (display only) ---

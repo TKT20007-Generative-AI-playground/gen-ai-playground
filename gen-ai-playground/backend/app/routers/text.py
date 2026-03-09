@@ -23,7 +23,7 @@ from app.models import (
     UserInfo,
 )
 from app.verda_service import verda_service
-from app.config import settings
+from app.template_discovery import get_template_map, _deployment_name_from_filename
 from verda.containers import ContainerDeploymentStatus
 
 def _sanitize_slug(model_path: str) -> str:
@@ -37,15 +37,15 @@ router = APIRouter(
 )
 
 @router.get("/models")
-def list_available_models():
+def list_available_models(current_user: UserInfo = Depends(get_current_user)):
     """List available models that can be deployed."""
     available_models = verda_service.available_models()
     return {"available_models": available_models}
 
 @router.get("/available-compute")
-def get_available_compute():
+def get_available_compute(current_user: UserInfo = Depends(get_current_user)):
     """for testing, check available compute resources for a given size"""
-    return verda_service.check_compute_recources(1)
+    return verda_service.check_compute_resources(1)
 
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_model(
@@ -53,7 +53,7 @@ def deploy_model(
     current_user: UserInfo = Depends(get_admin_user),
 ):
     """
-    Deploy an LLM model on Verda Cloud using SGLang or vLLM.
+    Deploy an LLM model on Verda Cloud using SGLang or vLLM.    
     
     This creates a new serverless container deployment running the specified model.
     The deployment may take several minutes to become healthy while the model downloads.
@@ -114,9 +114,9 @@ def connect_to_deployment(
         raise HTTPException(status_code=500, detail=str(e))
     
 def choose_text_model_path(model: str) -> str:
-    """Map a user-friendly model key to the actual model path used for deployment."""
+    """Map a user-friendly display name to the actual model path used for deployment."""
     model = model.strip()
-    for template_name, display_name in settings.TEXT_MODEL_PATHS_V2.items():
+    for template_name, display_name in get_template_map().items():
         if display_name == model:
             cfg = verda_service._parse_and_validate_template(template_name)
             return cfg.model
@@ -124,14 +124,14 @@ def choose_text_model_path(model: str) -> str:
     raise HTTPException(
         status_code=400,
         detail=f"Unsupported model: {model}. "
-               f"Supported models: {list(settings.TEXT_MODEL_PATHS_V2.values())}"
+               f"Supported models: {list(get_template_map().values())}"
     )
 
 
 def _resolve_template_name(model: str) -> str | None:
-    """Resolve a model key/display name to a V2 template filename, or None if legacy."""
+    """Resolve a display name to a template filename, or None."""
     model = model.strip()
-    for template_name, display_name in settings.TEXT_MODEL_PATHS_V2.items():
+    for template_name, display_name in get_template_map().items():
         if display_name == model:
             return template_name
     return None
@@ -198,7 +198,7 @@ def get_model_statuses(
         deployments = client.containers.get_deployments()
     except Exception:
         # If we can't reach Verda, everything is offline
-        return {key: "offline" for key in settings.TEXT_MODEL_PATHS_V2.values()}
+        return {name: "offline" for name in get_template_map().values()}
 
     # Build a lookup: deployment_name (lower) -> status string
     dep_statuses: dict[str, str] = {}
@@ -211,19 +211,13 @@ def get_model_statuses(
 
     result: dict[str, str] = {}
     
-    #V2 template models 
-    for template_name, v2_name in settings.TEXT_MODEL_PATHS_V2.items():
-        if v2_name in result:
+    for template_name, display_name in get_template_map().items():
+        if display_name in result:
             continue
-        try:
-            cfg = verda_service._parse_and_validate_template(template_name)
-            slug = _sanitize_slug(cfg.model)
-        except Exception:
-            result[v2_name] = "offline"
-            continue
+        dep_name_expected = _deployment_name_from_filename(template_name)
         matched_status = "offline"
         for dep_name, st in dep_statuses.items():
-            if slug in dep_name:
+            if dep_name_expected == dep_name:
                 if st == "healthy":
                     matched_status = "live"
                 elif st == "unknown":
@@ -231,7 +225,7 @@ def get_model_statuses(
                 else:
                     matched_status = "starting"
                 break
-        result[v2_name] = matched_status
+        result[display_name] = matched_status
 
     return result
 
@@ -273,11 +267,14 @@ def generate_text(
     used_model_path = model_path
 
     if model_path:
-        model_slug = _sanitize_slug(model_path)
-        for d in deployments:
-            if model_slug in d.get("name", "").lower():
-                deployment_name = d["name"]
-                break
+        # Find deployment by template filename stem
+        template_name = _resolve_template_name(request.model_path)
+        if template_name:
+            expected_dep = _deployment_name_from_filename(template_name)
+            for d in deployments:
+                if d.get("name", "").lower() == expected_dep:
+                    deployment_name = d["name"]
+                    break
     else:
         # Fallback: use any healthy deployment
         client = verda_service._get_client()
@@ -286,11 +283,10 @@ def generate_text(
                 dep_status = client.containers.get_deployment_status(d["name"])
                 if dep_status == ContainerDeploymentStatus.HEALTHY:
                     deployment_name = d["name"]
-                    # Try to infer model path from deployment name
-                    for tpl in settings.TEXT_MODEL_PATHS_V2:
+                    for tpl in get_template_map():
                         try:
-                            cfg = verda_service._parse_and_validate_template(tpl)
-                            if _sanitize_slug(cfg.model) in d["name"].lower():
+                            if _deployment_name_from_filename(tpl) == d["name"].lower():
+                                cfg = verda_service._parse_and_validate_template(tpl)
                                 used_model_path = cfg.model
                                 break
                         except Exception:
@@ -389,7 +385,8 @@ def chat_with_model(
     """
     model_key = request.model_path
     model_path = choose_text_model_path(model_key)
-    model_slug = _sanitize_slug(model_path)
+    template_name = _resolve_template_name(model_key)
+    expected_dep = _deployment_name_from_filename(template_name) if template_name else None
 
     print(f"Chat request from user: {current_user.username}, model: {model_key}")
 
@@ -402,13 +399,13 @@ def chat_with_model(
 
     existing = None
     for d in deployments:
-        if model_slug in d.get("name", "").lower():
+        if expected_dep and d.get("name", "").lower() == expected_dep:
             existing = d
             break
 
     if not existing:
         dep_names = [d.get("name", "?") for d in deployments]
-        print(f"No deployment found for slug '{model_slug}'. Available: {dep_names}")
+        print(f"No deployment found for '{expected_dep}'. Available: {dep_names}")
         raise HTTPException(
             status_code=503,
             detail=f"Model {model_key} is not deployed. Ask an admin to deploy it from the dashboard.",
@@ -416,7 +413,7 @@ def chat_with_model(
 
     # Check deployment health without mutating singleton state
     deployment_name = existing["name"]
-    print(f"Found deployment '{deployment_name}' for model_slug '{model_slug}'")
+    print(f"Found deployment '{deployment_name}' for '{expected_dep}'")
     try:
         client = verda_service._get_client()
         dep_status = client.containers.get_deployment_status(deployment_name)

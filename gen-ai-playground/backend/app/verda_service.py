@@ -4,8 +4,6 @@ Verda Cloud service for deploying and managing AI model containers.
 Uses the Verda Python SDK to deploy SGLang-based LLM containers
 and run inference against them.
 """
-import time
-import json
 from datetime import datetime
 from typing import Optional
 import json
@@ -183,26 +181,26 @@ class VerdaService:
     
     def available_models(self) -> list[dict]:
         """Return template name and availability from all JSON templates."""
+        from app.template_discovery import get_template_map
         
         # Fetch available resources once to avoid multiple api calls in the loop
-        all_resources = self.check_compute_recources(1)
+        all_resources = self.check_compute_resources(1)
 
         results = []
-        for template_name in list(settings.TEXT_MODEL_PATHS_V2.keys()):
+        for template_name, display_name in get_template_map().items():
             cfg = self._parse_and_validate_template(template_name)
             compute_name, gpu_count = self._resolve_gpu(cfg, all_resources)
             
-            model_name = settings.TEXT_MODEL_PATHS_V2.get(template_name, "unknown")
             results.append({
-                "value": model_name,
-                "label": model_name,
+                "value": display_name,
+                "label": display_name,
                 "template": template_name,
                 "tp": gpu_count,
                 "availability": compute_name,
             })
         return results
       
-    def check_compute_recources(self, size):
+    def check_compute_resources(self, size):
         """Check available compute resources for the specified template config."""
         client = self._get_client()
         
@@ -214,8 +212,7 @@ class VerdaService:
         )
         
         response = client.containers.client.get(SERVERLESS_COMPUTE_RESOURCES_ENDPOINT)
-        print(response.json())
-        print(type(response.json()))
+    
          
         resources = []
         for item in response.json():
@@ -225,9 +222,7 @@ class VerdaService:
             elif isinstance(item, dict):
                 resources.append(ComputeResource.from_dict(item))
                 
-        available_resources = [r for r in resources if r.is_available and r.size >= size] # filter resources based on availability and size 
-        
-        print(available_resources)    
+        available_resources = [r for r in resources if r.is_available and r.size >= size] # filter resources based on availability and size  
         
         return available_resources
     
@@ -265,7 +260,7 @@ class VerdaService:
         
         # resources can be passed in to avoid multiple api calls when checking all templates in available_models() 
         if resources is None:
-            resources = self.check_compute_recources(gpu_count)
+            resources = self.check_compute_resources(gpu_count)
             
         available = [r for r in resources if r.is_available and r.size >= gpu_count]
         available_gpu_types = {r.name for r in available}
@@ -302,10 +297,10 @@ class VerdaService:
 
         client = self._get_client()
 
-        # Generate deployment name if not provided
+        # Generate deployment name from template filename
         if deployment_name is None:
-            model_slug = cfg.model.split("/")[-1].lower()
-            deployment_name = model_slug.replace(".", "-").strip()      
+            from app.template_discovery import _deployment_name_from_filename
+            deployment_name = _deployment_name_from_filename(template_json)      
         # ensure hf secret exists
         self._ensure_hf_secret()
         

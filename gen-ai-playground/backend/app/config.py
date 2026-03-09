@@ -79,7 +79,6 @@ class Settings:
         "qwen-vllm.json": "Qwen2.5-32B",
         "qwen3-30b-moe-sglang.json": "Qwen3-30B-MoE",
         "qwen3-sglang.json": "Qwen3-8B",
-        "qwen3-sglang-think.json": "Qwen3-32B-think",
         "qwen3-thinking-sglang.json": "Qwen3-32B",
     }
 

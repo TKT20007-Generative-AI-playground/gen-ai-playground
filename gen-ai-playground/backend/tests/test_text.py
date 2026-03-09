@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tests for /text/* endpoints (deploy, connect, status, generate, chat, delete).
 
 Mocks verda_service so no real Verda/network calls are made.
@@ -91,9 +91,21 @@ def auth_headers(auth_token):
     return {"Authorization": f"Bearer {auth_token}"}
 
 
+@pytest.fixture(autouse=True)
+def mock_template_map():
+    """Mock get_template_map for all tests so display names resolve correctly."""
+    with patch('app.routers.text.get_template_map', return_value=MOCK_TEMPLATE_MAP):
+        yield
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+# Mock template map used by all tests that reference display names
+MOCK_TEMPLATE_MAP = {"deepseek-7b-sglang.json": "Deepseek-7b-sglang"}
+TEST_DISPLAY_NAME = "Deepseek-7b-sglang"
+TEST_DEPLOYMENT_NAME = "deepseek-7b-sglang"
 
 def _healthy_status():
     return {"name": "test-deploy", "status": "healthy", "model": "m", "healthy": True}
@@ -109,7 +121,7 @@ def _setup_deployment_discovery(mock_vs, healthy=True):
     mock_cfg.model = "deepseek-ai/deepseek-llm-7b-chat"
     mock_vs._parse_and_validate_template.return_value = mock_cfg
     mock_vs.list_deployments.return_value = [
-        {"name": "deepseek-llm-7b-chat-20260101", "created_at": "2026-01-01", "endpoint_url": "https://example.com"}
+        {"name": TEST_DEPLOYMENT_NAME, "created_at": "2026-01-01", "endpoint_url": "https://example.com"}
     ]
     mock_client = MagicMock()
     mock_status = MagicMock()
@@ -133,7 +145,7 @@ class TestHealthGating:
 
         response = client.post(
             "/text/generate",
-            json={"prompt": "Hello", "model_path": "deepSeek-7b"},
+            json={"prompt": "Hello", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -149,7 +161,7 @@ class TestHealthGating:
 
         response = client.post(
             "/text/chat",
-            json={"model_path": "deepSeek-7b", "messages": [{"role": "user", "content": "Hi"}]},
+            json={"model_path": TEST_DISPLAY_NAME, "messages": [{"role": "user", "content": "Hi"}]},
             headers=auth_headers,
         )
 
@@ -170,7 +182,7 @@ class TestHealthGating:
 
         response = client.post(
             "/text/generate",
-            json={"prompt": "Hello", "model_path": "deepSeek-7b"},
+            json={"prompt": "Hello", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -191,7 +203,7 @@ class TestHealthGating:
 
         response = client.post(
             "/text/chat",
-            json={"model_path": "deepSeek-7b", "messages": [{"role": "user", "content": "Hi"}]},
+            json={"model_path": TEST_DISPLAY_NAME, "messages": [{"role": "user", "content": "Hi"}]},
             headers=auth_headers,
         )
 
@@ -215,7 +227,7 @@ class TestDeployErrors:
 
         response = client.post(
             "/text/deploy",
-            json={"model_path": "deepSeek-7b"},
+            json={"model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -230,7 +242,7 @@ class TestDeployErrors:
 
         response = client.post(
             "/text/deploy",
-            json={"model_path": "deepSeek-7b"},
+            json={"model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -250,7 +262,7 @@ class TestDeployErrors:
 
         response = client.post(
             "/text/deploy",
-            json={"model_path": "deepSeek-7b"},
+            json={"model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -275,7 +287,7 @@ class TestConnectErrors:
 
         response = client.post(
             "/text/connect",
-            json={"deployment_name": "ghost", "model_path": "deepSeek-7b"},
+            json={"deployment_name": "ghost", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -293,7 +305,7 @@ class TestConnectErrors:
 
         response = client.post(
             "/text/connect",
-            json={"deployment_name": "x", "model_path": "deepSeek-7b"},
+            json={"deployment_name": "x", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -317,7 +329,7 @@ class TestConnectErrors:
 
         response = client.post(
             "/text/connect",
-            json={"deployment_name": "existing-deploy", "model_path": "deepSeek-7b"},
+            json={"deployment_name": "existing-deploy", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -392,7 +404,7 @@ class TestTextHistoryInserts:
 
         response = client.post(
             "/text/generate",
-            json={"prompt": "Tell me a story", "model_path": "deepSeek-7b"},
+            json={"prompt": "Tell me a story", "model_path": TEST_DISPLAY_NAME},
             headers=auth_headers,
         )
 
@@ -423,7 +435,7 @@ class TestTextHistoryInserts:
 
         response = client.post(
             "/text/chat",
-            json={"model_path": "deepSeek-7b", "messages": [{"role": "user", "content": "How are you?"}]},
+            json={"model_path": TEST_DISPLAY_NAME, "messages": [{"role": "user", "content": "How are you?"}]},
             headers=auth_headers,
         )
 
@@ -456,7 +468,7 @@ class TestTextHistoryInserts:
         with patch.object(mock_db.text_generations, "insert_one", side_effect=Exception("db down")):
             response = client.post(
                 "/text/generate",
-                json={"prompt": "go", "model_path": "deepSeek-7b"},
+                json={"prompt": "go", "model_path": TEST_DISPLAY_NAME},
                 headers=auth_headers,
             )
 
@@ -478,7 +490,7 @@ class TestTextHistoryInserts:
         with patch.object(mock_db.text_generations, "insert_one", side_effect=Exception("db down")):
             response = client.post(
                 "/text/chat",
-                json={"model_path": "deepSeek-7b", "messages": [{"role": "user", "content": "hey"}]},
+                json={"model_path": TEST_DISPLAY_NAME, "messages": [{"role": "user", "content": "hey"}]},
                 headers=auth_headers,
             )
 
@@ -521,7 +533,7 @@ class TestStatusEndpoint:
 
 
 # ===========================================================================
-# 5. Auth gating – endpoints should require valid JWT
+# 5. Auth gating â€“ endpoints should require valid JWT
 # ===========================================================================
 
 class TestAuthRequired:
