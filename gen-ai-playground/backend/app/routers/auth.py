@@ -138,7 +138,8 @@ def login(
             )
         
         # Generate JWT token
-        token_expiry = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRY_HOURS)
+        token_expiry_delta = timedelta(seconds=settings.JWT_EXPIRY_HOURS)
+        token_expiry = datetime.utcnow() + token_expiry_delta
         
         is_admin = user.get("is_admin", False)
         
@@ -161,7 +162,7 @@ def login(
             httponly=True,
             secure=settings.IS_PROD,  # keep False for local dev
             samesite="strict",
-            max_age=settings.JWT_EXPIRY_HOURS * 3600
+            max_age=int(token_expiry_delta.total_seconds())
         )
 
         # Generate CSRF token
@@ -174,7 +175,7 @@ def login(
             httponly=False,  # Must be False so frontend can read it
             secure=settings.IS_PROD,
             samesite="strict",
-            max_age=settings.JWT_EXPIRY_HOURS * 3600
+            max_age=int(token_expiry_delta.total_seconds())
         )
         
         return LoginResponse(

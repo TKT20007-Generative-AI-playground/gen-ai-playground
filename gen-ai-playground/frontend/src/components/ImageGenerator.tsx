@@ -18,7 +18,6 @@ function getCsrfToken(): string {
 }
 
 export default function ImageGenerator() {
-
   const [prompt, setPrompt] = useState("")
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [imageUrl2, setImageUrl2] = useState<string | null>(null)

@@ -9,6 +9,7 @@ import {
   Center,
   Modal
 } from "@mantine/core";
+import axios from "axios";
 
 interface ImageRecord {
   prompt: string;
@@ -31,14 +32,13 @@ export default function History() {
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
 
   useEffect(() => {
-    fetch(`${backendUrl}/images/history`, {
-      credentials: "include",
+    axios.get(`${backendUrl}/images/history`, {
+      withCredentials: true,
     })
-      .then((res) => res.json())
-      .then((data) => {
+      .then((res) => {
         const groups: { [prompt: string]: ImageRecord[] } = {};
 
-        (data.history || []).forEach((item: ImageRecord) => {
+        (res.data.history || []).forEach((item: ImageRecord) => {
           if (!groups[item.prompt]) groups[item.prompt] = [];
           groups[item.prompt].push(item);
         });

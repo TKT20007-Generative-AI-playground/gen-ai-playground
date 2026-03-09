@@ -1,13 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AuthContext } from "./AuthContext";
+import axios from "axios";
 
 const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(() =>
-    localStorage.getItem('isAdmin') === 'true'
-  );
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   const isLoggedIn = !!username;
 
@@ -16,35 +15,71 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Cleanup legacy client-side tokens from older auth flow
     localStorage.removeItem("token");
     localStorage.removeItem("username");
+    localStorage.removeItem("isAdmin");
 
     async function fetchMe() {
       try {
-        const res = await fetch(`${backendUrl}/me`, {
-          credentials: "include", // send httpOnly cookie
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setUsername(data.username || null);
-          setIsAdmin(data.is_admin || false);
-        } else {
-          setUsername(null);
-          setIsAdmin(false);
-        }
+        const res = await axios.get(`${backendUrl}/me`, { withCredentials: true });
+        setUsername(res.data.username || null);
+        setIsAdmin(res.data.is_admin || false);
       } catch {
         setUsername(null);
+        setIsAdmin(false);
       }
     }
 
     fetchMe();
   }, []);
 
-  // Login function - only updates state, cookie is set by backend
-  const login = (user: string, admin: boolean) => {
-    setUsername(user);
-    setIsAdmin(admin);
-    localStorage.setItem('isAdmin', String(admin));
-  };
+  const isHandlingExpiry = useRef(false);
+
+  const handleSessionExpired = useCallback(() => {
+    if (isHandlingExpiry.current) return;
+    isHandlingExpiry.current = true;
+    setUsername(null);
+    setIsAdmin(false);
+  }, []);
+
+  // Poll /me instead — it's the authoritative session check
+  useEffect(() => {
+    if (!username) return;
+
+    const interval = setInterval(() => {
+      axios.get(`${backendUrl}/me`, { withCredentials: true })
+        .catch((error) => {
+          if (error.response?.status === 401) {
+            handleSessionExpired();
+          }
+        });
+    }, 60_000);
+
+    return () => clearInterval(interval);
+  }, [username, handleSessionExpired]);
+
+  // Global axios interceptor: redirect on 401
+  const interceptorId = useRef<number | null>(null);
+  useEffect(() => {
+    interceptorId.current = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          handleSessionExpired();
+        }
+        return Promise.reject(error);
+      }
+    );
+    return () => {
+      if (interceptorId.current !== null) {
+        axios.interceptors.response.eject(interceptorId.current);
+      }
+    };
+  }, [handleSessionExpired]);
+
+  const login = useCallback(async () => {
+    const res = await axios.get(`${backendUrl}/me`, { withCredentials: true });
+    setUsername(res.data.username || null);
+    setIsAdmin(res.data.is_admin || false);
+  }, []);
 
   // Logout calls backend to clear httpOnly cookie
   const logout = async () => {
@@ -53,15 +88,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .split("; ")
         .find((c) => c.startsWith("csrf_token="))
         ?.split("=")[1] ?? "";
-      await fetch(`${backendUrl}/logout`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "X-CSRF-Token": csrfToken },
-      });
+
+      await axios.post(
+        `${backendUrl}/logout`,
+        {},                          // empty body
+        {
+          withCredentials: true,
+          headers: { "X-CSRF-Token": csrfToken },
+        }
+      );
     } finally {
       setUsername(null);
       setIsAdmin(false);
-      localStorage.removeItem('isAdmin');
     }
   };
 

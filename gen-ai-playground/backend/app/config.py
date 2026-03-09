@@ -30,7 +30,7 @@ class Settings:
     
     # JWT
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY")
-    JWT_EXPIRY_HOURS: int = 24
+    JWT_EXPIRY_HOURS: int = 90
     
     # CORS
     ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS")
