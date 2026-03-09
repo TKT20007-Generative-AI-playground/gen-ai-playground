@@ -7,8 +7,9 @@ import ModelSelector from "./ModelSelector"
 import PhotoArea from "./PhotoArea"
 import GeneratingText from "./GeneratingText"
 
-export default function ImageEditor({ imageToEdit }: { imageToEdit?: any }) {  
-
+export default function ImageEditor({ imageToEdit, }: {
+  imageToEdit?: string | null
+}) {
   const [prompt, setPrompt] = useState("");
   const [userImage, setUserImage] = useState<File | null>(null);
 
@@ -33,7 +34,7 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: any }) {
     if (!imageToEdit) return;
 
     try {
-      const byteCharacters = atob(imageToEdit.image_data);
+      const byteCharacters = atob(imageToEdit);
       const byteNumbers = Array.from(byteCharacters, c => c.charCodeAt(0));
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: "image/png" });
