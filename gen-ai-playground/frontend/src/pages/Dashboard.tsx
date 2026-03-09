@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import axios from 'axios'
 import {
   Title,
   Table,
@@ -19,13 +20,6 @@ interface Container {
   container_id: string
 }
 
-const textModelOptions = [
-  { value: 'deepseek-llm-7b', label: 'DeepSeek LLM 7B' },
-  { value: 'Qwen3-8B', label: 'Qwen 3 8B' },
-  { value: 'Qwen3-32B', label: 'Qwen 3 32B' },
-  { value: 'Llama-3.1-8B', label: 'Llama 3.1 8B' },
-]
-
 export default function Dashboard() {
   const [containers, setContainers] = useState<Container[]>([])
   const [loading, setLoading] = useState(true)
@@ -33,6 +27,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null)
   const [selectedModel, setSelectedModel] = useState<string | null>(null)
   const [deployLoading, setDeployLoading] = useState(false)
+  const [textModelOptions, setTextModelOptions] = useState<{ value: string; label: string }[]>([])
 
   const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -41,6 +36,28 @@ export default function Dashboard() {
       .split('; ')
       .find((c) => c.startsWith('csrf_token='))
       ?.split('=')[1] ?? ''
+
+  // Fetch available models from backend
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/text/models`, {
+          withCredentials: true,
+          headers: { 'X-CSRF-Token': getCsrfToken() },
+        })
+        const models = (res.data.available_models ?? []).map(
+          (m: { value: string; label: string }) => ({
+            value: m.value,
+            label: m.label,
+          })
+        )
+        setTextModelOptions(models)
+      } catch {
+        // silent
+      }
+    }
+    fetchModels()
+  }, [backendUrl])
 
   const fetchContainers = useCallback(async () => {
     try {

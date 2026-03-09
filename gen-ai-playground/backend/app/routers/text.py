@@ -23,8 +23,12 @@ from app.models import (
     UserInfo,
 )
 from app.verda_service import verda_service
-from app.config import settings
+from app.template_discovery import get_template_map, _deployment_name_from_filename
 from verda.containers import ContainerDeploymentStatus
+
+def _sanitize_slug(model_path: str) -> str:
+    """Convert a model path to a deployment-name-compatible slug."""
+    return model_path.split("/")[-1].lower().replace(".", "-")
 
 
 router = APIRouter(
@@ -32,6 +36,21 @@ router = APIRouter(
     tags=["text"],
 )
 
+@router.get("/models")
+def list_available_models(current_user: UserInfo = Depends(get_current_user)):
+    """
+    List all models available for deployment, fetched from JSON templates.
+
+    Returns:
+        List of model objects with value, label, template, GPU count, and availability.
+    """
+    available_models = verda_service.available_models()
+    return {"available_models": available_models}
+
+@router.get("/available-compute")
+def get_available_compute(current_user: UserInfo = Depends(get_current_user)):
+    """for testing, check available compute resources for a given size"""
+    return verda_service.check_compute_resources(1)
 
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_model(
@@ -39,7 +58,7 @@ def deploy_model(
     current_user: UserInfo = Depends(get_admin_user),
 ):
     """
-    Deploy an LLM model on Verda Cloud using SGLang.
+    Deploy an LLM model on Verda Cloud using SGLang or vLLM.
 
     This creates a new serverless container deployment running the specified model.
     The deployment may take several minutes to become healthy while the model downloads.
@@ -108,16 +127,41 @@ def connect_to_deployment(
         raise HTTPException(status_code=500, detail=str(e))
     
 def choose_text_model_path(model: str) -> str:
+    """Map a user-friendly display name to the actual model path used for deployment."""
     model = model.strip()
+    for template_name, display_name in get_template_map().items():
+        if display_name == model:
+            cfg = verda_service._parse_and_validate_template(template_name)
+            return cfg.model
 
-    try:
-        return settings.TEXT_MODEL_PATHS[model]
-    except KeyError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported model: {model}. "
-                   f"Supported models: {list(settings.TEXT_MODEL_PATHS.keys())}" # for better debugging and user feedback
-        )
+    raise HTTPException(
+        status_code=400,
+        detail=f"Unsupported model: {model}. "
+               f"Supported models: {list(get_template_map().values())}"
+    )
+
+
+def _resolve_template_name(model: str) -> str | None:
+    """Resolve a display name to a template filename, or None."""
+    model = model.strip()
+    for template_name, display_name in get_template_map().items():
+        if display_name == model:
+            return template_name
+    return None
+
+
+def _deploy_model_internal(model_key: str) -> dict:
+    """
+    Internal helper to deploy a model by key.
+    Used by the admin /deploy endpoint.
+    """
+    # Check V2 templates 
+    template = _resolve_template_name(model_key)
+    if template:
+        return verda_service.deploy_from_template(template_json=template)
+    else:
+        return {"error": f"Model '{model_key}' not found in available templates."}
+
 
 
 def _check_deployment_health(deployment_name: str, label: str = "Deployment") -> None:
@@ -135,23 +179,6 @@ def _check_deployment_health(deployment_name: str, label: str = "Deployment") ->
         raise
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
-
-
-def _deploy_model_internal(model_key: str) -> dict:
-    """
-    Internal helper to deploy a model by key.
-    Used by the admin /deploy endpoint.
-    """
-    model_path = choose_text_model_path(model_key)
-
-    if model_path == "deepseek-ai/deepseek-llm-7b-chat":
-        return verda_service.deploy_model(model_path=model_path)
-    elif model_path == "Qwen/Qwen3-8B":
-        return verda_service.deploy_from_template(template_json="qwen3-sglang.json")
-    elif model_path == "Qwen/Qwen3-32B":
-        return verda_service.deploy_from_template(template_json="qwen3-sglang-think.json")
-    else:
-        return verda_service.deploy_model(model_path=model_path)
 
 
 @router.get("/status", response_model=DeploymentStatusResponse)
@@ -201,7 +228,7 @@ def get_model_statuses(
         deployments = client.containers.get_deployments()
     except Exception:
         # If we can't reach Verda, everything is offline
-        return {key: "offline" for key in settings.TEXT_MODEL_PATHS}
+        return {name: "offline" for name in get_template_map().values()}
 
     # Build a lookup: deployment_name (lower) -> status string
     dep_statuses: dict[str, str] = {}
@@ -213,20 +240,22 @@ def get_model_statuses(
             dep_statuses[d.name.lower()] = "unknown"
 
     result: dict[str, str] = {}
-    for model_key, model_path in settings.TEXT_MODEL_PATHS.items():
-        slug = model_path.split("/")[-1].lower()
+    
+    for template_name, display_name in get_template_map().items():
+        if display_name in result:
+            continue
+        dep_name_expected = _deployment_name_from_filename(template_name)
         matched_status = "offline"
         for dep_name, st in dep_statuses.items():
-            if slug in dep_name:
+            if dep_name_expected == dep_name:
                 if st == "healthy":
                     matched_status = "live"
                 elif st == "unknown":
-                    # "unknown" means the container is shutting down — treat as offline
                     matched_status = "offline"
                 else:
                     matched_status = "starting"
                 break
-        result[model_key] = matched_status
+        result[display_name] = matched_status
 
     return result
 
@@ -272,11 +301,14 @@ def generate_text(
     used_model_path = model_path
 
     if model_path:
-        model_slug = model_path.split("/")[-1].lower()
-        for d in deployments:
-            if model_slug in d.get("name", "").lower():
-                deployment_name = d["name"]
-                break
+        # Find deployment by template filename stem
+        template_name = _resolve_template_name(request.model_path)
+        if template_name:
+            expected_dep = _deployment_name_from_filename(template_name)
+            for d in deployments:
+                if d.get("name", "").lower() == expected_dep:
+                    deployment_name = d["name"]
+                    break
     else:
         # Fallback: use any healthy deployment
         client = verda_service._get_client()
@@ -285,11 +317,14 @@ def generate_text(
                 dep_status = client.containers.get_deployment_status(d["name"])
                 if dep_status == ContainerDeploymentStatus.HEALTHY:
                     deployment_name = d["name"]
-                    # Try to infer model path from deployment name
-                    for mp in settings.TEXT_MODEL_PATHS.values():
-                        if mp.split("/")[-1].lower() in d["name"].lower():
-                            used_model_path = mp
-                            break
+                    for tpl in get_template_map():
+                        try:
+                            if _deployment_name_from_filename(tpl) == d["name"].lower():
+                                cfg = verda_service._parse_and_validate_template(tpl)
+                                used_model_path = cfg.model
+                                break
+                        except Exception:
+                            continue
                     break
             except Exception:
                 continue
@@ -300,7 +335,21 @@ def generate_text(
             detail="No suitable deployment found. Ask an admin to deploy a model.",
         )
 
-    _check_deployment_health(deployment_name)
+    # Check deployment health
+    try:
+        client = verda_service._get_client()
+        dep_status = client.containers.get_deployment_status(deployment_name)
+        status_str = dep_status.value if hasattr(dep_status, 'value') else str(dep_status)
+        if status_str != "healthy":
+            raise HTTPException(
+                status_code=503,
+                detail=f"Deployment is not healthy. Current status: {status_str}. "
+                       "Wait for the deployment to become healthy before generating text.",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
 
     try:
         result = verda_service.generate_text(
@@ -374,7 +423,8 @@ def chat_with_model(
     """
     model_key = request.model_path
     model_path = choose_text_model_path(model_key)
-    model_slug = model_path.split("/")[-1].lower()
+    template_name = _resolve_template_name(model_key)
+    expected_dep = _deployment_name_from_filename(template_name) if template_name else None
 
     print(f"Chat request from user: {current_user.username}, model: {model_key}")
 
@@ -387,21 +437,36 @@ def chat_with_model(
 
     existing = None
     for d in deployments:
-        if model_slug in d.get("name", "").lower():
+        if expected_dep and d.get("name", "").lower() == expected_dep:
             existing = d
             break
 
     if not existing:
         dep_names = [d.get("name", "?") for d in deployments]
-        print(f"No deployment found for slug '{model_slug}'. Available: {dep_names}")
+        print(f"No deployment found for '{expected_dep}'. Available: {dep_names}")
         raise HTTPException(
             status_code=503,
             detail=f"Model {model_key} is not deployed. Ask an admin to deploy it from the dashboard.",
         )
 
+    # Check deployment health without mutating singleton state
     deployment_name = existing["name"]
-    print(f"Found deployment '{deployment_name}' for model_slug '{model_slug}'")
-    _check_deployment_health(deployment_name, label=f"Model {model_key}")
+    print(f"Found deployment '{deployment_name}' for '{expected_dep}'")
+    try:
+        client = verda_service._get_client()
+        dep_status = client.containers.get_deployment_status(deployment_name)
+        status_str = dep_status.value if hasattr(dep_status, 'value') else str(dep_status)
+        print(f"Deployment '{deployment_name}' status: {status_str}")
+        if status_str != "healthy":
+            raise HTTPException(
+                status_code=503,
+                detail=f"Model {model_key} is not healthy yet (status: {status_str}). Please wait and try again.",
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Failed to check deployment status for '{deployment_name}': {e}")
+        raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
 
     # Chat
     try:
@@ -436,8 +501,12 @@ def chat_with_model(
         )
 
     except RuntimeError as e:
+        print(f"Chat RuntimeError: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Chat unexpected error: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Chat failed: {str(e)}",

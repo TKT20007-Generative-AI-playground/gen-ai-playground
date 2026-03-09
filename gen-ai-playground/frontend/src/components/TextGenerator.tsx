@@ -15,7 +15,6 @@ import {
 type ModelOption = {
   value: string
   label: string
-  slug: string
 }
 
 type Message = {
@@ -49,28 +48,6 @@ const getAuthHeaders = () => ({
   "X-CSRF-Token": getCsrfToken(),
 })
 
-const modelOptions: ModelOption[] = [
-  {
-    value: "deepseek-llm-7b",
-    label: "DeepSeek LLM 7B",
-    slug: "deepseek-llm-7b-chat",
-  },
-  {
-    value: "Qwen3-8B",
-    label: "Qwen 3 8B",
-    slug: "qwen3-8b",
-  },
-  {
-    value: "Qwen3-32B",
-    label: "Qwen 3 32B",
-    slug: "qwen3-32b",
-  },
-  {
-    value: "Llama-3.1-8B",
-    label: "Llama 3.1 8B",
-    slug: "llama-3.1-8b-instruct",
-  },
-]
 
 function parseModelReply(rawReply: string): {
   thinking: string | null
@@ -85,18 +62,39 @@ function parseModelReply(rawReply: string): {
   return { thinking: null, actualReply: rawReply.trim() }
 }
 
+const modelStatusPriority: Record<ModelStatus, number> = {
+  live: 0,
+  starting: 1,
+  unknown: 2,
+  offline: 3,
+}
+
 // Build dropdown data with colored status dots; disable non-live models
-function buildDropdownData(statuses: Record<string, ModelStatus>) {
-  return modelOptions.map((m) => {
-    const st = statuses[m.value]
-    const isLive = st === "live"
-    const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
-    return {
-      value: m.value,
-      label: `${emoji} ${m.label}`,
-      disabled: !isLive,
-    }
-  })
+function buildDropdownData(
+  modelOptions: ModelOption[],
+  statuses: Record<string, ModelStatus>
+) {
+  return modelOptions
+    .map((m) => {
+      const st = statuses[m.value]
+      const isLive = st === "live"
+      const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
+
+      return {
+        value: m.value,
+        label: `${emoji} ${m.label}`,
+        disabled: !isLive,
+      }
+    })
+    .sort((a, b) => {
+      const statusDiff =
+        modelStatusPriority[statuses[a.value]] -
+        modelStatusPriority[statuses[b.value]]
+
+      if (statusDiff !== 0) return statusDiff
+
+      return a.label.localeCompare(b.label)
+    })
 }
 
 // --- Chat panel (display only) ---
@@ -235,6 +233,7 @@ export default function TextGenerator() {
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [messagesByModel, setMessagesByModel] = useState<Record<string, Message[]>>({})
   const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
 
   // Keep a ref so async loops always see the latest messages.
   const messagesByModelRef = useRef<Record<string, Message[]>>({})
@@ -250,6 +249,29 @@ export default function TextGenerator() {
 
   const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
   const [statusMsgs, setStatusMsgs] = useState<Record<string, string | null>>({})
+
+  // Fetch available models from backend
+  useEffect(() => {
+    if (!isLoggedIn) return
+    const fetchModels = async () => {
+      try {
+        const res = await axios.get(`${backendUrl}/text/models`, {
+          headers: getAuthHeaders(),
+          withCredentials: true,
+        })
+        const models: ModelOption[] = (res.data.available_models ?? []).map(
+          (m: { value: string; label: string }) => ({
+            value: m.value,
+            label: m.label,
+          })
+        )
+        setModelOptions(models)
+      } catch {
+        // silent
+      }
+    }
+    fetchModels()
+  }, [backendUrl, isLoggedIn])
 
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
@@ -271,13 +293,6 @@ export default function TextGenerator() {
     return () => clearInterval(id)
   }, [fetchStatuses, isLoggedIn])
 
-  // Auto-deselect models that are no longer live
-  useEffect(() => {
-    setSelectedModels((prev) =>
-      prev.filter((m) => modelStatuses[m] === "live")
-    )
-  }, [modelStatuses])
-
   const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
   const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
 
@@ -290,6 +305,7 @@ export default function TextGenerator() {
     messagesWithUser: Message[],
   ) => {
     setLoadingByModel((prev) => ({ ...prev, [modelValue]: true }))
+    console.log(`Sending to ${modelValue}:`, messagesWithUser)
 
     try {
       const response = await axios.post(
@@ -327,9 +343,6 @@ export default function TextGenerator() {
   const generateText = async () => {
     if (!prompt.trim()) return
     if (selectedModels.length === 0) return
-
-    // Refresh statuses before sending to catch models that went offline
-    await fetchStatuses()
 
     const currentPrompt = prompt
     setPrompt("")
@@ -372,7 +385,7 @@ export default function TextGenerator() {
   }
 
   const isBreakout = selectedModels.length > 2
-  const dropdownData = buildDropdownData(modelStatuses)
+  const dropdownData = buildDropdownData(modelOptions, modelStatuses)
 
   return (
     <div
