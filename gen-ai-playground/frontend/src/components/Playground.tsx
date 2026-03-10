@@ -43,6 +43,7 @@ export default function Playground() {
           onChange={(value) => {
             if (value) navigate(`/playground/${value}`)
           }}
+        data-testid="playground-select" 
         />
       </Group>
 
