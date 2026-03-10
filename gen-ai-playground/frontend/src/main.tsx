@@ -7,10 +7,10 @@ import { AuthProvider } from './context/AuthProvider'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MantineProvider defaultColorScheme="light">
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </MantineProvider>
+      <MantineProvider defaultColorScheme="light">
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </MantineProvider>
   </StrictMode>,
 )
