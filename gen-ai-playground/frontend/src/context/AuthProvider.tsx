@@ -4,85 +4,133 @@ import axios from "axios";
 
 const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+// its own 401 and triggering an infinite retry loop
+const refreshClient = axios.create({ baseURL: backendUrl, withCredentials: true });
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [username, setUsername] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isReady, setIsReady] = useState(false); // prevent flashing logged-out UI on mount
 
   const isLoggedIn = !!username;
 
-  // Rehydrate state from backend on mount
+  // In-memory access token — never touches localStorage
+  const accessTokenRef = useRef<string | null>(null);
+
+  const clearSession = useCallback(() => {
+    accessTokenRef.current = null;
+    setUsername(null);
+    setIsAdmin(false);
+  }, []);
+
+  // Rehydrate on mount by attempting a token refresh
+  // If refresh cookie is still valid, we get a new access token silently
   useEffect(() => {
     // Cleanup legacy client-side tokens from older auth flow
     localStorage.removeItem("token");
     localStorage.removeItem("username");
     localStorage.removeItem("isAdmin");
 
-    async function fetchMe() {
+    async function rehydrate() {
+      console.log("[Auth] Rehydrating session...");
       try {
-        const res = await axios.get(`${backendUrl}/me`, { withCredentials: true });
-        setUsername(res.data.username || null);
-        setIsAdmin(res.data.is_admin || false);
+        const res = await refreshClient.post("/refresh");
+        accessTokenRef.current = res.data.token;
+        console.log("[Auth] Refresh token valid, got new access token");
+
+        const me = await axios.get(`${backendUrl}/me`, {
+          withCredentials: true,
+          headers: { Authorization: `Bearer ${accessTokenRef.current}` },
+        });
+        setUsername(me.data.username || null);
+        setIsAdmin(me.data.is_admin || false);
+        console.log("[Auth] Session restored for:", me.data.username);
       } catch {
-        setUsername(null);
-        setIsAdmin(false);
+        console.log("[Auth] No valid session found, starting logged out");
+        clearSession();
+      } finally {
+        setIsReady(true); // render children only after we know auth state
       }
     }
 
-    fetchMe();
-  }, []);
+    rehydrate();
+  }, [clearSession]);
 
-  const isHandlingExpiry = useRef(false);
+  // Refresh lock: if multiple requests 401 simultaneously, only one refresh fires
+  const isRefreshing = useRef(false);
+  const refreshQueue = useRef<((token: string | null) => void)[]>([]);
 
-  const handleSessionExpired = useCallback(() => {
-    if (isHandlingExpiry.current) return;
-    isHandlingExpiry.current = true;
-    setUsername(null);
-    setIsAdmin(false);
-  }, []);
+  const flushQueue = (token: string | null) => {
+    refreshQueue.current.forEach((cb) => cb(token));
+    refreshQueue.current = [];
+  };
 
-  // Poll /me instead — it's the authoritative session check
-  useEffect(() => {
-    if (!username) return;
-
-    const interval = setInterval(() => {
-      axios.get(`${backendUrl}/me`, { withCredentials: true })
-        .catch((error) => {
-          if (error.response?.status === 401) {
-            handleSessionExpired();
-          }
-        });
-    }, 60_000);
-
-    return () => clearInterval(interval);
-  }, [username, handleSessionExpired]);
-
-  // Global axios interceptor: redirect on 401
+  // Global axios interceptor: silently refresh on 401, then retry original request
   const interceptorId = useRef<number | null>(null);
   useEffect(() => {
     interceptorId.current = axios.interceptors.response.use(
       (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
-          handleSessionExpired();
+      async (error) => {
+        const original = error.config;
+        console.warn("[Auth] Request failed:", original.url, "status:", error.response?.status);
+
+        // Only attempt refresh once per request (avoid infinite loop)
+        if (error.response?.status !== 401 || original._retried) {
+          return Promise.reject(error);
         }
-        return Promise.reject(error);
+
+        if (isRefreshing.current) {
+          console.log("[Auth] Refresh in progress, queuing request:", original.url);
+          // Queue this request until the in-flight refresh completes
+          return new Promise((resolve, reject) => {
+            refreshQueue.current.push((token) => {
+              if (!token) return reject(error);
+              original.headers["Authorization"] = `Bearer ${token}`;
+              resolve(axios(original));
+            });
+          });
+        }
+
+        original._retried = true;
+        isRefreshing.current = true;
+        console.log("[Auth] Access token expired, attempting refresh...");
+
+        try {
+          const res = await refreshClient.post("/refresh");
+          const newToken = res.data.token;
+          accessTokenRef.current = newToken;
+          axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
+          flushQueue(newToken);
+          original.headers["Authorization"] = `Bearer ${newToken}`;
+          console.log("[Auth] Refresh successful, retrying original request:", original.url);
+          return axios(original); // retry original request
+        } catch {
+          console.error("[Auth] Refresh failed, clearing session");
+          flushQueue(null);
+          clearSession();
+          return Promise.reject(error);
+        } finally {
+          isRefreshing.current = false;
+        }
       }
     );
+
     return () => {
       if (interceptorId.current !== null) {
         axios.interceptors.response.eject(interceptorId.current);
       }
     };
-  }, [handleSessionExpired]);
+  }, [clearSession]);
 
-  const login = useCallback(async () => {
-    const res = await axios.get(`${backendUrl}/me`, { withCredentials: true });
-    setUsername(res.data.username || null);
-    setIsAdmin(res.data.is_admin || false);
+  const login = useCallback(async (token: string, newUsername: string, newIsAdmin: boolean) => {
+    // Login page receives the access token in the response body — store in memory
+    accessTokenRef.current = token;
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    setUsername(newUsername);
+    setIsAdmin(newIsAdmin);
   }, []);
 
-  // Logout calls backend to clear httpOnly cookie
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       const csrfToken = document.cookie
         .split("; ")
@@ -91,17 +139,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await axios.post(
         `${backendUrl}/logout`,
-        {},                          // empty body
+        {},
         {
           withCredentials: true,
           headers: { "X-CSRF-Token": csrfToken },
         }
       );
     } finally {
-      setUsername(null);
-      setIsAdmin(false);
+      delete axios.defaults.headers.common["Authorization"];
+      clearSession();
     }
-  };
+  }, [clearSession]);
+  
+  if (!isReady) return null; // prevents flashing logged-out UI
 
   return (
     <AuthContext.Provider value={{ isLoggedIn, username, isAdmin, login, logout }}>

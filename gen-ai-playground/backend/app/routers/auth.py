@@ -7,7 +7,7 @@ Security Model:
 - Frontend relies on HTTPOnly cookies (no localStorage)
 - Cookie settings: httponly=True, samesite="strict", secure=IS_PROD
 """
-from fastapi import APIRouter, HTTPException, Depends, Response
+from fastapi import APIRouter, HTTPException, Depends, Response, Request
 from pymongo.database import Database
 from datetime import datetime, timedelta
 import bcrypt
@@ -24,6 +24,53 @@ router = APIRouter(
     tags=["authentication"]
 )
 
+def _issue_access_token(username: str, is_admin: bool) -> tuple[str, datetime]:
+    """Return a short-lived access token (15 min) and its expiry datetime."""
+    expiry = datetime.utcnow() + timedelta(seconds=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    token = jwt.encode(
+        {"username": username, 
+        "is_admin": is_admin, 
+        "exp": expiry, 
+        "type": "access"},
+        settings.JWT_SECRET_KEY,
+        algorithm="HS256",
+    )
+    return token, expiry
+
+
+def _issue_refresh_token(username: str) -> tuple[str, timedelta]:
+    """Return a long-lived refresh token (7 days) and its TTL timedelta."""
+    delta = timedelta(seconds=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expiry = datetime.utcnow() + delta
+    token = jwt.encode(
+        {"username": username, "exp": expiry, "type": "refresh"},
+        settings.JWT_REFRESH_SECRET_KEY,   # ← separate secret for refresh tokens
+        algorithm="HS256",
+    )
+    return token, delta
+
+
+def _set_refresh_cookie(response: Response, token: str, max_age: timedelta) -> None:
+    response.set_cookie(
+        key="refresh_token",
+        value=token,
+        httponly=True,
+        secure=settings.IS_PROD,
+        samesite="strict",
+        max_age=int(max_age.total_seconds()),
+        path="/refresh",
+    )
+
+
+def _set_csrf_cookie(response: Response, token: str, max_age: timedelta) -> None:
+    response.set_cookie(
+        key="csrf_token",
+        value=token,
+        httponly=False,   # must be readable by frontend JS
+        secure=settings.IS_PROD,
+        samesite="strict",
+        max_age=int(max_age.total_seconds()),
+    )
 
 @router.post("/register", response_model=RegisterResponse)
 def register(
@@ -117,80 +164,58 @@ def login(
         Sets an HTTPOnly access_token cookie for browser-based authentication.
         Sets a non-HTTPOnly csrf_token cookie for CSRF protection.
     """
+    user = db.users.find_one({"username": credentials.username})
+    if not user or not bcrypt.checkpw(credentials.password.encode(), user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    is_admin = user.get("is_admin", False)
+
+    # 1. Short-lived access token  → returned in response body (frontend keeps in memory)
+    access_token, _ = _issue_access_token(user["username"], is_admin)
+
+    # 2. Long-lived refresh token  → HTTPOnly cookie, path-scoped to /auth/refresh
+    refresh_token, refresh_delta = _issue_refresh_token(user["username"])
+    _set_refresh_cookie(response, refresh_token, refresh_delta)
+
+    # 3. CSRF token  → non-HTTPOnly cookie, frontend reads and sends as X-CSRF-Token header
+    csrf_token = secrets.token_urlsafe(32)
+    _set_csrf_cookie(response, csrf_token, refresh_delta)
+
+    return LoginResponse(
+        message="Login successful",
+        token=access_token,         # short-lived, in-memory on frontend
+        username=user["username"],
+        is_admin=is_admin,
+    )
+
+@router.post("/refresh")
+def refresh(request: Request, response: Response, db: Database = Depends(get_database)):
+    """
+    Issue a new access token using the refresh token cookie.
+    Called automatically by the frontend when a 401 is received.
+    """
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="No refresh token")
+
     try:
-        # Find user by username
-        user = db.users.find_one({"username": credentials.username})
-        
-        if not user:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid username or password"
-            )
-        
-        # Verify password
-        if not bcrypt.checkpw(
-            credentials.password.encode('utf-8'),
-            user["password"]
-        ):
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid username or password"
-            )
-        
-        # Generate JWT token
-        token_expiry_delta = timedelta(hours=settings.JWT_EXPIRY_HOURS)
-        token_expiry = datetime.utcnow() + token_expiry_delta
-        
-        is_admin = user.get("is_admin", False)
-        
-        token_payload = {
-            "username": user["username"],
-            "is_admin": is_admin,
-            "exp": token_expiry
-        }
-        
-        token = jwt.encode(
-            token_payload,
-            settings.JWT_SECRET_KEY,
-            algorithm="HS256"
-        )
+        payload = jwt.decode(token, settings.JWT_REFRESH_SECRET_KEY, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Refresh token expired, please log in again")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-        # Set HTTPonly cookie
-        response.set_cookie(
-            key="access_token",
-            value=token,
-            httponly=True,
-            secure=settings.IS_PROD,  # keep False for local dev
-            samesite="strict",
-            max_age=int(token_expiry_delta.total_seconds())
-        )
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Wrong token type")
 
-        # Generate CSRF token
-        csrf_token = secrets.token_urlsafe(32)
+    user = db.users.find_one({"username": payload["username"]})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
 
-        # Set CSRF cookie (not httponly)
-        response.set_cookie(
-            key="csrf_token",
-            value=csrf_token,
-            httponly=False,  # Must be False so frontend can read it
-            secure=settings.IS_PROD,
-            samesite="strict",
-            max_age=int(token_expiry_delta.total_seconds())
-        )
-        
-        return LoginResponse(
-            message="Login successful",
-            token=token,
-            username=user["username"],
-            is_admin=is_admin
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Login failed: {str(e)}"
-        )
+    # Issue a fresh access token only — refresh token cookie stays unchanged
+    access_token, _ = _issue_access_token(user["username"], user.get("is_admin", False))
+
+    return {"token": access_token}
 
 @router.get("/me")
 def me(current_user=Depends(get_current_user)):
@@ -229,18 +254,11 @@ def logout(
         Requires a valid CSRF token for cookie-authenticated requests.
         Works for both cookie and Bearer token authentication, but CSRF is only enforced for cookie auth.
     """
-    # Clear the access token cookie
-    response.delete_cookie(
-        key="access_token",
-        httponly=True,
-        samesite="strict",
-        secure=settings.IS_PROD
-    )
-    # Clear the CSRF token cookie
-    response.delete_cookie(
-        key="csrf_token",
-        httponly=False,
-        samesite="strict",
-        secure=settings.IS_PROD
-    )
+    for key, httponly in [("access_token", True), ("refresh_token", True), ("csrf_token", False)]:
+        response.delete_cookie(
+            key=key, 
+            httponly=httponly, 
+            samesite="strict", 
+            secure=settings.IS_PROD,
+            path="/refresh")
     return {"message": "Logged out successfully"}
