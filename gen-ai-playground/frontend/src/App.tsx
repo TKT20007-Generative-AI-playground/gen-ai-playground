@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Header from "./components/Header"
 import Register from "./components/Register"
-import Playground from "./components/Playground"
+import Playground from "./pages/Playground"
 import Dashboard from "./pages/Dashboard"
 import History from "./components/History"
 import { useAuth } from "./context/AuthContext"
@@ -31,13 +31,11 @@ function App() {
 
         <Route path="/register" element={<Register />} />
 
-        {/* Redirect /playground → default tab */}
         <Route
           path="/playground"
           element={<Navigate to="/playground/ImageGenerator" replace />}
         />
 
-        {/* Tab-based Playground */}
         <Route
           path="/playground/:tab"
           element={
