@@ -565,7 +565,107 @@ class TestAuthRequired:
     def test_delete_requires_auth(self, client):
         response = client.delete("/text/deploy?deployment_name=x")
         assert response.status_code == 422
-        
+
+
+# ===========================================================================
+# 6. enable_thinking / thinking_budget parameter handling
+# ===========================================================================
+
+class TestThinkingParams:
+    """enable_thinking and thinking_budget pass-through and validation."""
+
+    @patch("app.routers.text.verda_service")
+    def test_valid_thinking_params_passed_to_service(
+        self, mock_vs, client, registered_user, auth_headers
+    ):
+        """enable_thinking=True + valid thinking_budget < max_tokens → 200 and forwarded to chat()."""
+        _setup_deployment_discovery(mock_vs, healthy=True)
+        mock_vs.chat.return_value = {
+            "reply": "I thought about it.",
+            "model": "deepseek-ai/deepseek-llm-7b-chat",
+            "usage": {},
+        }
+
+        response = client.post(
+            "/text/chat",
+            json={
+                "model_path": TEST_DISPLAY_NAME,
+                "messages": [{"role": "user", "content": "Think hard"}],
+                "max_tokens": 512,
+                "enable_thinking": True,
+                "thinking_budget": 128,
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        assert response.json()["reply"] == "I thought about it."
+
+        _, call_kwargs = mock_vs.chat.call_args
+        assert call_kwargs["enable_thinking"] is True
+        assert call_kwargs["thinking_budget"] == 128
+
+    @patch("app.routers.text.verda_service")
+    def test_thinking_budget_equal_to_max_tokens_returns_422(
+        self, mock_vs, client, registered_user, auth_headers
+    ):
+        """thinking_budget == max_tokens violates the model validator → 422 before hitting service."""
+        response = client.post(
+            "/text/chat",
+            json={
+                "model_path": TEST_DISPLAY_NAME,
+                "messages": [{"role": "user", "content": "Think"}],
+                "max_tokens": 256,
+                "enable_thinking": True,
+                "thinking_budget": 256,
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 422
+        mock_vs.chat.assert_not_called()
+
+    @patch("app.routers.text.verda_service")
+    def test_thinking_budget_greater_than_max_tokens_returns_422(
+        self, mock_vs, client, registered_user, auth_headers
+    ):
+        """thinking_budget > max_tokens violates the model validator → 422 before hitting service."""
+        response = client.post(
+            "/text/chat",
+            json={
+                "model_path": TEST_DISPLAY_NAME,
+                "messages": [{"role": "user", "content": "Think more"}],
+                "max_tokens": 256,
+                "enable_thinking": True,
+                "thinking_budget": 512,
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 422
+        mock_vs.chat.assert_not_called()
+
+    @patch("app.routers.text.verda_service")
+    def test_thinking_budget_without_enable_thinking_returns_422(
+        self, mock_vs, client, registered_user, auth_headers
+    ):
+        """thinking_budget set while enable_thinking=False → 422."""
+        response = client.post(
+            "/text/chat",
+            json={
+                "model_path": TEST_DISPLAY_NAME,
+                "messages": [{"role": "user", "content": "Think"}],
+                "max_tokens": 512,
+                "enable_thinking": False,
+                "thinking_budget": 128,
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 422
+        mock_vs.chat.assert_not_called()
+
+
 class TestTemplateFiles:
     """Test that the command generation from templates works as expected."""
     
