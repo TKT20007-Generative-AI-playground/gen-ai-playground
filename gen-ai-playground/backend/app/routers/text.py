@@ -24,7 +24,6 @@ from app.models import (
 )
 from app.verda_service import verda_service
 from app.template_discovery import get_template_map, _deployment_name_from_filename
-from app.template_models import TemplateConfig
 from verda.containers import ContainerDeploymentStatus
 
 def _sanitize_slug(model_path: str) -> str:
