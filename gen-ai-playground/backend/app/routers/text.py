@@ -23,7 +23,7 @@ from app.models import (
     UserInfo,
 )
 from app.verda_service import verda_service
-from app.template_discovery import get_template_map, _deployment_name_from_filename
+from app.template_discovery import get_template_map, get_template_configs, _deployment_name_from_filename
 from verda.containers import ContainerDeploymentStatus
 
 def _sanitize_slug(model_path: str) -> str:
@@ -116,10 +116,10 @@ def connect_to_deployment(
 def choose_text_model_path(model: str) -> str:
     """Map a user-friendly display name to the actual model path used for deployment."""
     model = model.strip()
+    configs = get_template_configs()
     for template_name, display_name in get_template_map().items():
         if display_name == model:
-            cfg = verda_service._parse_and_validate_template(template_name)
-            return cfg.model
+            return configs[template_name].model
 
     raise HTTPException(
         status_code=400,
@@ -300,14 +300,11 @@ def generate_text(
                 dep_status = client.containers.get_deployment_status(d["name"])
                 if dep_status == ContainerDeploymentStatus.HEALTHY:
                     deployment_name = d["name"]
+                    configs = get_template_configs()
                     for tpl in get_template_map():
-                        try:
-                            if _deployment_name_from_filename(tpl) == d["name"].lower():
-                                cfg = verda_service._parse_and_validate_template(tpl)
-                                used_model_path = cfg.model
-                                break
-                        except Exception:
-                            continue
+                        if _deployment_name_from_filename(tpl) == d["name"].lower():
+                            used_model_path = configs[tpl].model
+                            break
                     break
             except Exception:
                 continue
@@ -450,11 +447,9 @@ def chat_with_model(
     # Detect if model supports thinking from template config
     supports_thinking = False
     if template_name:
-        try:
-            cfg = verda_service._parse_and_validate_template(template_name)
+        cfg = get_template_configs().get(template_name)
+        if cfg is not None:
             supports_thinking = cfg.sglang is not None and cfg.sglang.reasoning_parser is not None
-        except Exception:
-            pass
 
     # Chat
     try:

@@ -27,41 +27,55 @@ def _deployment_name_from_filename(filename: str) -> str:
     return filename.removesuffix(".json").lower()
 
 
-def discover_templates() -> dict[str, str]:
+def discover_templates() -> tuple[dict[str, str], dict[str, TemplateConfig]]:
     """
-    Scan TEMPLATES_DIR for *.json, validate each, return {filename: display_name}.
+    Scan TEMPLATES_DIR for *.json, validate each.
+    Returns ({filename: display_name}, {filename: TemplateConfig}).
     Skips files in _SKIP_TEMPLATES and invalid templates.
     """
-    result: dict[str, str] = {}
+    names: dict[str, str] = {}
+    configs: dict[str, TemplateConfig] = {}
     if not TEMPLATES_DIR.is_dir():
-        return result
+        return names, configs
 
     for path in sorted(TEMPLATES_DIR.glob("*.json")):
         if path.name in _SKIP_TEMPLATES:
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            TemplateConfig(**data)
-            result[path.name] = _display_name_from_filename(path.name)
+            cfg = TemplateConfig(**data)
+            names[path.name] = _display_name_from_filename(path.name)
+            configs[path.name] = cfg
         except Exception:
             continue
 
-    return result
+    return names, configs
 
 
 _cache: dict[str, str] | None = None
+_config_cache: dict[str, TemplateConfig] | None = None
+
+
+def _ensure_cache() -> None:
+    global _cache, _config_cache
+    if _cache is None:
+        _cache, _config_cache = discover_templates()
 
 
 def get_template_map() -> dict[str, str]:
     """Return the cached {template_filename: display_name} mapping."""
-    global _cache
-    if _cache is None:
-        _cache = discover_templates()
-    return _cache
+    _ensure_cache()
+    return _cache  # type: ignore[return-value]
+
+
+def get_template_configs() -> dict[str, TemplateConfig]:
+    """Return the cached {template_filename: TemplateConfig} mapping."""
+    _ensure_cache()
+    return _config_cache  # type: ignore[return-value]
 
 
 def refresh() -> dict[str, str]:
     """Re-scan the templates directory and update the cache."""
-    global _cache
-    _cache = discover_templates()
+    global _cache, _config_cache
+    _cache, _config_cache = discover_templates()
     return _cache
