@@ -443,9 +443,9 @@ export default function TextGenerator() {
             onChange={(val) => {
               const next = typeof val === "number" ? val : 256
               setMaxTokens(next)
-              setThinkingBudget((prev) => Math.min(prev, next - 1))
+              setThinkingBudget((prev) => Math.min(prev, Math.max(1, next - 1)))
             }}
-            min={1}
+            min={selectedModels.some((m) => enableThinkingByModel[m]) ? 2 : 1}
             max={32768}
             step={64}
             clampBehavior="strict"
@@ -456,7 +456,7 @@ export default function TextGenerator() {
             <NumberInput
               label="Thinking Budget"
               value={thinkingBudget}
-              onChange={(val) => setThinkingBudget(typeof val === "number" ? Math.min(val, maxTokens - 1) : Math.floor(maxTokens * 0.8))}
+              onChange={(val) => setThinkingBudget(typeof val === "number" ? Math.min(val, maxTokens - 1) : Math.max(1, Math.floor(maxTokens * 0.8)))}
               min={1}
               max={maxTokens - 1}
               step={64}
@@ -506,7 +506,11 @@ export default function TextGenerator() {
                       enableThinking={enableThinkingByModel[modelValue] ?? false}
                       onToggleThinking={(enabled) => {
                         setEnableThinkingByModel((prev) => ({ ...prev, [modelValue]: enabled }))
-                        if (enabled) setThinkingBudget(Math.floor(maxTokens * 0.8))
+                        if (enabled) {
+                          const effectiveMax = Math.max(maxTokens, 2)
+                          setMaxTokens(effectiveMax)
+                          setThinkingBudget(Math.max(1, Math.floor(effectiveMax * 0.8)))
+                        }
                       }}
                     />
                   ))}
@@ -541,7 +545,11 @@ export default function TextGenerator() {
                   enableThinking={enableThinkingByModel[modelValue] ?? false}
                   onToggleThinking={(enabled) => {
                     setEnableThinkingByModel((prev) => ({ ...prev, [modelValue]: enabled }))
-                    if (enabled) setThinkingBudget(Math.floor(maxTokens * 0.8))
+                    if (enabled) {
+                      const effectiveMax = Math.max(maxTokens, 2)
+                      setMaxTokens(effectiveMax)
+                      setThinkingBudget(Math.max(1, Math.floor(effectiveMax * 0.8)))
+                    }
                   }}
                 />
               ))}
