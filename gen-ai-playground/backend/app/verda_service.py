@@ -191,12 +191,18 @@ class VerdaService:
             cfg = self._parse_and_validate_template(template_name)
             compute_name, gpu_count = self._resolve_gpu(cfg, all_resources)
             
+            supports_thinking = (
+                cfg.sglang is not None
+                and cfg.sglang.reasoning_parser is not None
+            ) if hasattr(cfg, 'sglang') else False
+
             results.append({
                 "value": display_name,
                 "label": display_name,
                 "template": template_name,
                 "tp": gpu_count,
                 "availability": compute_name,
+                "supports_thinking": supports_thinking,
             })
         return results
       
@@ -700,6 +706,8 @@ class VerdaService:
         temperature: float = 0.7,
         top_p: float = 0.9,
         enable_thinking: bool = False,
+        thinking_budget: int | None = None,
+        supports_thinking: bool = False,
         deployment_name: str = "",
         model_path: str = "",
     ) -> dict:
@@ -732,8 +740,11 @@ class VerdaService:
             "temperature": temperature,
             "top_p": top_p,
         }
-        if enable_thinking:
-            chat_data["chat_template_kwargs"] = {"enable_thinking": True}
+        if supports_thinking:
+            thinking_kwargs = {"enable_thinking": enable_thinking}
+            if enable_thinking and thinking_budget is not None:
+                thinking_kwargs["thinking_budget"] = thinking_budget
+            chat_data["chat_template_kwargs"] = thinking_kwargs
 
         response = deployment.run_sync(
             chat_data,

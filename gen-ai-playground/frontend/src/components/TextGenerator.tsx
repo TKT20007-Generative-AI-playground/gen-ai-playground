@@ -5,8 +5,11 @@ import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "re
 import {
   Alert,
   Button,
+  Group,
   MultiSelect,
+  NumberInput,
   Paper,
+  Switch,
   Text,
   ScrollArea,
   TextInput,
@@ -15,6 +18,7 @@ import {
 type ModelOption = {
   value: string
   label: string
+  supportsThinking: boolean
 }
 
 type Message = {
@@ -95,6 +99,9 @@ type ChatPanelProps = {
   isBusy: boolean
   modelStatus: ModelStatus
   statusMessage: string | null
+  supportsThinking: boolean
+  enableThinking: boolean
+  onToggleThinking: (enabled: boolean) => void
 }
 
 function ChatPanel({
@@ -105,6 +112,9 @@ function ChatPanel({
   isBusy,
   modelStatus,
   statusMessage,
+  supportsThinking,
+  enableThinking,
+  onToggleThinking,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -149,10 +159,19 @@ function ChatPanel({
         </Alert>
       )}
 
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px", alignItems: "center" }}>
         <Button size="xs" color="orange" onClick={onClearMessages} disabled={isBusy}>
           Clear
         </Button>
+        {supportsThinking && (
+          <Switch
+            label="Thinking"
+            size="xs"
+            checked={enableThinking}
+            onChange={(e) => onToggleThinking(e.currentTarget.checked)}
+            disabled={isBusy}
+          />
+        )}
       </div>
 
       <ScrollArea
@@ -221,6 +240,9 @@ export default function TextGenerator() {
   const [messagesByModel, setMessagesByModel] = useState<Record<string, Message[]>>({})
   const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
+  const [maxTokens, setMaxTokens] = useState<number>(256)
+  const [thinkingBudget, setThinkingBudget] = useState<number>(1024)
+  const [enableThinkingByModel, setEnableThinkingByModel] = useState<Record<string, boolean>>({})
 
   // Keep a ref so async loops always see the latest messages.
   const messagesByModelRef = useRef<Record<string, Message[]>>({})
@@ -255,9 +277,10 @@ export default function TextGenerator() {
           headers: getAuthHeaders(),
         })
         const models: ModelOption[] = (res.data.available_models ?? []).map(
-          (m: { value: string; label: string }) => ({
+          (m: { value: string; label: string; supports_thinking?: boolean }) => ({
             value: m.value,
             label: m.label,
+            supportsThinking: m.supports_thinking ?? false,
           })
         )
         setModelOptions(models)
@@ -307,9 +330,11 @@ export default function TextGenerator() {
         {
           model_path: modelValue,
           messages: messagesWithUser,
-          max_tokens: 256,
+          max_tokens: maxTokens,
           temperature: 0.7,
           top_p: 0.9,
+          enable_thinking: enableThinkingByModel[modelValue] ?? false,
+          ...(enableThinkingByModel[modelValue] ? { thinking_budget: thinkingBudget } : {}),
         },
         { headers: getAuthHeaders() }
       )
@@ -411,6 +436,39 @@ export default function TextGenerator() {
       />
 
       {selectedModels.length > 0 && (
+        <Group gap="md">
+          <NumberInput
+            label="Max Output Tokens"
+            value={maxTokens}
+            onChange={(val) => {
+              const next = typeof val === "number" ? val : 256
+              setMaxTokens(next)
+              setThinkingBudget((prev) => Math.min(prev, next - 1))
+            }}
+            min={1}
+            max={32768}
+            step={64}
+            clampBehavior="strict"
+            style={{ width: 180 }}
+            disabled={isAnyLoading}
+          />
+          {selectedModels.some((m) => enableThinkingByModel[m]) && (
+            <NumberInput
+              label="Thinking Budget"
+              value={thinkingBudget}
+              onChange={(val) => setThinkingBudget(typeof val === "number" ? Math.min(val, maxTokens - 1) : Math.floor(maxTokens * 0.8))}
+              min={1}
+              max={maxTokens - 1}
+              step={64}
+              clampBehavior="strict"
+              style={{ width: 180 }}
+              disabled={isAnyLoading}
+            />
+          )}
+        </Group>
+      )}
+
+      {selectedModels.length > 0 && (
         <>
           {/* Panels */}
           {isBreakout ? (
@@ -444,6 +502,12 @@ export default function TextGenerator() {
                       isBusy={isAnyLoading}
                       modelStatus={modelStatuses[modelValue] ?? "unknown"}
                       statusMessage={statusMsgs[modelValue] ?? null}
+                      supportsThinking={modelOptions.find((m) => m.value === modelValue)?.supportsThinking ?? false}
+                      enableThinking={enableThinkingByModel[modelValue] ?? false}
+                      onToggleThinking={(enabled) => {
+                        setEnableThinkingByModel((prev) => ({ ...prev, [modelValue]: enabled }))
+                        if (enabled) setThinkingBudget(Math.floor(maxTokens * 0.8))
+                      }}
                     />
                   ))}
                 </div>
@@ -473,6 +537,12 @@ export default function TextGenerator() {
                   isBusy={isAnyLoading}
                   modelStatus={modelStatuses[modelValue] ?? "unknown"}
                   statusMessage={statusMsgs[modelValue] ?? null}
+                  supportsThinking={modelOptions.find((m) => m.value === modelValue)?.supportsThinking ?? false}
+                  enableThinking={enableThinkingByModel[modelValue] ?? false}
+                  onToggleThinking={(enabled) => {
+                    setEnableThinkingByModel((prev) => ({ ...prev, [modelValue]: enabled }))
+                    if (enabled) setThinkingBudget(Math.floor(maxTokens * 0.8))
+                  }}
                 />
               ))}
             </div>

@@ -24,6 +24,7 @@ from app.models import (
 )
 from app.verda_service import verda_service
 from app.template_discovery import get_template_map, _deployment_name_from_filename
+from app.template_models import TemplateConfig
 from verda.containers import ContainerDeploymentStatus
 
 def _sanitize_slug(model_path: str) -> str:
@@ -447,6 +448,15 @@ def chat_with_model(
         print(f"Failed to check deployment status for '{deployment_name}': {e}")
         raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
 
+    # Detect if model supports thinking from template config
+    supports_thinking = False
+    if template_name:
+        try:
+            cfg = verda_service._parse_and_validate_template(template_name)
+            supports_thinking = cfg.sglang is not None and cfg.sglang.reasoning_parser is not None
+        except Exception:
+            pass
+
     # Chat
     try:
         result = verda_service.chat(
@@ -454,6 +464,9 @@ def chat_with_model(
             max_tokens=request.max_tokens,
             temperature=request.temperature,
             top_p=request.top_p,
+            enable_thinking=request.enable_thinking,
+            thinking_budget=request.thinking_budget,
+            supports_thinking=supports_thinking,
             deployment_name=deployment_name,
             model_path=model_path,
         )

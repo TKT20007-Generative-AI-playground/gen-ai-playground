@@ -1,7 +1,7 @@
 """
 Pydantic models for request and response validation
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
@@ -132,6 +132,14 @@ class ChatRequest(BaseModel):
     max_tokens: int = 256
     temperature: float = 0.7
     top_p: float = 0.9
+    enable_thinking: bool = False
+    thinking_budget: Optional[int] = None
+
+    @model_validator(mode="after")
+    def validate_thinking_budget(self):
+        if self.thinking_budget is not None and self.thinking_budget >= self.max_tokens:
+            raise ValueError("thinking_budget must be less than max_tokens")
+        return self
 
 
 class ChatResponse(BaseModel):
