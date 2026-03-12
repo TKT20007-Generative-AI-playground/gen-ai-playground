@@ -133,12 +133,15 @@ class ChatRequest(BaseModel):
     temperature: float = 0.7
     top_p: float = 0.9
     enable_thinking: bool = False
-    thinking_budget: Optional[int] = None
+    thinking_budget: Optional[int] = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def validate_thinking_budget(self):
-        if self.thinking_budget is not None and self.thinking_budget >= self.max_tokens:
-            raise ValueError("thinking_budget must be less than max_tokens")
+        if self.thinking_budget is not None:
+            if not self.enable_thinking:
+                raise ValueError("thinking_budget requires enable_thinking to be true")
+            if self.thinking_budget >= self.max_tokens:
+                raise ValueError("thinking_budget must be less than max_tokens")
         return self
 
 
