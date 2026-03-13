@@ -381,6 +381,26 @@ export default function TextGenerator() {
   const isBreakout = selectedModels.length > 2
   const dropdownData = buildDropdownData(modelOptions, modelStatuses)
 
+  // Count models by status
+  const statusCounts = Object.values(modelStatuses).reduce(
+    (acc, status) => {
+      acc[status] = (acc[status] || 0) + 1
+      return acc
+    },
+    {} as Record<ModelStatus, number>
+  )
+
+  const statusSummary = [
+    statusCounts.live ? `🟢 ${statusCounts.live} ready` : null,
+    statusCounts.starting ? `🟡 ${statusCounts.starting} starting` : null,
+    statusCounts.offline ? `⚪ ${statusCounts.offline} offline` : null,
+    statusCounts.unknown ? `⚪ ${statusCounts.unknown} unknown` : null,
+  ]
+    .filter(Boolean)
+    .join(" | ")
+
+  const showStartingMsg = Boolean(statusCounts.starting)
+
   return (
     <div
       style={{
@@ -394,6 +414,16 @@ export default function TextGenerator() {
         gap: "16px",
       }}
     >
+      {statusSummary && (
+        <Alert color="blue" variant="light" mb={8} p="xs" styles={{ message: { fontSize: 13 } }}>
+          Model status: {statusSummary}
+        </Alert>
+      )}
+      {showStartingMsg && (
+        <Alert color="yellow" variant="light" mb={8} p="xs" styles={{ message: { fontSize: 13 } }}>
+          Some of the models are still starting up. It usually takes about 2 minutes.
+        </Alert>
+      )}
       <Text c="dimmed" size="sm" mb={6}>
         Select up to {MAX_MODELS} models for text generation.
       </Text>
