@@ -1,20 +1,26 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import Header from "./components/Header"
 import Front from "./pages/Front"
 import Register from "./components/Register"
 import Playground from "./pages/Playground"
-import Dashboard from "./pages/Dashboard"
+import DashboardLayout from "./components/DashboardLayout"
+import DashboardContainers from "./pages/DashboardContainers"
+import DashboardUsers from "./pages/DashboardUsers"
 import History from "./components/History"
 // import { useAuth } from "./context/AuthContext"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
 
-function App() {
-  // const { isLoggedIn } = useAuth()
+function AppContent() {
+  const { isLoggedIn } = useAuth()
+  const location = useLocation()
+  
+  // Hide Header on dashboard routes
+  const isDashboardRoute = location.pathname.startsWith('/dashboard')
 
   return (
-    <BrowserRouter>
-      <Header />
+    <>
+      {!isDashboardRoute && <Header />}
 
       <Routes>
         <Route
@@ -49,15 +55,28 @@ function App() {
           }
         />
 
+        {/* Dashboard routes with standalone layout */}
         <Route
           path="/dashboard"
           element={
             <AdminRoute>
-              <Dashboard />
+              <DashboardLayout />
             </AdminRoute>
           }
-        />
+        >
+          <Route index element={<Navigate to="/dashboard/containers" replace />} />
+          <Route path="containers" element={<DashboardContainers />} />
+          <Route path="users" element={<DashboardUsers />} />
+        </Route>
       </Routes>
+    </>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   )
 }

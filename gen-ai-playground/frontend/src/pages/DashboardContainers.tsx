@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
 import {
-  Title,
   Table,
   Badge,
   Button,
@@ -20,7 +19,7 @@ interface Container {
   container_id: string
 }
 
-export default function Dashboard() {
+export default function DashboardContainers() {
   const [containers, setContainers] = useState<Container[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -155,9 +154,9 @@ export default function Dashboard() {
   }
 
   return (
-    <Stack p="md">
+    <Stack>
       <Group justify="space-between">
-        <Title order={2}>Dashboard - Verda Deployments</Title>
+        <Text size="xl" fw={500}>Verda Deployments</Text>
         <Button variant="light" onClick={fetchContainers}>
           Refresh
         </Button>

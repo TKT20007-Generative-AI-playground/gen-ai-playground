@@ -54,32 +54,31 @@ export default function Header() {
     <>
       <Group justify="space-between" p="md" bg="linear-gradient(135deg, #000F65, #0b1328)" style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Group gap="md">
-          <Text fw={500} c="white" component={Link} to="/">
-            Generative AI Playground
-          </Text>
+          {isAdmin && (
+            <Button component={Link} to="/dashboard" variant="white" color="dark" style={{ flexShrink: 0 }}>
+              Dashboard
+            </Button>
+          )}
+          <Text fw={500} c="white" style={{ flexShrink: 0 }}>Generative AI Playground</Text>
           {isLoggedIn && (
             <Button
               variant="white"
               color="dark"
               onClick={() => setHistoryOpened(true)}
-            > 
+              style={{ flexShrink: 0 }}
+            >
               History
             </Button>
           )}
-          {isAdmin && (
-            <Button component={Link} to="/dashboard" variant="white" color="dark">
-              Dashboard
-            </Button>
-          )}
-          <Button component={Link} to="/playground" variant="white" color="dark">
+          <Button component={Link} to="/playground" variant="white" color="dark" style={{ flexShrink: 0 }}>
             Playground
           </Button>
         </Group>
 
         {isLoggedIn ? (
-          <Button variant="white" color="dark" onClick={logout}>Logout</Button>
+          <Button variant="white" color="dark" onClick={logout} style={{ flexShrink: 0 }}>Logout</Button>
         ) : (
-          <Button variant="white" color="dark" onClick={() => setLoginOpened(true)}>Login</Button>
+          <Button variant="white" color="dark" onClick={() => setLoginOpened(true)} style={{ flexShrink: 0 }}>Login</Button>
         )}
 
         <LoginModal opened={loginOpened} onClose={() => { setLoginOpened(false); setRedirectTo(null); }} redirectTo={redirectTo} />

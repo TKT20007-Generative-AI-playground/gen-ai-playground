@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
+import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import {
   Container,
@@ -66,24 +67,11 @@ export default function Register() {
     }
 
     try {
-      const res = await fetch(`${backendUrl}/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          password,
-          invitation_code: inviteCode,
-        }),
+      await axios.post(`${backendUrl}/register`, {
+        username,
+        password,
+        invitation_code: inviteCode,
       })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data.detail || "Registration failed")
-        return
-      }
 
       setSuccess("User registered successfully!");
       setUsername("");
@@ -95,8 +83,12 @@ export default function Register() {
         navigate("/", { state: { openLoginModal: true } })
       }, 1500) // timeout so that the user can see that registration was successful
 
-    } catch {
-      setError("Server unreachable");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError("Server unreachable");
+      }
     }
   }
 

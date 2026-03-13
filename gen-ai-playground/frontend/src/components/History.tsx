@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
   Stack,
   Title,
@@ -52,7 +53,7 @@ export default function History() {
         });
         const data = res.data;
         const groups: { [prompt: string]: ImageRecord[] } = {};
-        (data.history || []).forEach((item: ImageRecord) => {
+        (res.data.history || []).forEach((item: ImageRecord) => {
           if (!groups[item.prompt]) groups[item.prompt] = [];
           groups[item.prompt].push(item);
         });

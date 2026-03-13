@@ -63,6 +63,26 @@ class UserInfo(BaseModel):
     is_admin: bool = False
 
 
+# ---- User management models ----
+
+class UserListItem(BaseModel):
+    """Model for a single user in the user list"""
+    username: str
+    is_admin: bool = False
+    created_at: Optional[datetime] = None
+
+
+class UserListResponse(BaseModel):
+    """Response model for user list endpoint"""
+    users: List[UserListItem]
+
+
+class DeleteUserResponse(BaseModel):
+    """Response model for user deletion"""
+    message: str
+    username: str
+
+
 # ---- Text generation models ----
 
 class DeployModelRequest(BaseModel):
