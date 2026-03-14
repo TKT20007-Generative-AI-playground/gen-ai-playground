@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 import base64
 import time
 import httpx
+import requests
 
 from app.config import settings
 from app.database import get_database
@@ -46,15 +47,22 @@ def get_history(
         history = list(db.images.find(
             {"username": current_user.username},
             {
-                "_id": 0,
+                "_id": 1,
                 "prompt": 1,
                 "model": 1,
                 "timestamp": 1,
                 "image_size": 1,
                 "image_data": 1,
-                "image_type": 1
+                "image_type": 1,
+                "parent_image_id": 1,
             }
         ).sort("timestamp", -1).limit(50))
+
+        for item in history:
+            if "_id" in item:
+                del item["_id"]
+            if "parent_image_id" in item:
+                del item["parent_image_id"]
         
         return HistoryResponse(history=history)
     except Exception as e:
@@ -110,6 +118,24 @@ async def generate_image(
         "Content-Type": "application/json",
         "Authorization": f"Bearer {settings.VERDA_API_KEY}"
     }
+    parent_image_id = None
+
+    if image_request.image_to_edit:
+        base64_img = image_request.image_to_edit
+
+        if "," in base64_img:
+            base64_img = base64_img.split(",", 1)[1]
+
+        data = build_request_data(model, prompt, base64_img)
+        image_type = "edited"
+        parent_image_id = image_request.parent_image_id
+
+    else:
+        data = build_request_data(model, prompt)
+        image_type = "generated"
+
+    # Call Verda API
+    resp = requests.post(url, headers=headers, json=data)
     data = build_request_data(model, prompt)
  
     async with httpx.AsyncClient(timeout=120) as client:
@@ -136,7 +162,16 @@ async def generate_image(
 
                 # Decode base64 to bytes
                 image_bytes = base64.b64decode(return_image_base64)
-                save_image_to_db(db, prompt, model, return_image_base64, current_user, image_type)
+                save_image_to_db(
+                    db,
+                    prompt,
+                    model,
+                    return_image_base64,
+                    current_user,
+                    image_type,
+                    user_base64_image=image_request.image_to_edit,
+                    parent_image_id=parent_image_id
+                )
                 
                 return Response(
                     content=image_bytes,
@@ -158,7 +193,7 @@ async def generate_image(
             print(f"Image generation finished at: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}")
 
             # Save to MongoDB
-            save_image_to_db(db, prompt, model, image_base64, current_user, image_type)
+            save_image_to_db(db, prompt, model, image_base64, current_user, image_type, parent_image_id=parent_image_id)
 
             return Response(
                 content=image_bytes,
@@ -268,7 +303,8 @@ async def edit_image(
         )
 def save_image_to_db(db: Database, prompt: str, model:
                     str, image_base64: str, current_user:UserInfo,
-                    image_type:str, user_base64_image: Optional[str] = None ):
+                    image_type:str, user_base64_image: Optional[str] = None, 
+                    parent_image_id: Optional[str] = None ):
     """ Saves the image(s) to mongoDB.
         If the user has provided the original image, it is also saved to the database,
         and the edited image is referenced by the original record ID.
@@ -306,8 +342,9 @@ def save_image_to_db(db: Database, prompt: str, model:
             "image_type": image_type
         }
         
-        if original_id != None:
-            image_record["parent_image_id"] = original_id
+        if parent_image_id:
+            image_record["parent_image_id"] = ObjectId(parent_image_id)
+    
                 
         db.images.insert_one(image_record)
         print(f"Saved image data to MongoDB for user: {current_user.username}")

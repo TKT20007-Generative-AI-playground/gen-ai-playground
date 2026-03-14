@@ -7,66 +7,97 @@ import ModelSelector from "./ModelSelector"
 import PhotoArea from "./PhotoArea"
 import GeneratingText from "./GeneratingText"
 
-export default function ImageEditor() {
+type ImageToEdit = {
+  image_data: string
+  image_type: string | null | undefined
+  model: string
+  prompt: string
+}
 
-  const [prompt, setPrompt] = useState("")
-  const [userImage, setUserImage] = useState<File | null>(null)
 
-  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null)
-  const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null)
+export default function ImageEditor({
+  imageToEdit,
+}: {
+  imageToEdit?: ImageToEdit | null
+}) {
+  const [prompt, setPrompt] = useState("");
+  const [userImage, setUserImage] = useState<File | null>(null);
 
-  const [selectedModels, setSelectedModels] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(false)
+  const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
+  const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null);
 
-  // Keep ref to latest edited URL so we can revoke on unmount
-  const editedUrlRef = useRef<string | null>(null)
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const backendUrl = import.meta.env.VITE_API_URL
-  const selectedModel = selectedModels[0]
+  const editedUrlRef = useRef<string | null>(null);
+
+  const backendUrl = import.meta.env.VITE_API_URL;
+  const selectedModel = selectedModels[0];
 
   function setModel(value: string | null) {
-    if (!value) setSelectedModels([])
-    else setSelectedModels([value])
+    if (!value) setSelectedModels([]);
+    else setSelectedModels([value]);
   }
 
-  // Original image URL is derived from the uploaded file, so "effect owns the URL"
+  // Load image passed via location.state
+  useEffect(() => {
+    if (!imageToEdit) return;
+
+    try {
+      const byteCharacters = atob(imageToEdit.image_data);
+      const byteNumbers = Array.from(byteCharacters, c => c.charCodeAt(0));
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "image/png" });
+
+      const file = new File([blob], "edited.png", { type: "image/png" });
+      setUserImage(file);
+
+      replaceEditedUrl(null);
+      setPrompt("");
+      setModel(null);
+    } catch (err) {
+      console.error("Failed to load imageToEdit:", err);
+    }
+  }, [imageToEdit]);
+
+  // Create preview URL for uploaded image
   useEffect(() => {
     if (!userImage) {
-      setOriginalImageUrl(null)
-      return
+      setOriginalImageUrl(null);
+      return;
     }
 
-    const url = URL.createObjectURL(userImage)
-    setOriginalImageUrl(url)
+    const url = URL.createObjectURL(userImage);
+    setOriginalImageUrl(url);
 
-    return () => URL.revokeObjectURL(url)
-  }, [userImage])
+    return () => URL.revokeObjectURL(url);
+  }, [userImage]);
 
-  // One-time unmount cleanup for edited URL
+  // Cleanup edited image URL
   useEffect(() => {
     return () => {
-      if (editedUrlRef.current) URL.revokeObjectURL(editedUrlRef.current)
-    }
-  }, [])
+      if (editedUrlRef.current) URL.revokeObjectURL(editedUrlRef.current);
+    };
+  }, []);
 
   function replaceEditedUrl(next: string | null) {
-    setEditedImageUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev)
-      editedUrlRef.current = next
-      return next
-    })
+    setEditedImageUrl(prev => {
+      if (prev) URL.revokeObjectURL(prev);
+      editedUrlRef.current = next;
+      return next;
+    });
   }
 
   async function editImage(nextPrompt: string) {
     if (!userImage || !nextPrompt.trim() || !selectedModel) {
-      alert("Please provide an image, a prompt, and select a model")
-      return
+      alert("Please provide an image, a prompt, and select a model");
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
-      const base64 = await fileToBase64(userImage)
+      const base64 = await fileToBase64(userImage);
 
       const csrfToken = document.cookie
         .split("; ")
@@ -84,34 +115,32 @@ export default function ImageEditor() {
           withCredentials: true,
           responseType: "blob",
         }
-      )
+      );
 
-      const url = URL.createObjectURL(response.data)
-      replaceEditedUrl(url)
+      const url = URL.createObjectURL(response.data);
+      replaceEditedUrl(url);
     } catch (err) {
-      console.error(err)
+      console.error(err);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
   function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => resolve(reader.result as string)
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   }
 
   function handleUpload(file: File | null) {
-    setUserImage(file)
-
-    // Clear previous edited result when uploading a new image
-    replaceEditedUrl(null)
+    setUserImage(file);
+    replaceEditedUrl(null);
   }
-  
-  const FORM_WIDTH = 620
+
+  const FORM_WIDTH = 620;
 
   return (
     <Stack align="center" w="100%" gap="md">
@@ -149,19 +178,68 @@ export default function ImageEditor() {
 
       {isLoading && <GeneratingText baseText="Editing image" />}
 
+      {originalImageUrl && !editedImageUrl && (
+        <PhotoArea
+          src={originalImageUrl}
+          alt="Original"
+          height={420}
+          header={<Text fw={600}>Original</Text>}
+        />
+      )}
+
       {editedImageUrl && (
-        <div style={{ width: "100%" }}>
-          <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-            <PhotoArea src={originalImageUrl} alt="Original" height={420} header={<Text fw={600}>Original</Text>} />
+        <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md" w="100%">
+          <div>
+            <PhotoArea
+              src={originalImageUrl}
+              alt="Original"
+              height={420}
+              header={<Text fw={600}>Original</Text>}
+            />
+            <Button
+              mt="sm"
+              fullWidth
+              onClick={() => {
+                fetch(originalImageUrl!)
+                  .then(res => res.blob())
+                  .then(blob => {
+                    const file = new File([blob], "reedit.png", { type: blob.type });
+                    setUserImage(file);
+                    replaceEditedUrl(null);
+                    setPrompt("");
+                  });
+              }}
+            >
+              Edit image
+            </Button>
+          </div>
+
+          <div>
             <PhotoArea
               src={editedImageUrl}
               alt="Edited result"
               height={420}
               header={<Text fw={600}>Edited result</Text>}
             />
-          </SimpleGrid>
-        </div>
+            <Button
+              mt="sm"
+              fullWidth
+              onClick={() => {
+                fetch(editedImageUrl!)
+                  .then(res => res.blob())
+                  .then(blob => {
+                    const file = new File([blob], "reedit.png", { type: blob.type });
+                    setUserImage(file);
+                    replaceEditedUrl(null);
+                    setPrompt("");
+                  });
+              }}
+            >
+              Edit image
+            </Button>
+          </div>
+        </SimpleGrid>
       )}
     </Stack>
-  )
+  );
 }
