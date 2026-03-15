@@ -6,11 +6,11 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from pymongo.database import Database
+from bson import ObjectId
 from datetime import datetime, timezone
 import base64
 import time
 import httpx
-import requests
 
 from app.config import settings
 from app.database import get_database
@@ -99,6 +99,8 @@ async def generate_image(
     model = image_request.model
     image_type = "generated"
     
+    # Start timing
+    start_time = time.perf_counter()
     # Validate API key
     if not settings.VERDA_API_KEY:
         raise HTTPException(
@@ -130,10 +132,7 @@ async def generate_image(
         data = build_request_data(model, prompt)
         image_type = "generated"
 
-    # Call Verda API
-    resp = requests.post(url, headers=headers, json=data)
-    data = build_request_data(model, prompt)
- 
+    # Call Verda API once using async HTTP client
     async with httpx.AsyncClient(timeout=120) as client:
         resp = await client.post(url, headers=headers, json=data)
     
@@ -149,52 +148,35 @@ async def generate_image(
     resp_data = resp.json()
     if model == "FLUX2_KLEIN_9B" or model == "FLUX2_KLEIN_4B":
         if "image" in resp_data:
-                return_image_base64 = resp_data["image"]
-                print(f"Received base64 image (length: {len(return_image_base64)})")
-
-                # Remove data URL prefix if exists
-                if "," in return_image_base64:
-                    return_image_base64 = return_image_base64.split(",", 1)[1]
-
-                # Decode base64 to bytes
-                image_bytes = base64.b64decode(return_image_base64)
-                save_image_to_db(
-                    db,
-                    prompt,
-                    model,
-                    return_image_base64,
-                    current_user,
-                    image_type,
-                    user_base64_image=image_request.image_to_edit,
-                    parent_image_id=parent_image_id
-                )
-                
-                return Response(
-                    content=image_bytes,
-                    media_type="image/png",
-                    headers={"Content-Disposition": "inline"}
-                )
+            return_image_base64 = resp_data["image"]
+            print(f"Received base64 image (length: {len(return_image_base64)})")
+            return build_timed_image_response(
+                db=db,
+                prompt=prompt,
+                model=model,
+                image_base64=return_image_base64,
+                current_user=current_user,
+                image_type=image_type,
+                start_time=start_time,
+                user_base64_image=image_request.image_to_edit,
+                parent_image_id=parent_image_id,
+            )
     else:   
         if resp_data.get("status") == "COMPLETED" and resp_data.get("output", {}).get("outputs"):
             image_base64 = resp_data["output"]["outputs"][0]
             print(f"Received base64 image (length: {len(image_base64)})")
 
-            # Remove data URL prefix if exists
-            if "," in image_base64:
-                image_base64 = image_base64.split(",", 1)[1]
-
-            # Decode base64 to bytes
-            image_bytes = base64.b64decode(image_base64)
-
             print(f"Image generation finished at: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}")
 
-            # Save to MongoDB
-            save_image_to_db(db, prompt, model, image_base64, current_user, image_type, parent_image_id=parent_image_id)
-
-            return Response(
-                content=image_bytes,
-                media_type="image/png",
-                headers={"Content-Disposition": "inline"}
+            return build_timed_image_response(
+                db=db,
+                prompt=prompt,
+                model=model,
+                image_base64=image_base64,
+                current_user=current_user,
+                image_type=image_type,
+                start_time=start_time,
+                parent_image_id=parent_image_id,
             )
     
     raise HTTPException(
@@ -223,6 +205,9 @@ async def edit_image(
     image_base64 = image_request.image # base64 image from req body
     image_type = "edited"
     
+    # Start timing
+    start_time = time.perf_counter()
+    
     if "," in image_base64:
         image_base64 = image_base64.split(",",1)[1]
     print("editing image...")
@@ -248,34 +233,30 @@ async def edit_image(
                 return_image_base64 = resp_data["image"]
                 print(f"Received base64 image (length: {len(return_image_base64)})")
 
-                # Remove data URL prefix if exists
-                if "," in return_image_base64:
-                    return_image_base64 = return_image_base64.split(",", 1)[1]
-
-                # Decode base64 to bytes
-                image_bytes = base64.b64decode(return_image_base64)
-                save_image_to_db(db, prompt, model, return_image_base64, current_user, image_type, image_base64)
-                return Response(
-                    content=image_bytes,
-                    media_type="image/png",
-                    headers={"Content-Disposition": "inline"}
+                return build_timed_image_response(
+                    db=db,
+                    prompt=prompt,
+                    model=model,
+                    image_base64=return_image_base64,
+                    current_user=current_user,
+                    image_type=image_type,
+                    start_time=start_time,
+                    user_base64_image=image_base64,
                 )
         else:
             if resp_data.get("status") == "COMPLETED" and resp_data.get("output", {}).get("outputs"):
                 return_image_base64 = resp_data["output"]["outputs"][0]
                 print(f"Received base64 image (length: {len(return_image_base64)})")
 
-                # Remove data URL prefix if exists
-                if "," in return_image_base64:
-                    return_image_base64 = return_image_base64.split(",", 1)[1]
-
-                # Decode base64 to bytes
-                image_bytes = base64.b64decode(return_image_base64)
-                save_image_to_db(db, prompt, model, return_image_base64, current_user, image_type, image_base64)
-                return Response(
-                    content=image_bytes,
-                    media_type="image/png",
-                    headers={"Content-Disposition": "inline"}
+                return build_timed_image_response(
+                    db=db,
+                    prompt=prompt,
+                    model=model,
+                    image_base64=return_image_base64,
+                    current_user=current_user,
+                    image_type=image_type,
+                    start_time=start_time,
+                    user_base64_image=image_base64,
                 )
             else:
                 print(f"Condition failed, status: {resp_data.get('status')}, outputs: {resp_data.get('output')}")
@@ -293,10 +274,50 @@ async def edit_image(
                 "resp_data": resp.json() if 'resp' in locals() else None
             }
         )
+
+
+def build_timed_image_response(
+    db: Database,
+    prompt: str,
+    model: str,
+    image_base64: str,
+    current_user: UserInfo,
+    image_type: str,
+    start_time: float,
+    user_base64_image: Optional[str] = None,
+    parent_image_id: Optional[str] = None,
+) -> Response:
+    """Decode image data, save with generation time, and return PNG response."""
+    if "," in image_base64:
+        image_base64 = image_base64.split(",", 1)[1]
+
+    image_bytes = base64.b64decode(image_base64)
+    generation_time_ms = int((time.perf_counter() - start_time) * 1000)
+
+    save_image_to_db(
+        db,
+        prompt,
+        model,
+        image_base64,
+        current_user,
+        image_type,
+        user_base64_image=user_base64_image,
+        parent_image_id=parent_image_id,
+        generation_time_ms=generation_time_ms,
+    )
+
+    return Response(
+        content=image_bytes,
+        media_type="image/png",
+        headers={"Content-Disposition": "inline", "X-Generation-Time-Ms": str(generation_time_ms)},
+    )
+
+
 def save_image_to_db(db: Database, prompt: str, model:
                     str, image_base64: str, current_user:UserInfo,
                     image_type:str, user_base64_image: Optional[str] = None, 
-                    parent_image_id: Optional[str] = None ):
+                    parent_image_id: Optional[str] = None,
+                    generation_time_ms: Optional[int] = None ):
     """ Saves the image(s) to mongoDB.
         If the user has provided the original image, it is also saved to the database,
         and the edited image is referenced by the original record ID.
@@ -333,6 +354,9 @@ def save_image_to_db(db: Database, prompt: str, model:
             "username": current_user.username,
             "image_type": image_type
         }
+        
+        if generation_time_ms is not None:
+            image_record["generation_time_ms"] = generation_time_ms
         
         if parent_image_id:
             image_record["parent_image_id"] = ObjectId(parent_image_id)

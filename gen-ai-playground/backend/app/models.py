@@ -117,6 +117,7 @@ class TextGenerateResponse(BaseModel):
     model: str
     prompt: str
     usage: Dict[str, Any] = {}
+    generation_time_ms: Optional[int] = None
 
 
 class ChatMessage(BaseModel):
@@ -139,6 +140,7 @@ class ChatResponse(BaseModel):
     reply: str
     model: str
     usage: Dict[str, Any] = {}
+    generation_time_ms: Optional[int] = None
 
 
 
