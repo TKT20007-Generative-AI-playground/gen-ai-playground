@@ -195,7 +195,18 @@ export default function ImageEditor({
 
   function startReeditFromUrl(sourceUrl: string) {
     fetch(sourceUrl)
-      .then(res => res.blob())
+      .then(res => {
+        if (!res.ok) {
+          throw new Error(`Failed to fetch image for re-edit: ${res.status} ${res.statusText}`);
+        }
+
+        const contentType = (res.headers.get("content-type") || "").toLowerCase();
+        if (contentType && !contentType.startsWith("image/")) {
+          throw new Error(`Failed to prepare image for re-edit: unexpected content type ${contentType}`);
+        }
+
+        return res.blob();
+      })
       .then(blob => {
         const file = new File([blob], "reedit.png", { type: blob.type });
         setUserImage(file);

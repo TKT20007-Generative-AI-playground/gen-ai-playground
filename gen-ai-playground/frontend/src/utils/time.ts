@@ -16,7 +16,14 @@ export function formatDurationMs(ms: number, options: FormatDurationOptions = {}
     return `${totalSeconds.toFixed(decimals)}s`
   }
 
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}m ${seconds.toFixed(decimals)}s`
+  let minutes = Math.floor(totalSeconds / 60)
+  let roundedSeconds = Number((totalSeconds % 60).toFixed(decimals))
+
+  // Carry overflow so we never render values like "1m 60.00s".
+  if (roundedSeconds >= 60) {
+    minutes += 1
+    roundedSeconds = 0
+  }
+
+  return `${minutes}m ${roundedSeconds.toFixed(decimals)}s`
 }

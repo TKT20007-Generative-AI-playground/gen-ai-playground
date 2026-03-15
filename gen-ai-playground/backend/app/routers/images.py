@@ -24,6 +24,18 @@ router = APIRouter(
 )
 
 
+def normalize_base64_image(image_data: Optional[str]) -> Optional[str]:
+    """Strip data URL prefix and whitespace from optional base64 image data."""
+    if not image_data:
+        return image_data
+
+    normalized = image_data.strip()
+    if "," in normalized:
+        normalized = normalized.split(",", 1)[1]
+
+    return normalized.strip()
+
+
 @router.get("/history", response_model=HistoryResponse)
 def get_history(
     current_user: UserInfo = Depends(get_current_user),
@@ -117,12 +129,11 @@ async def generate_image(
         "Authorization": f"Bearer {settings.VERDA_API_KEY}"
     }
     parent_image_id = None
+    user_base64_image = None
 
     if image_request.image_to_edit:
-        base64_img = image_request.image_to_edit
-
-        if "," in base64_img:
-            base64_img = base64_img.split(",", 1)[1]
+        base64_img = normalize_base64_image(image_request.image_to_edit)
+        user_base64_image = base64_img
 
         data = build_request_data(model, prompt, base64_img)
         image_type = "edited"
@@ -158,7 +169,7 @@ async def generate_image(
                 current_user=current_user,
                 image_type=image_type,
                 start_time=start_time,
-                user_base64_image=image_request.image_to_edit,
+                user_base64_image=user_base64_image,
                 parent_image_id=parent_image_id,
             )
     else:   
@@ -176,6 +187,7 @@ async def generate_image(
                 current_user=current_user,
                 image_type=image_type,
                 start_time=start_time,
+                user_base64_image=user_base64_image,
                 parent_image_id=parent_image_id,
             )
     
@@ -208,8 +220,7 @@ async def edit_image(
     # Start timing
     start_time = time.perf_counter()
     
-    if "," in image_base64:
-        image_base64 = image_base64.split(",",1)[1]
+    image_base64 = normalize_base64_image(image_base64)
     print("editing image...")
     url = choose_model_url(model)
      # Prepare request
@@ -266,12 +277,19 @@ async def edit_image(
                 )
     except httpx.HTTPError as e:
         print("Full error traceback:\n", traceback.format_exc())
+        safe_resp_data = None
+        if 'resp' in locals():
+            try:
+                safe_resp_data = resp.json()
+            except ValueError:
+                safe_resp_data = resp.text
+
         raise HTTPException(
             status_code=500,
             detail={
                 "error": "Problem with image editing",
                 "exception": str(e),
-                "resp_data": resp.json() if 'resp' in locals() else None
+                "resp_data": safe_resp_data
             }
         )
 
@@ -288,8 +306,8 @@ def build_timed_image_response(
     parent_image_id: Optional[str] = None,
 ) -> Response:
     """Decode image data, save with generation time, and return PNG response."""
-    if "," in image_base64:
-        image_base64 = image_base64.split(",", 1)[1]
+    image_base64 = normalize_base64_image(image_base64)
+    user_base64_image = normalize_base64_image(user_base64_image)
 
     image_bytes = base64.b64decode(image_base64)
     generation_time_ms = int((time.perf_counter() - start_time) * 1000)
