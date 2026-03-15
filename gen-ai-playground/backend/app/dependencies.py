@@ -11,15 +11,13 @@ from app.models import UserInfo
 
 def get_current_user(
     authorization: str = Header(None),
-    access_token: str = Cookie(None),
     db: Database = Depends(get_database)
 ) -> UserInfo:
     """
     Dependency to verify JWT token and extract user information.
 
     Args:
-        authorization: Optional. Bearer token from Authorization header. If present and starts with "Bearer ", this is used for authentication.
-        access_token: Optional. JWT token from access_token cookie. Used if Authorization header is not present.
+        authorization: Bearer token from Authorization header.
         db: Database instance.
 
     Returns:
@@ -27,21 +25,11 @@ def get_current_user(
 
     Raises:
         HTTPException: If authentication fails.
-
-    Selection logic:
-        If Authorization header is present and starts with "Bearer ", use its value as the token.
-        Else, if access_token cookie is present, use its value as the token.
-        If neither is present, authentication fails.
     """
     token = None
 
-    # Mobile / API client
     if authorization and authorization.startswith("Bearer "):
         token = authorization.replace("Bearer ", "")
-
-    # Browser cookie
-    elif access_token:
-        token = access_token
 
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -79,7 +67,6 @@ def get_current_user(
 
 
 def validate_csrf_token(
-    access_token: str = Cookie(None),
     csrf_cookie: str = Cookie(None, alias="csrf_token"),
     csrf_header: str = Header(None, alias="X-CSRF-Token"),
     authorization: str = Header(None)
@@ -89,21 +76,22 @@ def validate_csrf_token(
     Skips CSRF validation if Authorization: Bearer is present.
 
     Args:
-        access_token: HTTPOnly JWT cookie. If absent, CSRF check is skipped.
         csrf_cookie: Non-HTTPOnly CSRF token cookie set by the backend on login.
+            Also serves as the session indicator — if absent, there is no
+            browser session and CSRF check is skipped.
         csrf_header: X-CSRF-Token header sent by the frontend on each request.
         authorization: Optional Authorization header. If Bearer token is present, CSRF is skipped.
 
     Raises:
-        HTTPException: 403 if CSRF cookie and header are present but do not match.
+        HTTPException: 403 if CSRF cookie is present but the header is missing or mismatched.
     """
     if authorization and authorization.startswith("Bearer "):
         return
-    # No session cookie → not a browser/cookie-based request; skip CSRF
-    if not access_token:
+    # No CSRF cookie → no browser session; skip CSRF
+    if not csrf_cookie:
         return
 
-    if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+    if not csrf_header or csrf_cookie != csrf_header:
         raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
 

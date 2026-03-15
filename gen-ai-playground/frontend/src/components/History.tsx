@@ -13,6 +13,7 @@ import {
 } from "@mantine/core";
 import axios from "axios";
 import { EDIT_MODELS } from "../constants/models"
+import { useAuth } from "../context/AuthContext";
 
 interface ImageRecord {
   prompt: string;
@@ -30,35 +31,41 @@ interface PromptGroup {
 const backendUrl = import.meta.env.VITE_API_URL;
 
 export default function History() {
+  const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const [history, setHistory] = useState<PromptGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
 
   useEffect(() => {
-    axios.get(`${backendUrl}/images/history`, {
-      withCredentials: true,
-    })
-      .then((res) => {
+    if (!isLoggedIn) return;
+
+    async function fetchHistory() {
+      setLoading(true);
+      try {
+        const res = await axios.get(`${backendUrl}/images/history`, {
+          withCredentials: true,
+        });
+        const data = res.data;
         const groups: { [prompt: string]: ImageRecord[] } = {};
         (data.history || []).forEach((item: ImageRecord) => {
           if (!groups[item.prompt]) groups[item.prompt] = [];
           groups[item.prompt].push(item);
         });
 
-        const grouped = Object.keys(groups).map((prompt) => ({
+        setHistory(Object.keys(groups).map((prompt) => ({
           prompt,
           images: groups[prompt],
-        }));
-
-        setHistory(grouped);
-        setLoading(false);
-      })
-      .catch((err) => {
+        })));
+      } catch (err) {
         console.error("Failed to fetch history:", err);
+      } finally {
         setLoading(false);
-      });
-  }, []);
+      }
+    }
+
+    fetchHistory();
+  }, [isLoggedIn]);
 
   if (loading)
     return (

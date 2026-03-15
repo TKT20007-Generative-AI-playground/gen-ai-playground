@@ -39,8 +39,9 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
 
       login(res.data.token, res.data.username, res.data.is_admin || false);
       onClose();
-    } catch (error: any) {
-      alert(error.response?.data?.detail || 'Login failed');
+    } catch (error: unknown) {
+      const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      alert(detail || 'Login failed');
     }
   };
 

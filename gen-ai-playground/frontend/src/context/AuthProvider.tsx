@@ -4,7 +4,7 @@ import axios from "axios";
 
 const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-// its own 401 and triggering an infinite retry loop
+// Separate axios instance to avoid the global interceptor catching its own 401 and triggering an infinite retry loop
 const refreshClient = axios.create({ baseURL: backendUrl, withCredentials: true });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -19,6 +19,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearSession = useCallback(() => {
     accessTokenRef.current = null;
+    delete axios.defaults.headers.common["Authorization"];
     setUsername(null);
     setIsAdmin(false);
   }, []);
@@ -32,10 +33,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("isAdmin");
 
     async function rehydrate() {
+      // If there's no csrf_token cookie, there's no past session to restore
+      const hasCsrf = document.cookie.split("; ").some((c) => c.startsWith("csrf_token="));
+      if (!hasCsrf) {
+        console.log("[Auth] No previous session, skipping refresh");
+        setIsReady(true);
+        return;
+      }
+
       console.log("[Auth] Rehydrating session...");
       try {
         const res = await refreshClient.post("/refresh");
         accessTokenRef.current = res.data.token;
+        axios.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
         console.log("[Auth] Refresh token valid, got new access token");
 
         const me = await axios.get(`${backendUrl}/me`, {
@@ -146,7 +156,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       );
     } finally {
-      delete axios.defaults.headers.common["Authorization"];
       clearSession();
     }
   }, [clearSession]);

@@ -2,10 +2,10 @@
 Authentication routes: registration and login
 
 Security Model:
-- User authentication uses HTTPOnly cookies (secure, XSS-protected)
-- Token is returned in login response body for flexibility
-- Frontend relies on HTTPOnly cookies (no localStorage)
-- Cookie settings: httponly=True, samesite="strict", secure=IS_PROD
+- Access token is returned in the response body and kept in-memory on the frontend
+- Refresh token is stored in an HTTPOnly cookie (path-scoped to /refresh)
+- CSRF token is a non-HTTPOnly cookie used for double-submit protection
+- Cookie settings: samesite="strict", secure=IS_PROD
 """
 from fastapi import APIRouter, HTTPException, Depends, Response, Request
 from pymongo.database import Database
@@ -26,7 +26,7 @@ router = APIRouter(
 
 def _issue_access_token(username: str, is_admin: bool) -> tuple[str, datetime]:
     """Return a short-lived access token (15 min) and its expiry datetime."""
-    expiry = datetime.utcnow() + timedelta(seconds=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expiry = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     token = jwt.encode(
         {"username": username, 
         "is_admin": is_admin, 
@@ -40,7 +40,7 @@ def _issue_access_token(username: str, is_admin: bool) -> tuple[str, datetime]:
 
 def _issue_refresh_token(username: str) -> tuple[str, timedelta]:
     """Return a long-lived refresh token (7 days) and its TTL timedelta."""
-    delta = timedelta(seconds=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     expiry = datetime.utcnow() + delta
     token = jwt.encode(
         {"username": username, "exp": expiry, "type": "refresh"},
@@ -161,7 +161,8 @@ def login(
         HTTPException: If authentication fails
     
     Notes:
-        Sets an HTTPOnly access_token cookie for browser-based authentication.
+        Access token is returned in the response body (frontend stores in memory).
+        Sets an HTTPOnly refresh_token cookie for session persistence.
         Sets a non-HTTPOnly csrf_token cookie for CSRF protection.
     """
     user = db.users.find_one({"username": credentials.username})
@@ -173,7 +174,7 @@ def login(
     # 1. Short-lived access token  → returned in response body (frontend keeps in memory)
     access_token, _ = _issue_access_token(user["username"], is_admin)
 
-    # 2. Long-lived refresh token  → HTTPOnly cookie, path-scoped to /auth/refresh
+    # 2. Long-lived refresh token  → HTTPOnly cookie, path-scoped to /refresh
     refresh_token, refresh_delta = _issue_refresh_token(user["username"])
     _set_refresh_cookie(response, refresh_token, refresh_delta)
 
@@ -223,7 +224,7 @@ def me(current_user=Depends(get_current_user)):
     Return the current authenticated user's username and admin status.
 
     Args:
-        current_user: User extracted from the JWT cookie or Bearer token.
+        current_user: User extracted from the Bearer token.
 
     Returns:
         dict: username and is_admin flag for the authenticated user.
@@ -254,11 +255,17 @@ def logout(
         Requires a valid CSRF token for cookie-authenticated requests.
         Works for both cookie and Bearer token authentication, but CSRF is only enforced for cookie auth.
     """
-    for key, httponly in [("access_token", True), ("refresh_token", True), ("csrf_token", False)]:
-        response.delete_cookie(
-            key=key, 
-            httponly=httponly, 
-            samesite="strict", 
-            secure=settings.IS_PROD,
-            path="/refresh")
+    response.delete_cookie(
+        key="refresh_token",
+        httponly=True,
+        samesite="strict",
+        secure=settings.IS_PROD,
+        path="/refresh",
+    )
+    response.delete_cookie(
+        key="csrf_token",
+        httponly=False,
+        samesite="strict",
+        secure=settings.IS_PROD,
+    )
     return {"message": "Logged out successfully"}

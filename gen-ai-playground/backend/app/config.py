@@ -32,7 +32,7 @@ class Settings:
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY")
     JWT_REFRESH_SECRET_KEY: str = os.getenv("JWT_REFRESH_SECRET_KEY")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # CORS
     ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS")

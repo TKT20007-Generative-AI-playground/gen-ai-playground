@@ -11,6 +11,7 @@ import base64
 # Import the app
 from server import app
 from app.dependencies import validate_csrf_token
+from app.config import settings
 
 
 @pytest.fixture
@@ -83,32 +84,26 @@ def registered_user2(mock_db, test_user2_data):
 
 @pytest.fixture
 def auth_token(test_user_data):
-    """Generate a valid JWT token for testing"""
-    secret_key = "dev-secret-key-for-local-development"
-    token_expiry = datetime.utcnow() + timedelta(hours=24)
-    
-    token_payload = {
+    """Generate a valid JWT access token for testing"""
+    payload = {
         "username": test_user_data["username"],
-        "exp": token_expiry
+        "is_admin": False,
+        "exp": datetime.utcnow() + timedelta(hours=24),
+        "type": "access",
     }
-    
-    token = jwt.encode(token_payload, secret_key, algorithm="HS256")
-    return token
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
 
 
 @pytest.fixture
 def auth_token2(test_user2_data):
-    """Generate a valid JWT token for second user"""
-    secret_key = "dev-secret-key-for-local-development"
-    token_expiry = datetime.utcnow() + timedelta(hours=24)
-    
-    token_payload = {
+    """Generate a valid JWT access token for second user"""
+    payload = {
         "username": test_user2_data["username"],
-        "exp": token_expiry
+        "is_admin": False,
+        "exp": datetime.utcnow() + timedelta(hours=24),
+        "type": "access",
     }
-    
-    token = jwt.encode(token_payload, secret_key, algorithm="HS256")
-    return token
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
 
 
 @pytest.fixture
@@ -161,24 +156,6 @@ class TestHistoryEndpoint:
         assert "history" in data
         assert len(data["history"]) == 3  # Only user 1's images
 
-    def test_get_history_with_valid_cookie(self, client, registered_user, auth_token, populated_history):
-        """Test getting history with access_token cookie auth"""
-        client.cookies.set("access_token", auth_token)
-        response = client.get("/images/history")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "history" in data
-        assert len(data["history"]) == 3
-
-    def test_get_history_with_invalid_cookie(self, client, populated_history):
-        """Test getting history with invalid access_token cookie"""
-        client.cookies.set("access_token", "invalid_token")
-        response = client.get("/images/history")
-
-        assert response.status_code == 401
-        assert "Invalid token" in response.json()["detail"]
-    
     def test_get_history_without_token(self, client, populated_history):
         """Test getting history without authentication token"""
         response = client.get("/images/history")
@@ -195,15 +172,13 @@ class TestHistoryEndpoint:
     
     def test_get_history_with_expired_token(self, client, registered_user, populated_history):
         """Test getting history with expired token"""
-        secret_key = "dev-secret-key-for-local-development"
-        token_expiry = datetime.utcnow() - timedelta(hours=1)  # Expired 1 hour ago
-        
-        token_payload = {
+        expired_payload = {
             "username": registered_user["username"],
-            "exp": token_expiry
+            "is_admin": False,
+            "exp": datetime.utcnow() - timedelta(hours=1),
+            "type": "access",
         }
-        
-        expired_token = jwt.encode(token_payload, secret_key, algorithm="HS256")
+        expired_token = jwt.encode(expired_payload, settings.JWT_SECRET_KEY, algorithm="HS256")
         headers = {"Authorization": f"Bearer {expired_token}"}
         response = client.get("/images/history", headers=headers)
         

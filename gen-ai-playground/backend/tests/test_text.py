@@ -14,6 +14,7 @@ import os
 
 from server import app
 from app.dependencies import validate_csrf_token
+from app.config import settings
 
 
 # ---------------------------------------------------------------------------
@@ -80,13 +81,14 @@ def admin_registered_user(mock_db, test_user_data):
 
 @pytest.fixture
 def auth_token(test_user_data):
-    """Generate a valid JWT token."""
-    secret_key = "dev-secret-key-for-local-development"
+    """Generate a valid JWT access token."""
     payload = {
         "username": test_user_data["username"],
+        "is_admin": False,
         "exp": datetime.utcnow() + timedelta(hours=24),
+        "type": "access",
     }
-    return jwt.encode(payload, secret_key, algorithm="HS256")
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
 
 
 @pytest.fixture
@@ -514,20 +516,6 @@ class TestStatusEndpoint:
         mock_vs.get_deployment_status.return_value = _healthy_status()
 
         response = client.get("/text/status?deployment_name=test-deploy", headers=auth_headers)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "healthy"
-        assert data["healthy"] is True
-
-    @patch("app.routers.text.verda_service")
-    def test_status_accepts_cookie_auth(
-        self, mock_vs, client, registered_user, auth_token
-    ):
-        mock_vs.get_deployment_status.return_value = _healthy_status()
-        client.cookies.set("access_token", auth_token)
-
-        response = client.get("/text/status?deployment_name=test-deploy")
 
         assert response.status_code == 200
         data = response.json()
