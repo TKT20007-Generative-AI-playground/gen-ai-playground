@@ -47,7 +47,7 @@ export default function Header() {
 
   return (
     <>
-      <Group justify="space-between" p="md" bg="#2C4E87">
+      <Group justify="space-between" p="md" bg="#000F65">
         <Group gap="md">
           <Text fw={500} c="white">Generative AI Playground </Text>
           {isLoggedIn && (
@@ -55,7 +55,7 @@ export default function Header() {
               variant="white"
               color="dark"
               onClick={() => setHistoryOpened(true)}
-            >
+            > 
               History
             </Button>
           )}
