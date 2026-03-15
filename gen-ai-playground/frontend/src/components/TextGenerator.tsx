@@ -10,6 +10,8 @@ import {
   Text,
   ScrollArea,
   TextInput,
+  Select,
+  Group,
 } from "@mantine/core"
 
 type ModelOption = {
@@ -222,6 +224,11 @@ export default function TextGenerator() {
   const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
 
+  // Deployment state
+  const [deployModel, setDeployModel] = useState<string | null>(null)
+  const [deployLoading, setDeployLoading] = useState(false)
+  const [deployMsg, setDeployMsg] = useState<string | null>(null)
+
   // Keep a ref so async loops always see the latest messages.
   const messagesByModelRef = useRef<Record<string, Message[]>>({})
 
@@ -283,7 +290,7 @@ export default function TextGenerator() {
   useEffect(() => {
     if (!isLoggedIn) return
     fetchStatuses()
-    const id = setInterval(fetchStatuses, 30000)
+    const id = setInterval(fetchStatuses, 10000)
     return () => clearInterval(id)
   }, [fetchStatuses, isLoggedIn])
 
@@ -362,6 +369,35 @@ export default function TextGenerator() {
     }
   }
 
+  const handleDeploy = async () => {
+    if (!deployModel) return
+    setDeployLoading(true)
+    setDeployMsg(null)
+    try {
+      const token = localStorage.getItem("token")
+      await axios.post(
+        `${backendUrl}/text/deploy`,
+        { model_path: deployModel },
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+      )
+      setDeployMsg("Model deployed successfully! It takes a few seconds for it to appear in model status")
+      setDeployModel(null)
+    } catch (error: unknown) {
+      const errorMsg = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Failed to deploy model."
+      setDeployMsg(errorMsg)
+    } finally {
+      setDeployLoading(false)
+    }
+  }
+
+  // Auto-dismiss success message after 4 seconds
+  useEffect(() => {
+    if (deployMsg === "Model deployed successfully! It takes a few seconds for it to appear in model status") {
+      const timer = setTimeout(() => setDeployMsg(null), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [deployMsg])
+
   if (!isLoggedIn) {
     return (
       <div
@@ -424,6 +460,35 @@ export default function TextGenerator() {
           Some of the models are still starting up. It usually takes about 2 minutes.
         </Alert>
       )}
+
+      {/* Deploy model dropdown and button */}
+      <Group align="end" gap="sm">
+        <Select
+          label="Deploy a model"
+          placeholder="Select model"
+          data={modelOptions}
+          value={deployModel}
+          onChange={setDeployModel}
+          disabled={deployLoading}
+          searchable
+          clearable
+          style={{ minWidth: 220 }}
+        />
+        <Button
+          onClick={handleDeploy}
+          disabled={!deployModel || deployLoading}
+          loading={deployLoading}
+        >
+          Deploy
+        </Button>
+      </Group>
+
+      {deployMsg && (
+        <Alert color={deployMsg === "Model deployed successfully! It takes a few seconds for it to appear in model status" ? "green" : "red"} mb={16} withCloseButton onClose={() => setDeployMsg(null)}>
+          {deployMsg}
+        </Alert>
+      )}
+
       <Text c="dimmed" size="sm" mb={6}>
         Select up to {MAX_MODELS} models for text generation.
       </Text>

@@ -50,7 +50,7 @@ def get_available_compute(current_user: UserInfo = Depends(get_current_user)):
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_model(
     request: DeployModelRequest,
-    current_user: UserInfo = Depends(get_admin_user),
+    current_user: UserInfo = Depends(get_current_user),
 ):
     """
     Deploy an LLM model on Verda Cloud using SGLang or vLLM.    
