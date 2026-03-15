@@ -82,6 +82,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       (response) => response,
       async (error) => {
         const original = error.config;
+        if (!original) {
+          return Promise.reject(error);
+        }
         console.warn("[Auth] Request failed:", original.url, "status:", error.response?.status);
 
         // Only attempt refresh once per request (avoid infinite loop)
@@ -95,6 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return new Promise((resolve, reject) => {
             refreshQueue.current.push((token) => {
               if (!token) return reject(error);
+              original.headers = original.headers ?? {};
               original.headers["Authorization"] = `Bearer ${token}`;
               resolve(axios(original));
             });
@@ -111,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           accessTokenRef.current = newToken;
           axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
           flushQueue(newToken);
+          original.headers = original.headers ?? {};
           original.headers["Authorization"] = `Bearer ${newToken}`;
           console.log("[Auth] Refresh successful, retrying original request:", original.url);
           return axios(original); // retry original request

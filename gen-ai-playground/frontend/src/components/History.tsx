@@ -38,7 +38,11 @@ export default function History() {
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
 
   useEffect(() => {
-    if (!isLoggedIn) return;
+    if (!isLoggedIn) {
+       setLoading(false);
+       setHistory([]);
+       return;
+     }
 
     async function fetchHistory() {
       setLoading(true);

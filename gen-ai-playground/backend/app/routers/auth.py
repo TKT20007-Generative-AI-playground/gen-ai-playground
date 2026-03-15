@@ -18,14 +18,14 @@ from app.config import settings
 from app.database import get_database
 from app.models import RegisterRequest, LoginRequest, RegisterResponse, LoginResponse
 from app.utils.validation import validate_password
-from app.dependencies import get_current_user, validate_csrf_token, get_admin_user
+from app.dependencies import get_current_user, validate_csrf_token
 
 router = APIRouter(
     tags=["authentication"]
 )
 
 def _issue_access_token(username: str, is_admin: bool) -> tuple[str, datetime]:
-    """Return a short-lived access token (15 min) and its expiry datetime."""
+    """Return a short-lived access token and its expiry datetime (lifetime is configuration-driven)."""
     expiry = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     token = jwt.encode(
         {"username": username, 
@@ -39,7 +39,7 @@ def _issue_access_token(username: str, is_admin: bool) -> tuple[str, datetime]:
 
 
 def _issue_refresh_token(username: str) -> tuple[str, timedelta]:
-    """Return a long-lived refresh token (7 days) and its TTL timedelta."""
+    """Return a long-lived refresh token and its TTL timedelta (lifetime is configuration-driven)."""
     delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     expiry = datetime.utcnow() + delta
     token = jwt.encode(
@@ -190,7 +190,7 @@ def login(
     )
 
 @router.post("/refresh")
-def refresh(request: Request, response: Response, db: Database = Depends(get_database)):
+def refresh(request: Request, db: Database = Depends(get_database)):
     """
     Issue a new access token using the refresh token cookie.
     Called automatically by the frontend when a 401 is received.
