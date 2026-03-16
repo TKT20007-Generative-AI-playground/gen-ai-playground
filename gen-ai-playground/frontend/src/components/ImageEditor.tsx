@@ -40,6 +40,7 @@ export default function ImageEditor({
 
   const editedUrlRef = useRef<string | null>(null);
   const editControllerRef = useRef<AbortController | null>(null);
+  const reeditControllerRef = useRef<AbortController | null>(null);
 
   const backendUrl = import.meta.env.VITE_API_URL;
   const selectedModel = selectedModels[0];
@@ -55,6 +56,8 @@ export default function ImageEditor({
 
     editControllerRef.current?.abort();
     editControllerRef.current = null;
+    reeditControllerRef.current?.abort();
+    reeditControllerRef.current = null;
 
     try {
       const byteCharacters = atob(imageToEdit.image_data);
@@ -95,6 +98,7 @@ export default function ImageEditor({
   useEffect(() => {
     return () => {
       editControllerRef.current?.abort();
+      reeditControllerRef.current?.abort();
       if (editedUrlRef.current) URL.revokeObjectURL(editedUrlRef.current);
     };
   }, []);
@@ -183,6 +187,8 @@ export default function ImageEditor({
   function handleUpload(file: File | null) {
     editControllerRef.current?.abort();
     editControllerRef.current = null;
+    reeditControllerRef.current?.abort();
+    reeditControllerRef.current = null;
 
     setUserImage(file);
     replaceEditedUrl(null);
@@ -194,20 +200,35 @@ export default function ImageEditor({
   }
 
   function startReeditFromUrl(sourceUrl: string) {
-    fetch(sourceUrl)
-      .then(res => {
-        if (!res.ok) {
-          throw new Error(`Failed to fetch image for re-edit: ${res.status} ${res.statusText}`);
-        }
+    reeditControllerRef.current?.abort();
+    const controller = new AbortController();
+    reeditControllerRef.current = controller;
+    setError(null);
 
-        const contentType = (res.headers.get("content-type") || "").toLowerCase();
+    axios.get(sourceUrl, {
+      responseType: "blob",
+      timeout: IMAGE_REQUEST_TIMEOUT_MS,
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (reeditControllerRef.current !== controller) return;
+
+        const contentTypeHeader = response.headers["content-type"];
+        const contentType = Array.isArray(contentTypeHeader)
+          ? contentTypeHeader[0]?.toLowerCase() ?? ""
+          : String(contentTypeHeader ?? "").toLowerCase();
+
         if (contentType && !contentType.startsWith("image/")) {
           throw new Error(`Failed to prepare image for re-edit: unexpected content type ${contentType}`);
         }
 
-        return res.blob();
+        return response.data as Blob;
       })
       .then(blob => {
+        if (!blob) return;
+
+        if (reeditControllerRef.current !== controller) return;
+
         const file = new File([blob], "reedit.png", { type: blob.type });
         setUserImage(file);
         replaceEditedUrl(null);
@@ -217,8 +238,24 @@ export default function ImageEditor({
         setShowEditedResult(false);
       })
       .catch((err) => {
+        if (reeditControllerRef.current !== controller) return;
+
+        if (axios.isCancel(err)) {
+          return;
+        }
+
         console.error("Failed to prepare image for re-edit:", err);
-        setError("Failed to prepare image for re-edit");
+        const message = getAxiosRequestErrorMessage(
+          err,
+          "Preparing image for re-edit timed out",
+          "Failed to prepare image for re-edit",
+        );
+        setError(message);
+      })
+      .finally(() => {
+        if (reeditControllerRef.current === controller) {
+          reeditControllerRef.current = null;
+        }
       });
   }
 
