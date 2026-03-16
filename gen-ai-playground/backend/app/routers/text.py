@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pymongo.database import Database
 from datetime import datetime
 from typing import Optional
+import time
 
 
 from app.database import get_database
@@ -335,6 +336,7 @@ def generate_text(
         raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
 
     try:
+        gen_start_time = time.perf_counter()
         result = verda_service.generate_text(
             deployment_name=deployment_name,
             model_path=used_model_path or "",
@@ -343,6 +345,7 @@ def generate_text(
             temperature=request.temperature,
             top_p=request.top_p,
         )
+        gen_time_ms = int((time.perf_counter() - gen_start_time) * 1000)
 
         # Save to history in MongoDB
         try:
@@ -354,6 +357,7 @@ def generate_text(
                 "timestamp": datetime.utcnow(),
                 "username": current_user.username,
                 "usage": result.get("usage", {}),
+                "generation_time_ms": gen_time_ms,
             }
             db.text_generations.insert_one(history_record)
             print(f"Saved text generation to MongoDB for user: {current_user.username}")
@@ -365,6 +369,7 @@ def generate_text(
             model=result["model"],
             prompt=request.prompt,
             usage=result.get("usage", {}),
+            generation_time_ms=gen_time_ms,
         )
 
     except RuntimeError as e:
@@ -449,6 +454,7 @@ def chat_with_model(
 
     # Chat
     try:
+        chat_start_time = time.perf_counter()
         result = verda_service.chat(
             messages=[msg.model_dump() for msg in request.messages],
             max_tokens=request.max_tokens,
@@ -457,6 +463,7 @@ def chat_with_model(
             deployment_name=deployment_name,
             model_path=model_path,
         )
+        chat_time_ms = int((time.perf_counter() - chat_start_time) * 1000)
 
         # Save to history
         try:
@@ -468,6 +475,7 @@ def chat_with_model(
                 "timestamp": datetime.utcnow(),
                 "username": current_user.username,
                 "usage": result.get("usage", {}),
+                "generation_time_ms": chat_time_ms,
             }
             db.text_generations.insert_one(history_record)
         except Exception as e:
@@ -477,6 +485,7 @@ def chat_with_model(
             reply=result["reply"],
             model=result["model"],
             usage=result.get("usage", {}),
+            generation_time_ms=chat_time_ms,
         )
 
     except RuntimeError as e:
