@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Header from "./components/Header"
-import Main from "./pages/Main"
+import Front from "./pages/Front"
 import Register from "./components/Register"
 import Playground from "./pages/Playground"
 import Dashboard from "./pages/Dashboard"
@@ -20,7 +20,7 @@ function App() {
         <Route
           path="/"
           element={
-              <Main />
+              <Front />
           }
         />
 

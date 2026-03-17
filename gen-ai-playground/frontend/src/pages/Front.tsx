@@ -1,4 +1,7 @@
-import { Box, Button, Group, Stack, Title } from "@mantine/core";
+import { Box, Button, Group, Image, Stack, Title } from "@mantine/core";
+import { Carousel } from "@mantine/carousel";
+import AutoScroll from "embla-carousel-auto-scroll";
+import { useRef } from "react";
 import HoverCard from "../components/HoverCard";
 import useFadeIn from "../hooks/useFadeIn";
 
@@ -12,6 +15,7 @@ const titleStyle = {
 const headerColor = "#000F65"
 
 const Main = () => {
+    const autoplay = useRef(AutoScroll({ speed: 1, stopOnInteraction: false, stopOnMouseEnter: true }));
     const heroTitles = useFadeIn(0);
     const heroButton = useFadeIn(400);
 
@@ -37,9 +41,8 @@ const Main = () => {
                 <Group align="center" gap="xl" w={{ base: "90%", sm: "70%", md: "40%" }} justify="space-between" wrap="wrap">
                     <Stack gap={0} ref={heroTitles.ref} className={`fade-in ${heroTitles.isVisible ? "visible" : ""}`}>
                         <Title {...titleStyle} style={{ paddingBottom: "2rem"}} fz={{ base: "1.5rem", sm: "2rem", md: "3rem" }}>WELCOME TO</Title>
-                        <Title {...titleStyle} fz={{ base: "2.5rem", sm: "3.5rem", md: "5rem" }}>GENERATIVE AI</Title>
-                        <Title {...titleStyle} fz={{ base: "2.5rem", sm: "3.5rem", md: "5rem" }}>PLAYGROUND</Title>
-                        <Title {...titleStyle} style={{ paddingBottom: "2rem", paddingTop: "1rem" }} fz={{ base: "0.5rem", sm: "0.5rem", md: "1rem" }}>IN COLLABORATION WITH VERDA</Title>
+                        <Title {...titleStyle} fz={{ base: "2rem", sm: "3rem", md: "4rem" }}>GENERATIVE AI</Title>
+                        <Title {...titleStyle} fz={{ base: "2rem", sm: "3rem", md: "4rem" }}>PLAYGROUND</Title>
                     </Stack>
                     <Box ref={heroButton.ref} className={`fade-in ${heroButton.isVisible ? "visible" : ""}`}>
                         <Button size="lg" variant="white" style={{ color: headerColor, paddingLeft: "2rem", paddingRight: "2rem" }}>Get Started</Button>
@@ -72,6 +75,39 @@ const Main = () => {
                         delay={1200}
                     />
                 </Group>
+            </Box>
+
+            <Box style={{ padding: "4rem 2rem" }}>
+                <Title order={2} ta="center" mb="xl" style={{ color: headerColor, fontFamily: "'Google sans', sans-serif" }}>
+                    Featured Works
+                </Title>
+                <Carousel
+                    withIndicators
+                    height={300}
+                    slideSize={{ base: "100%", sm: "50%", md: "33.333%" }}
+                    slideGap="md"
+                    emblaOptions={{ loop: true, align: "start" }}
+                    plugins={[autoplay.current]}
+                >
+                    <Carousel.Slide>
+                        <Image src="/images/flux-gen.png" h="100%" fit="cover" radius="md" />
+                    </Carousel.Slide>
+                    <Carousel.Slide>
+                        <Image src="/images/flux-edit.png" h="100%" fit="cover" radius="md" />
+                    </Carousel.Slide>
+                    <Carousel.Slide>
+                        <Image src="/images/text-generate.png" h="100%" fit="cover" radius="md" />
+                    </Carousel.Slide>
+                    <Carousel.Slide>
+                        <Image src="/images/flux-gen.png" h="100%" fit="cover" radius="md" />
+                    </Carousel.Slide>
+                    <Carousel.Slide>
+                        <Image src="/images/flux-edit.png" h="100%" fit="cover" radius="md" />
+                    </Carousel.Slide>
+                    <Carousel.Slide>
+                        <Image src="/images/text-generate.png" h="100%" fit="cover" radius="md" />
+                    </Carousel.Slide>
+                </Carousel>
             </Box>
         </>
     );
