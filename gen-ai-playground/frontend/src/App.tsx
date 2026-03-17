@@ -3,7 +3,7 @@ import Header from "./components/Header"
 import Register from "./components/Register"
 import Playground from "./pages/Playground"
 import Dashboard from "./pages/Dashboard"
-import History from "./components/History"
+import HistoryPage from "./pages/HistoryPage"
 import { useAuth } from "./context/AuthContext"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
@@ -31,10 +31,7 @@ function App() {
 
         <Route path="/register" element={<Register />} />
 
-        <Route
-          path="/playground"
-          element={<Navigate to="/playground/ImageGenerator" replace />}
-        />
+        <Route path="/playground" element={<Navigate to="/playground/ImageGenerator" replace />} />
 
         <Route
           path="/playground/:tab"
@@ -49,7 +46,7 @@ function App() {
           path="/history"
           element={
             <ProtectedRoute>
-              <History />
+              <HistoryPage />
             </ProtectedRoute>
           }
         />

@@ -56,6 +56,9 @@ class HistoryItem(BaseModel):
 class HistoryResponse(BaseModel):
     """Response model for history endpoint"""
     history: List[HistoryItem]
+    total: int
+    page: int
+    total_pages: int
 
 
 class UserInfo(BaseModel):
@@ -142,5 +145,19 @@ class ChatResponse(BaseModel):
     usage: Dict[str, Any] = {}
     generation_time_ms: Optional[int] = None
 
+class HistoryItemText(BaseModel):
+    type: str
+    messages: List[ChatMessage]
+    reply: str
+    model: str
+    timestamp: datetime
+    username: str
+    usage: Optional[Dict[str, Any]] = {}
+    generation_time_ms: Optional[int] = None
 
-
+class HistoryResponseText(BaseModel):
+    """Response model for text generation history endpoint"""
+    history: List[HistoryItemText]
+    total: int
+    page: int
+    total_pages: int

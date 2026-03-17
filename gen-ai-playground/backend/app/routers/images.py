@@ -3,11 +3,12 @@ Image generation and history routes
 """
 import traceback
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import Response
 from pymongo.database import Database
 from bson import ObjectId
 from datetime import datetime, timezone
+import math
 import base64
 import time
 import httpx
@@ -39,7 +40,10 @@ def normalize_base64_image(image_data: Optional[str]) -> Optional[str]:
 @router.get("/history", response_model=HistoryResponse)
 def get_history(
     current_user: UserInfo = Depends(get_current_user),
-    db: Database = Depends(get_database)
+    db: Database = Depends(get_database),
+    from_date: Optional[int] = Query(None, alias="from"),  
+    to_date: Optional[int] = Query(None, alias="to"),
+    page_num: Optional[int] = Query(1, alias="page")
 ):
     """
     Get image generation history for authenticated user
@@ -47,17 +51,37 @@ def get_history(
     Args:
         current_user: Authenticated user information
         db: Database instance
-        
+        time_period: Optional[str]: time period to get history for
+        page_num: Optional[int]: page number to get history for
     Returns:
         HistoryResponse: List of image generation history items
         
     Raises:
         HTTPException: If fetching history fails
     """
+    
+    page_size = 10
+    page = int(page_num)
+    query = {"username": current_user.username}
+    
+    if from_date or to_date:
+        date_filter = {}
+        if from_date:
+            date_filter["$gte"] = datetime.fromtimestamp(from_date / 1000, tz=timezone.utc)
+        if to_date:
+            date_filter["$lte"] = datetime.fromtimestamp(to_date / 1000, tz=timezone.utc)
+        query["timestamp"] = date_filter
+    
+    total = db.images.count_documents(query)
+    if total == 0:
+        return HistoryResponse(history=[], total=0, page=page, total_pages=0)
+    total_pages = math.ceil(total / page_size)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+    
     try:
-        # Get last 50 image generations for this user, sorted by newest first
         history = list(db.images.find(
-            {"username": current_user.username},
+            query,
             {
                 "_id": 1,
                 "prompt": 1,
@@ -67,21 +91,13 @@ def get_history(
                 "image_data": 1,
                 "image_type": 1,
                 "parent_image_id": 1,
-            }
-        ).sort("timestamp", -1).limit(50))
-
-        for item in history:
-            if "_id" in item:
-                del item["_id"]
-            if "parent_image_id" in item:
-                del item["parent_image_id"]
-        
-        return HistoryResponse(history=history)
+            }).sort("timestamp", -1).skip(start).limit(page_size))
+        return HistoryResponse(history=history, total=total, page=page, total_pages=total_pages)
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch history: {str(e)}"
-        )
+        print(f"Error getting history: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting history: {e}")
+        
+        
 
 
 @router.post('/generate')

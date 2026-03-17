@@ -9,11 +9,7 @@ export const MODELS = [
   "FLUX1_KONTEXT_DEV",
 ] as const
 
-export const EDIT_MODELS = [
-  "FLUX2_KLEIN_9B",
-  "FLUX2_KLEIN_4B",
-  "FLUX1_KONTEXT_DEV",
-] as const
+export const EDIT_MODELS = ["FLUX2_KLEIN_9B", "FLUX2_KLEIN_4B", "FLUX1_KONTEXT_DEV"] as const
 
 export const MODEL_DISPLAY_NAMES: Record<string, string> = {
   FLUX2_KLEIN_9B: "FLUX.2 [klein] 9B",

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
 test("Backend is running and returns hello message", async ({ request }) => {
   const response = await request.get("http://127.0.0.1:8000/");

@@ -4,9 +4,11 @@ Text generation routes using Verda container deployments.
 Provides endpoints to deploy an LLM on Verda, check deployment status,
 generate text completions, chat with the model, and clean up.
 """
+import math
+
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pymongo.database import Database
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import time
 
@@ -14,6 +16,7 @@ import time
 from app.database import get_database
 from app.dependencies import get_current_user, get_admin_user
 from app.models import (
+    HistoryResponseText,
     TextGenerateRequest,
     TextGenerateResponse,
     ChatRequest,
@@ -520,4 +523,64 @@ def delete_deployment(
         raise HTTPException(status_code=500, detail=result.get("message"))
     return result
 
+@router.get("/history", response_model=HistoryResponseText)
+def history(
+    current_user: UserInfo = Depends(get_current_user),
+    db: Database = Depends(get_database),
+    from_date: Optional[int] = Query(None, alias="from"),
+    to_date: Optional[int] = Query(None, alias="to"),
+    page: int = Query(1, alias="page"),
+):
+    page_size = 10
+
+    query = {"username": current_user.username}
+
+    if from_date or to_date:
+        date_filter = {}
+        if from_date:
+            date_filter["$gte"] = datetime.fromtimestamp(from_date / 1000, tz=timezone.utc)
+        if to_date:
+            date_filter["$lte"] = datetime.fromtimestamp(to_date / 1000, tz=timezone.utc)
+        query["timestamp"] = date_filter
+
+    total = db.text_generations.count_documents(query)
+
+    if total == 0:
+        return HistoryResponseText(history=[], total=0, page=page, total_pages=0)
+
+    total_pages = math.ceil(total / page_size)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+
+    try:
+        history = list(
+            db.text_generations.find(
+                query,
+                {
+                    "_id": 1,
+                    "type": 1,
+                    "messages": 1,
+                    "reply": 1,
+                    "model": 1,
+                    "timestamp": 1,
+                    "username": 1,
+                    "usage": 1,
+                    "generation_time_ms": 1,
+                },
+            )
+            .sort("timestamp", -1)
+            .skip(start)
+            .limit(page_size)
+        )
+
+        return HistoryResponseText(
+            history=history,
+            total=total,
+            page=page,
+            total_pages=total_pages,
+        )
+
+    except Exception as e:
+        print(f"Error getting history: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting history: {e}")
 

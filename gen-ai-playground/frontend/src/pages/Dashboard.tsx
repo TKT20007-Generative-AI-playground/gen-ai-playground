@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import { useState, useEffect, useCallback } from "react"
+import axios from "axios"
 import {
   Title,
   Table,
@@ -11,7 +11,7 @@ import {
   Stack,
   Alert,
   Select,
-} from '@mantine/core'
+} from "@mantine/core"
 
 interface Container {
   name: string
@@ -29,8 +29,8 @@ export default function Dashboard() {
   const [deployLoading, setDeployLoading] = useState(false)
   const [textModelOptions, setTextModelOptions] = useState<{ value: string; label: string }[]>([])
 
-  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-  const token = localStorage.getItem('token')
+  const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
+  const token = localStorage.getItem("token")
 
   // Fetch available models from backend
   useEffect(() => {
@@ -43,7 +43,7 @@ export default function Dashboard() {
           (m: { value: string; label: string }) => ({
             value: m.value,
             label: m.label,
-          })
+          }),
         )
         setTextModelOptions(models)
       } catch {
@@ -61,12 +61,12 @@ export default function Dashboard() {
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.detail || 'Failed to fetch deployments')
+        throw new Error(data.detail || "Failed to fetch deployments")
       }
       const data = await res.json()
       setContainers(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch deployments')
+      setError(err instanceof Error ? err.message : "Failed to fetch deployments")
     } finally {
       setLoading(false)
     }
@@ -82,20 +82,17 @@ export default function Dashboard() {
     if (!confirm(`Delete deployment "${deploymentName}"? This cannot be undone.`)) return
     setActionLoading(deploymentName)
     try {
-      const res = await fetch(
-        `${backendUrl}/dashboard/containers/${deploymentName}/stop`,
-        {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      )
+      const res = await fetch(`${backendUrl}/dashboard/containers/${deploymentName}/stop`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.detail || 'Failed to delete deployment')
+        throw new Error(data.detail || "Failed to delete deployment")
       }
       await fetchContainers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete deployment')
+      setError(err instanceof Error ? err.message : "Failed to delete deployment")
     } finally {
       setActionLoading(null)
     }
@@ -107,20 +104,20 @@ export default function Dashboard() {
     setError(null)
     try {
       const res = await fetch(`${backendUrl}/text/deploy`, {
-        method: 'POST',
+        method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ model_path: selectedModel }),
       })
       if (!res.ok) {
         const data = await res.json()
-        throw new Error(data.detail || 'Failed to deploy model')
+        throw new Error(data.detail || "Failed to deploy model")
       }
       await fetchContainers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to deploy model')
+      setError(err instanceof Error ? err.message : "Failed to deploy model")
     } finally {
       setDeployLoading(false)
     }
@@ -128,16 +125,16 @@ export default function Dashboard() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'healthy':
-        return 'green'
-      case 'deploying':
-        return 'blue'
-      case 'error':
-        return 'red'
-      case 'unhealthy':
-        return 'orange'
+      case "healthy":
+        return "green"
+      case "deploying":
+        return "blue"
+      case "error":
+        return "red"
+      case "unhealthy":
+        return "orange"
       default:
-        return 'gray'
+        return "gray"
     }
   }
 
@@ -168,11 +165,7 @@ export default function Dashboard() {
           onChange={setSelectedModel}
           style={{ minWidth: 220 }}
         />
-        <Button
-          onClick={handleDeploy}
-          disabled={!selectedModel}
-          loading={deployLoading}
-        >
+        <Button onClick={handleDeploy} disabled={!selectedModel} loading={deployLoading}>
           Deploy
         </Button>
       </Group>
@@ -196,14 +189,22 @@ export default function Dashboard() {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {containers.map((c) => (
+            {containers.map(c => (
               <Table.Tr key={c.container_id}>
                 <Table.Td>
                   <Text fw={500}>{c.name}</Text>
                 </Table.Td>
                 <Table.Td>
-                  <Text size="sm" c="dimmed" style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {c.image || '—'}
+                  <Text
+                    size="sm"
+                    c="dimmed"
+                    style={{
+                      maxWidth: 300,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {c.image || "—"}
                   </Text>
                 </Table.Td>
                 <Table.Td>

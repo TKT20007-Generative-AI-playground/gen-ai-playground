@@ -2,15 +2,7 @@ import axios from "axios"
 import { useAuth } from "../context/AuthContext"
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
 
-import {
-  Alert,
-  Button,
-  MultiSelect,
-  Paper,
-  Text,
-  ScrollArea,
-  TextInput,
-} from "@mantine/core"
+import { Alert, Button, MultiSelect, Paper, Text, ScrollArea, TextInput } from "@mantine/core"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 
@@ -62,12 +54,9 @@ const modelStatusPriority: Record<ModelStatus, number> = {
 }
 
 // Build dropdown data with colored status dots; disable non-live models
-function buildDropdownData(
-  modelOptions: ModelOption[],
-  statuses: Record<string, ModelStatus>
-) {
+function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string, ModelStatus>) {
   return modelOptions
-    .map((m) => {
+    .map(m => {
       const st = statuses[m.value]
       const isLive = st === "live"
       const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
@@ -80,8 +69,7 @@ function buildDropdownData(
     })
     .sort((a, b) => {
       const statusDiff =
-        modelStatusPriority[statuses[a.value]] -
-        modelStatusPriority[statuses[b.value]]
+        modelStatusPriority[statuses[a.value]] - modelStatusPriority[statuses[b.value]]
 
       if (statusDiff !== 0) return statusDiff
 
@@ -176,7 +164,7 @@ function ChatPanel({
           </Text>
         ) : (
           <>
-            {messages.map((message) => (
+            {messages.map(message => (
               <Paper
                 key={message.id}
                 p="sm"
@@ -198,7 +186,7 @@ function ChatPanel({
                   }}
                 >
                   <Text fw={700} size="xs">
-                    {message.role === "user" ? "You" : message.modelLabel ?? modelLabel}
+                    {message.role === "user" ? "You" : (message.modelLabel ?? modelLabel)}
                   </Text>
                   {message.role === "assistant" && message.generationTimeMs != null && (
                     <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -251,7 +239,7 @@ export default function TextGenerator() {
 
   const setMessagesForModel = (modelValue: string, next: Message[]) => {
     messagesByModelRef.current = { ...messagesByModelRef.current, [modelValue]: next }
-    setMessagesByModel((prev) => ({ ...prev, [modelValue]: next }))
+    setMessagesByModel(prev => ({ ...prev, [modelValue]: next }))
   }
 
   const clearMessagesForModel = (modelValue: string) => {
@@ -282,11 +270,11 @@ export default function TextGenerator() {
           (m: { value: string; label: string }) => ({
             value: m.value,
             label: m.label,
-          })
+          }),
         )
         setModelOptions(models)
       } catch {
-        // silent 
+        // silent
       }
     }
     fetchModels()
@@ -311,8 +299,8 @@ export default function TextGenerator() {
     return () => clearInterval(id)
   }, [fetchStatuses, isLoggedIn])
 
-  const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
-  const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
+  const getModelLabel = (value: string) => modelOptions.find(m => m.value === value)?.label ?? value
+  const isAnyLoading = selectedModels.some(m => Boolean(loadingByModel[m]))
 
   /**
    * Send message to a single model panel.
@@ -323,13 +311,13 @@ export default function TextGenerator() {
     messagesWithUser: Message[],
     pendingMessageId: string,
   ) => {
-    setLoadingByModel((prev) => ({ ...prev, [modelValue]: true }))
+    setLoadingByModel(prev => ({ ...prev, [modelValue]: true }))
     console.log(`Sending to ${modelValue}:`, messagesWithUser)
 
     try {
       const requestMessages = messagesWithUser
-        .filter((message) => !message.isPending)
-        .map((message) => ({ role: message.role, content: message.content }))
+        .filter(message => !message.isPending)
+        .map(message => ({ role: message.role, content: message.content }))
 
       const response = await axios.post(
         `${backendUrl}/text/chat`,
@@ -340,43 +328,47 @@ export default function TextGenerator() {
           temperature: 0.7,
           top_p: 0.9,
         },
-        { headers: getAuthHeaders() }
+        { headers: getAuthHeaders() },
       )
 
       const result = response.data
       const parsed = parseModelReply(result.reply)
       if (parsed.thinking) console.log("Thinking:", parsed.thinking)
       const label = getModelLabel(modelValue)
-      const replaced = (messagesByModelRef.current[modelValue] ?? []).map((message) =>
+      const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
         message.id === pendingMessageId
           ? {
-            ...message,
-            content: parsed.actualReply,
-            modelLabel: label,
-            generationTimeMs: result.generation_time_ms ?? undefined,
-            isPending: false,
-            pendingStartTime: undefined,
-          }
-          : message
+              ...message,
+              content: parsed.actualReply,
+              modelLabel: label,
+              generationTimeMs: result.generation_time_ms ?? undefined,
+              isPending: false,
+              pendingStartTime: undefined,
+            }
+          : message,
       )
       setMessagesForModel(modelValue, replaced)
     } catch (error: unknown) {
       console.error("chat error:", error)
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      const replaced = (messagesByModelRef.current[modelValue] ?? []).map((message) =>
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
+        ?.detail
+      const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
         message.id === pendingMessageId
           ? {
-            ...message,
-            content: "Failed to generate a response.",
-            isPending: false,
-            pendingStartTime: undefined,
-          }
-          : message
+              ...message,
+              content: "Failed to generate a response.",
+              isPending: false,
+              pendingStartTime: undefined,
+            }
+          : message,
       )
       setMessagesForModel(modelValue, replaced)
-      setStatusMsgs((prev) => ({ ...prev, [modelValue]: detail || "Failed to reach the server." }))
+      setStatusMsgs(prev => ({
+        ...prev,
+        [modelValue]: detail || "Failed to reach the server.",
+      }))
     } finally {
-      setLoadingByModel((prev) => ({ ...prev, [modelValue]: false }))
+      setLoadingByModel(prev => ({ ...prev, [modelValue]: false }))
     }
   }
 
@@ -488,7 +480,7 @@ export default function TextGenerator() {
                     gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
                   }}
                 >
-                  {selectedModels.map((modelValue) => (
+                  {selectedModels.map(modelValue => (
                     <ChatPanel
                       key={modelValue}
                       modelValue={modelValue}
@@ -511,13 +503,15 @@ export default function TextGenerator() {
                 display: "grid",
                 gap: "20px",
                 gridTemplateColumns:
-                  selectedModels.length === 1 ? "minmax(320px, 1fr)" : "repeat(2, minmax(320px, 1fr))",
+                  selectedModels.length === 1
+                    ? "minmax(320px, 1fr)"
+                    : "repeat(2, minmax(320px, 1fr))",
                 width: "100%",
                 margin: "0 auto",
                 alignItems: "stretch",
               }}
             >
-              {selectedModels.map((modelValue) => (
+              {selectedModels.map(modelValue => (
                 <ChatPanel
                   key={modelValue}
                   modelValue={modelValue}
@@ -539,11 +533,15 @@ export default function TextGenerator() {
               style={{ flex: 1, minWidth: 0 }}
               placeholder="Type your message to send to selected models..."
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={e => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isAnyLoading}
             />
-            <Button onClick={generateText} disabled={!prompt.trim() || isAnyLoading} loading={isAnyLoading}>
+            <Button
+              onClick={generateText}
+              disabled={!prompt.trim() || isAnyLoading}
+              loading={isAnyLoading}
+            >
               Send
             </Button>
           </div>

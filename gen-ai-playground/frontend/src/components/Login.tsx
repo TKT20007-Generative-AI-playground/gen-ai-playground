@@ -1,15 +1,7 @@
-import {
-  Modal,
-  TextInput,
-  PasswordInput,
-  Button,
-  Stack,
-  Text,
-  Anchor,
-} from '@mantine/core'
-import { useForm } from '@mantine/form'
-import { Link } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { Modal, TextInput, PasswordInput, Button, Stack, Text, Anchor } from "@mantine/core"
+import { useForm } from "@mantine/form"
+import { Link } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
 
 interface LoginModalProps {
   opened: boolean
@@ -19,34 +11,34 @@ interface LoginModalProps {
 export default function LoginModal({ opened, onClose }: LoginModalProps) {
   const { login } = useAuth()
 
-  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
   const form = useForm({
     initialValues: {
-      username: '',
-      password: '',
+      username: "",
+      password: "",
     },
   })
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
       const res = await fetch(`${backendUrl}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       })
 
       const data = await res.json()
 
       if (!res.ok) {
-        alert(data.detail || 'Login failed')
+        alert(data.detail || "Login failed")
         return
       }
 
       login(data.token, data.username, data.is_admin || false)
       onClose()
     } catch {
-      alert('Server unreachable')
+      alert("Server unreachable")
     }
   }
 
@@ -59,7 +51,7 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
             placeholder="Your username"
             required
             data-testid="login-username"
-            {...form.getInputProps('username')}
+            {...form.getInputProps("username")}
           />
 
           <PasswordInput
@@ -67,7 +59,7 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
             placeholder="Your password"
             required
             data-testid="login-password"
-            {...form.getInputProps('password')}
+            {...form.getInputProps("password")}
           />
 
           <Button type="submit" fullWidth>
@@ -76,11 +68,7 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
 
           <Text size="sm" ta="center">
             Don’t have an account?{" "}
-            <Anchor
-              component={Link}
-              to="/register"
-              onClick={onClose}
-            >
+            <Anchor component={Link} to="/register" onClick={onClose}>
               Register
             </Anchor>
           </Text>
@@ -89,4 +77,3 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
     </Modal>
   )
 }
-
