@@ -26,7 +26,7 @@ type Message = {
   modelLabel?: string
 }
 
-type ModelStatus = "live" | "starting" | "offline" | "unknown"
+type ModelStatus = "live" | "starting" | "offline" | "paused" | "unknown"
 
 const makeMessageId = () => {
   // Prefer crypto.randomUUID when available; fall back for older browsers.
@@ -54,11 +54,12 @@ function parseModelReply(rawReply: string): {
 const modelStatusPriority: Record<ModelStatus, number> = {
   live: 0,
   starting: 1,
-  unknown: 2,
-  offline: 3,
+  paused: 2,
+  unknown: 3,
+  offline: 4,
 }
 
-// Build dropdown data with colored status dots; disable non-live models
+// Build dropdown data with colored status dots; only disable offline models
 function buildDropdownData(
   modelOptions: ModelOption[],
   statuses: Record<string, ModelStatus>
@@ -66,13 +67,13 @@ function buildDropdownData(
   return modelOptions
     .map((m) => {
       const st = statuses[m.value]
-      const isLive = st === "live"
-      const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
+      const isSelectable = st !== "offline" && st !== "unknown"  // Allow live, starting, paused
+      const emoji = st === "live" ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : st === "paused" ? "\u{1F535}" : "\u26AA"
 
       return {
         value: m.value,
         label: `${emoji} ${m.label}`,
-        disabled: !isLive,
+        disabled: !isSelectable,
       }
     })
     .sort((a, b) => {
@@ -131,7 +132,7 @@ function ChatPanel({
 
       {modelStatus && modelStatus !== "live" && (
         <Alert
-          color={modelStatus === "starting" ? "yellow" : "gray"}
+          color={modelStatus === "starting" ? "yellow" : modelStatus === "paused" ? "blue" : "gray"}
           variant="light"
           mb={8}
           p="xs"
@@ -141,7 +142,9 @@ function ChatPanel({
             ? statusMessage
             : modelStatus === "starting"
               ? "This model is starting up. It usually takes about 2 minutes."
-              : "This model is not deployed. Ask an admin to deploy it from the dashboard."}
+              : modelStatus === "paused"
+                ? "This model is paused. Generating text will start it automatically (cold start ~2-5 min)."
+                : "This model is not deployed. Ask an admin to deploy it from the dashboard."}
         </Alert>
       )}
 
@@ -429,13 +432,14 @@ export default function TextGenerator() {
   const statusSummary = [
     statusCounts.live ? `🟢 ${statusCounts.live} ready` : null,
     statusCounts.starting ? `🟡 ${statusCounts.starting} starting` : null,
+    statusCounts.paused ? `🔵 ${statusCounts.paused} paused` : null,
     statusCounts.offline ? `⚪ ${statusCounts.offline} offline` : null,
     statusCounts.unknown ? `⚪ ${statusCounts.unknown} unknown` : null,
   ]
     .filter(Boolean)
     .join(" | ")
 
-  const showStartingMsg = Boolean(statusCounts.starting)
+  const showStartingMsg = Boolean(statusCounts.starting || statusCounts.paused)
 
   return (
     <div
@@ -457,7 +461,11 @@ export default function TextGenerator() {
       )}
       {showStartingMsg && (
         <Alert color="yellow" variant="light" mb={8} p="xs" styles={{ message: { fontSize: 13 } }}>
-          Some of the models are still starting up. It usually takes about 2 minutes.
+          {statusCounts.starting && statusCounts.paused
+            ? `${statusCounts.starting} model(s) are still starting up (usually ~2 min). ${statusCounts.paused} model(s) are paused and will cold-start on first use.`
+            : statusCounts.starting
+              ? "Some of the models are still starting up. It usually takes about 2 minutes."
+              : "Some of the models are paused to save costs and will cold-start on first use."}
         </Alert>
       )}
 
@@ -583,7 +591,7 @@ export default function TextGenerator() {
               onKeyDown={handleKeyDown}
               disabled={isAnyLoading}
             />
-            <Button onClick={generateText} disabled={!prompt.trim() || isAnyLoading} loading={isAnyLoading}>
+            <Button onClick={generateText} disabled={!prompt.trim() || isAnyLoading || selectedModels.some((m) => modelStatuses[m] === "starting")} loading={isAnyLoading}>
               Send
             </Button>
           </div>

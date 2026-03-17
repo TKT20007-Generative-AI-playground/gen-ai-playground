@@ -8,6 +8,8 @@ from datetime import datetime
 from typing import Optional
 import json
 from pathlib import Path
+import threading
+import time
 
 
 from verda import VerdaClient
@@ -268,6 +270,108 @@ class VerdaService:
         compute_name = self._set_compute_name(cfg, available_gpu_types)
         return compute_name, gpu_count
     
+    def get_deployment_replica_count(self, deployment_name: str) -> int:
+        """
+        Get the number of running replicas for a deployment.
+        
+        Args:
+            deployment_name: Name of the deployment.
+            
+        Returns:
+            Number of running replicas (0 if deployment is paused/scaled down).
+        """
+        try:
+            client = self._get_client()
+            replicas = client.containers.get_deployment_replicas(deployment_name)
+            # If it returns a list, count; if it returns a number, use directly
+            return len(replicas) if isinstance(replicas, list) else int(replicas)
+        except Exception as e:
+            import traceback
+            print(f"[ERROR] Error getting replicas for '{deployment_name}': {e}")
+            print(f"[ERROR] Traceback: {traceback.format_exc()}")
+            return 0
+
+    def update_deployment_scaling(
+        self,
+        deployment_name: str,
+        min_replica_count: int = 0,
+        max_replica_count: int = 5,
+    ) -> dict:
+        """
+        Update the scaling configuration of an existing deployment.
+        
+        Args:
+            deployment_name: Name of the deployment to update.
+            min_replica_count: New minimum replica count.
+            max_replica_count: New maximum replica count.
+            
+        Returns:
+            dict with update status
+        """
+        client = self._get_client()
+        try:
+            # Get current scaling options
+            current_scaling = client.containers.get_deployment_scaling_options(deployment_name)
+            
+            # Create new scaling options with updated min/max replicas
+            updated_scaling = ScalingOptions(
+                min_replica_count=min_replica_count,
+                max_replica_count=max_replica_count,
+                scale_down_policy=current_scaling.scale_down_policy,
+                scale_up_policy=current_scaling.scale_up_policy,
+                queue_message_ttl_seconds=current_scaling.queue_message_ttl_seconds,
+                concurrent_requests_per_replica=current_scaling.concurrent_requests_per_replica,
+                scaling_triggers=current_scaling.scaling_triggers,
+            )
+            
+            # Use the dedicated scaling update method
+            result = client.containers.update_deployment_scaling_options(deployment_name, updated_scaling)
+            
+            # Verify the update took effect
+            verified = client.containers.get_deployment_scaling_options(deployment_name)
+            
+            return {
+                "status": "updated",
+                "name": deployment_name,
+                "min_replicas": min_replica_count,
+                "max_replicas": max_replica_count,
+            }
+        except APIException as e:
+            print(f"Error updating deployment scaling for '{deployment_name}': {e}")
+            return {
+                "status": "error",
+                "name": deployment_name,
+                "message": str(e),
+            }
+
+    def _schedule_scaling_downgrade(
+        self,
+        deployment_name: str,
+        delay_seconds: int = 300,
+    ) -> None:
+        """
+        Schedule a scaling downgrade (min_replica_count reduction) after a delay.
+        Runs in a background thread.
+        
+        Args:
+            deployment_name: Name of the deployment to downgrade.
+            delay_seconds: Seconds to wait before downgrading (default 5 minutes).
+        """
+        def downgrade_task():
+            try:
+                print(f"Scheduled scaling downgrade for '{deployment_name}' in {delay_seconds}s...")
+                time.sleep(delay_seconds)
+                print(f"Downgrading scaling for '{deployment_name}': min_replicas 1 → 0")
+                result = self.update_deployment_scaling(deployment_name, min_replica_count=0)
+                print(f"Scaling update result: {result}")
+            except Exception as e:
+                print(f"Error during scaling downgrade for '{deployment_name}': {e}")
+                import traceback
+                traceback.print_exc()
+        
+        thread = threading.Thread(target=downgrade_task, daemon=True)
+        thread.start()
+    
     def deploy_from_template(
         self,
         template_json: str,
@@ -356,7 +460,7 @@ class VerdaService:
         scaling_options = ScalingOptions(
             min_replica_count=1,
             max_replica_count=3,
-            scale_down_policy=ScalingPolicy(delay_seconds=300),
+            scale_down_policy=ScalingPolicy(delay_seconds=60),
             scale_up_policy=ScalingPolicy(delay_seconds=0),
             queue_message_ttl_seconds=500,
             concurrent_requests_per_replica=32,
@@ -384,6 +488,10 @@ class VerdaService:
         created = client.containers.create_deployment(deployment)
 
         print(f"Created deployment from template: {created.name}")
+        
+        # Schedule automatic scaling downgrade from min_replica_count=1 to 0 after 5 minutes
+        self._schedule_scaling_downgrade(created.name, delay_seconds=300)
+        
         return {
             "name": created.name,
             "status": "deploying",
@@ -451,7 +559,7 @@ class VerdaService:
         scaling_options = ScalingOptions(
             min_replica_count=1,
             max_replica_count=3,
-            scale_down_policy=ScalingPolicy(delay_seconds=300),
+            scale_down_policy=ScalingPolicy(delay_seconds=60),
             scale_up_policy=ScalingPolicy(delay_seconds=0),
             queue_message_ttl_seconds=500,
             concurrent_requests_per_replica=32,
@@ -481,6 +589,10 @@ class VerdaService:
         created = client.containers.create_deployment(deployment)
 
         print(f"Created deployment: {created.name}")
+        
+        # Schedule automatic scaling downgrade from min_replica_count=1 to 0 after 5 minutes
+        self._schedule_scaling_downgrade(created.name, delay_seconds=300)
+        
         return {
             "name": created.name,
             "status": "deploying",
@@ -549,7 +661,7 @@ class VerdaService:
         scaling_options = ScalingOptions(
             min_replica_count=1,
             max_replica_count=3,
-            scale_down_policy=ScalingPolicy(delay_seconds=300),
+            scale_down_policy=ScalingPolicy(delay_seconds=60),
             scale_up_policy=ScalingPolicy(delay_seconds=0),
             queue_message_ttl_seconds=500,
             concurrent_requests_per_replica=32,
@@ -578,6 +690,10 @@ class VerdaService:
         
         created = client.containers.create_deployment(deployment)
         print(f"Created deployment: {created.name}")
+        
+        # Schedule automatic scaling downgrade from min_replica_count=1 to 0 after 5 minutes
+        self._schedule_scaling_downgrade(created.name, delay_seconds=300)
+        
         return {
             "name": created.name,
             "status": "deploying",
@@ -603,12 +719,22 @@ class VerdaService:
 
         try:
             status = client.containers.get_deployment_status(deployment_name)
+            
+            # Fetch full deployment to check replica count
+            deployment = client.containers.get_deployment_by_name(deployment_name)
+            replicas = getattr(deployment, 'replicas', None)
+            
+            # If no running replicas, deployment is not ready to serve
+            is_healthy = status == ContainerDeploymentStatus.HEALTHY
+            if replicas and replicas.get('running', 0) == 0:
+                is_healthy = False
 
             return {
                 "name": deployment_name,
                 "status": status.value,
                 "model": model_path,
-                "healthy": status == ContainerDeploymentStatus.HEALTHY,
+                "healthy": is_healthy,
+                "replicas": replicas,
             }
 
         except APIException as e:
