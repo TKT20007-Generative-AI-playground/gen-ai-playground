@@ -207,13 +207,13 @@ def get_model_statuses(
     current_user: UserInfo = Depends(get_current_user),
 ):
     """
-    Return the live/starting/offline/paused status for each known model.
-    Used by the frontend to show green/yellow/gray indicators in the model selector.
+    Return the live/starting/offline/cold status for each known model.
+    Used by the frontend to show green/yellow/blue/gray indicators in the model selector.
     
     Status meanings:
     - live: Healthy and ready to serve
     - starting: Deployment exists but not yet healthy (initializing)
-    - paused: Deployment paused/idle
+    - cold: Deployment paused/idle (will auto-start on first request)
     - offline: Deployment doesn't exist or unreachable
     """
     try:
@@ -246,16 +246,16 @@ def get_model_statuses(
             if dep_name_expected == dep_name:
                 # Map Verda status to our UI status
                 if st == "healthy":
-                    # Check replica count to distinguish "live" (1+) from "paused" (0)
+                    # Check replica count to distinguish "live" (1+) from "cold" (0)
                     replica_count = verda_service.get_deployment_replica_count(dep_name)
                     if replica_count > 0:
                         matched_status = "live"
                     else:
-                        matched_status = "paused"
+                        matched_status = "cold"
                 elif st in ("initializing", "pending", "scaling"):
                     matched_status = "starting"
                 elif st in ("paused", "pausing"):
-                    matched_status = "paused"
+                    matched_status = "cold"
                 elif st == "unknown":
                     matched_status = "offline"
                 else:

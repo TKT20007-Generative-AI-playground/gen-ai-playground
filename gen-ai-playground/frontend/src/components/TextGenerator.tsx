@@ -26,7 +26,7 @@ type Message = {
   modelLabel?: string
 }
 
-type ModelStatus = "live" | "starting" | "offline" | "paused" | "unknown"
+type ModelStatus = "live" | "starting" | "offline" | "cold" | "unknown"
 
 const makeMessageId = () => {
   // Prefer crypto.randomUUID when available; fall back for older browsers.
@@ -54,7 +54,7 @@ function parseModelReply(rawReply: string): {
 const modelStatusPriority: Record<ModelStatus, number> = {
   live: 0,
   starting: 1,
-  paused: 2,
+  cold: 2,
   unknown: 3,
   offline: 4,
 }
@@ -67,8 +67,8 @@ function buildDropdownData(
   return modelOptions
     .map((m) => {
       const st = statuses[m.value]
-      const isSelectable = st !== "offline" && st !== "unknown"  // Allow live, starting, paused
-      const emoji = st === "live" ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : st === "paused" ? "\u{1F535}" : "\u26AA"
+      const isSelectable = st !== "offline" && st !== "unknown"  // Allow live, starting, cold
+      const emoji = st === "live" ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : st === "cold" ? "\u{1F535}" : "\u26AA"
 
       return {
         value: m.value,
@@ -110,10 +110,38 @@ function ChatPanel({
   statusMessage,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [offlineStartTime, setOfflineStartTime] = useState<number | null>(null)
+  const [offlineDuration, setOfflineDuration] = useState<number>(0)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, isLoading])
+
+  // Track how long the model has been offline
+  useEffect(() => {
+    if (modelStatus === "offline") {
+      // Model just went offline
+      if (offlineStartTime === null) {
+        setOfflineStartTime(Date.now())
+      }
+    } else {
+      // Model is back online or in another state
+      setOfflineStartTime(null)
+      setOfflineDuration(0)
+    }
+  }, [modelStatus, offlineStartTime])
+
+  // Update offline duration every second
+  useEffect(() => {
+    if (offlineStartTime === null) return
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - offlineStartTime) / 1000)
+      setOfflineDuration(elapsed)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [offlineStartTime])
 
   return (
     <div
@@ -132,7 +160,7 @@ function ChatPanel({
 
       {modelStatus && modelStatus !== "live" && (
         <Alert
-          color={modelStatus === "starting" ? "yellow" : modelStatus === "paused" ? "blue" : "gray"}
+          color={modelStatus === "starting" ? "yellow" : modelStatus === "cold" ? "blue" : "gray"}
           variant="light"
           mb={8}
           p="xs"
@@ -142,9 +170,11 @@ function ChatPanel({
             ? statusMessage
             : modelStatus === "starting"
               ? "This model is starting up. It usually takes about 2 minutes."
-              : modelStatus === "paused"
-                ? "This model is paused. Generating text will start it automatically (cold start ~2-5 min)."
-                : "This model is not deployed. Ask an admin to deploy it from the dashboard."}
+              : modelStatus === "cold"
+                ? "This model is cold. Generating text will start it automatically (~2-5 min)."
+                : offlineDuration < 30
+                  ? "This model is offline. It might be pulling the image. Please wait for 30 seconds..."
+                  : "This model has been offline for a while. Try deploying it again."}
         </Alert>
       )}
 
@@ -432,14 +462,14 @@ export default function TextGenerator() {
   const statusSummary = [
     statusCounts.live ? `🟢 ${statusCounts.live} ready` : null,
     statusCounts.starting ? `🟡 ${statusCounts.starting} starting` : null,
-    statusCounts.paused ? `🔵 ${statusCounts.paused} paused` : null,
+    statusCounts.cold ? `🔵 ${statusCounts.cold} cold` : null,
     statusCounts.offline ? `⚪ ${statusCounts.offline} offline` : null,
     statusCounts.unknown ? `⚪ ${statusCounts.unknown} unknown` : null,
   ]
     .filter(Boolean)
     .join(" | ")
 
-  const showStartingMsg = Boolean(statusCounts.starting || statusCounts.paused)
+  const showStartingMsg = Boolean(statusCounts.starting || statusCounts.cold)
 
   return (
     <div
@@ -461,11 +491,11 @@ export default function TextGenerator() {
       )}
       {showStartingMsg && (
         <Alert color="yellow" variant="light" mb={8} p="xs" styles={{ message: { fontSize: 13 } }}>
-          {statusCounts.starting && statusCounts.paused
-            ? `${statusCounts.starting} model(s) are still starting up (usually ~2 min). ${statusCounts.paused} model(s) are paused and will cold-start on first use.`
+          {statusCounts.starting && statusCounts.cold
+            ? `${statusCounts.starting} model(s) are still starting up (usually ~2 min). ${statusCounts.cold} model(s) are cold and will start on first use (~2-5 min).`
             : statusCounts.starting
               ? "Some of the models are still starting up. It usually takes about 2 minutes."
-              : "Some of the models are paused to save costs and will cold-start on first use."}
+              : "Some of the models are cold to save costs and will start on first use (~2-5 min)."}
         </Alert>
       )}
 
