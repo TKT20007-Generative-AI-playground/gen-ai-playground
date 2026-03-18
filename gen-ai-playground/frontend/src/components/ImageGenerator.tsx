@@ -169,6 +169,7 @@ export default function ImageGenerator() {
           signal: controller.signal,
         },
       ).then((response) => {
+        window.dispatchEvent(new Event("history-update"));
         if (controllerRef.current !== controller) return
 
         const timeMs = parseGenerationTimeMs(response.headers as Record<string, unknown>)
