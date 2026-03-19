@@ -1,6 +1,3 @@
-
-
-
 export interface ImageRecord {
   prompt: string
   model: string

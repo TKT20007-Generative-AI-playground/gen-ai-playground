@@ -1,5 +1,3 @@
-
-
 import { Badge, Box, Card, Group, Overlay, Text } from "@mantine/core"
 import { useState } from "react"
 import type { ImageRecord } from "./historyInterfaces"

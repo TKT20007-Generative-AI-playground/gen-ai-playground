@@ -1,4 +1,3 @@
-
 export const ImageIcon = () => (
   <svg
     width="16"

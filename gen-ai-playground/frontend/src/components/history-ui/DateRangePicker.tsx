@@ -1,4 +1,4 @@
-import { DatePickerInput } from '@mantine/dates'
+import { DatePickerInput } from "@mantine/dates"
 
 export default function DateRangePicker({
   dateRange,

@@ -1,4 +1,4 @@
-import { Center, Stack, ThemeIcon, Text } from '@mantine/core'
+import { Center, Stack, ThemeIcon, Text } from "@mantine/core"
 
 type EmptyStateProps = {
   label: string

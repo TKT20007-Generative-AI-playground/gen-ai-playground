@@ -1,6 +1,17 @@
-import { ActionIcon, Badge, Box, Button, Divider, Group, Paper, Stack, Text, Tooltip } from "@mantine/core"
+import {
+  ActionIcon,
+  Badge,
+  Box,
+  Button,
+  Divider,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  Tooltip,
+} from "@mantine/core"
 import { useState } from "react"
-import type {TextRecord} from "./historyInterfaces"
+import type { TextRecord } from "./historyInterfaces"
 import { formatDate } from "./imageUtils"
 import { ClockIcon, CopyIcon } from "./Icons"
 
