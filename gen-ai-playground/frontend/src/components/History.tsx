@@ -8,6 +8,7 @@ import TextCard from "./history-ui/TextCard"
 import EmptyState from "./history-ui/EmptyState"
 import { TextIcon, ImageIcon, DownloadIcon, EditIcon } from "./history-ui/Icons"
 import { getTypeColor, getTypeIcon, getTypeLabel, formatDate } from "./history-ui/ImageUtils"
+import { HoverTab } from "./history-ui/HoverTab"
 import {
   Stack,
   Text,
@@ -115,8 +116,9 @@ export default function History() {
         .then(imgRes => {
           const groups: { [prompt: string]: ImageRecord[] } = {}
           ;(imgRes.data.history || []).forEach((item: ImageRecord) => {
-            if (!groups[item.prompt]) groups[item.prompt] = []
-            groups[item.prompt].push(item)
+            const key = item.prompt.trim().toLowerCase()
+            if (!groups[key]) groups[key] = []
+            groups[key].push(item)
           })
           setImageHistory(Object.keys(groups).map(prompt => ({ prompt, images: groups[prompt] })))
           setTotalPages(prev => ({ ...prev, images: imgRes.data.total_pages || 1 }))
@@ -179,44 +181,9 @@ export default function History() {
             Browse your past generations
           </Text>
         </Stack>
-
-        <Tabs
-          value={activeTab}
-          onChange={value => setActiveTab(value as Tab)}
-          variant="default"
-          styles={{
-            root: { borderBottom: "none" },
-            list: {
-              borderBottom: "none",
-              gap: 2,
-            },
-            tab: {
-              fontSize: 13,
-              fontWeight: 500,
-              color: "rgba(5, 5, 5, 0.75)",
-              padding: "10px 18px",
-              borderRadius: rem(10),
-              borderBottomLeftRadius: 0,
-              borderBottomRightRadius: 0,
-              border: "1px solid transparent",
-              borderBottom: "none",
-              marginBottom: -1,
-              transition: "all 0.2s ease",
-              "&[dataActive]": {
-                color: "black",
-                background: "rgba(255,255,255,0.05)",
-                borderColor: "rgba(255,255,255,0.08)",
-                borderBottomColor: "transparent",
-              },
-              "&:hover:not([dataActive])": {
-                color: "black",
-                background: "rgba(255,255,255,0.02)",
-              },
-            },
-          }}
-        >
+        <Tabs value={activeTab} onChange={value => setActiveTab(value as Tab)} variant="default">
           <Tabs.List>
-            <Tabs.Tab value="images" leftSection={<ImageIcon />}>
+            <HoverTab value="images" leftSection={<ImageIcon />}>
               Images
               {totalImages > 0 && (
                 <Badge
@@ -235,9 +202,9 @@ export default function History() {
                   {totalImages}
                 </Badge>
               )}
-            </Tabs.Tab>
+            </HoverTab>
 
-            <Tabs.Tab value="text" leftSection={<TextIcon />}>
+            <HoverTab value="text" leftSection={<TextIcon />}>
               Text
               {textHistory.length > 0 && (
                 <Badge
@@ -256,7 +223,7 @@ export default function History() {
                   {textHistory.length}
                 </Badge>
               )}
-            </Tabs.Tab>
+            </HoverTab>
           </Tabs.List>
         </Tabs>
       </Box>
