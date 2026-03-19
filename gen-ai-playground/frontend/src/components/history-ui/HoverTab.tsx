@@ -7,7 +7,7 @@ export function HoverTab({
 }: {
   value: string
   children: React.ReactNode
-  [key: string]: any
+  [key: string]: string | React.ReactNode
 }) {
   const { hovered, ref } = useHover()
 

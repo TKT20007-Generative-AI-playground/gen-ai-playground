@@ -1,4 +1,4 @@
-import { Container, Title } from "@mantine/core"
+import { Container } from "@mantine/core"
 import History from "../components/History"
 import { useMediaQuery } from "@mantine/hooks"
 export default function HistoryPage() {

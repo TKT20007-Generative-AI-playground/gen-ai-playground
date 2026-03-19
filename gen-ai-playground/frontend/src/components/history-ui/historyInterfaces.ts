@@ -30,7 +30,7 @@ export interface TextRecord {
     prompt_tokens?: number
     total_tokens?: number
     completion_tokens?: number
-    prompt_tokens_details?: String
+    prompt_tokens_details?: string
     reasoning_tokens?: number
   }
   generation_time_ms?: number

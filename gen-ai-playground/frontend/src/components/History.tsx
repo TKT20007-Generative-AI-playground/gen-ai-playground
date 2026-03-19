@@ -74,9 +74,7 @@ export default function History() {
   }
 
   const fetchTextHistory = useCallback(
-    (range: [Date | null, Date | null], pageNum: number) => {
-      setLoading(true)
-
+    async (range: [Date | null, Date | null], pageNum: number) => {
       const headers = {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
@@ -84,69 +82,88 @@ export default function History() {
 
       const params = buildParams(range, pageNum)
 
-      axios
-        .get(`${backendUrl}/text/history`, { headers, params })
-        .then(res => {
-          setTextHistory(res.data.history || [])
-          setTotalPages(prev => ({ ...prev, text: res.data.total_pages || 1 }))
-        })
-        .catch(err => {
-          console.error("Failed to fetch text history:", err)
-        })
-        .finally(() => {
-          setLoading(false)
-        })
+      const res = await axios.get(`${backendUrl}/text/history`, {
+        headers,
+        params,
+      })
+
+      return {
+        history: res.data.history || [],
+        totalPages: res.data.total_pages || 1,
+      }
     },
     [backendUrl],
   )
 
   const fetchImagesHistory = useCallback(
-    (range: [Date | null, Date | null], pageNum: number) => {
-      setLoading(true)
-
+    async (range: [Date | null, Date | null], pageNum: number) => {
       const headers = {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
       }
       const params = buildParams(range, pageNum)
 
-      axios
-        .get(`${backendUrl}/images/history`, { headers, params })
-        .then(imgRes => {
-          const groups: { [prompt: string]: ImageRecord[] } = {}
-          ;(imgRes.data.history || []).forEach((item: ImageRecord) => {
-            const key = item.prompt.trim().toLowerCase()
-            if (!groups[key]) groups[key] = []
-            groups[key].push(item)
-            console.log(item)
-          })
-          setImageHistory(Object.keys(groups).map(prompt => ({ prompt, images: groups[prompt] })))
-          setTotalPages(prev => ({ ...prev, images: imgRes.data.total_pages || 1 }))
-        })
-        .catch(err => {
-          console.error("Failed to fetch history:", err)
-        })
-        .finally(() => {
-          setLoading(false)
-        })
+      const imgRes = await axios.get(`${backendUrl}/images/history`, {
+        headers,
+        params,
+      })
+
+      const groups: { [prompt: string]: ImageRecord[] } = {}
+      ;(imgRes.data.history || []).forEach((item: ImageRecord) => {
+        const key = item.prompt.trim().toLowerCase()
+        if (!groups[key]) groups[key] = []
+        groups[key].push(item)
+      })
+
+      return {
+        grouped: Object.keys(groups).map(prompt => ({
+          prompt,
+          images: groups[prompt],
+        })),
+        totalPages: imgRes.data.total_pages || 1,
+      }
     },
     [backendUrl],
   )
 
   useEffect(() => {
-    if (activeTab === "images") {
-      fetchImagesHistory(dateRange, currentPage)
-    } else {
-      fetchTextHistory(dateRange, currentPage)
+    const run = async () => {
+      setLoading(true)
+
+      try {
+        if (activeTab === "images") {
+          const data = await fetchImagesHistory(dateRange, currentPage)
+
+          setImageHistory(data.grouped)
+          setTotalPages(prev => ({
+            ...prev,
+            images: data.totalPages,
+          }))
+        } else {
+          const data = await fetchTextHistory(dateRange, currentPage)
+
+          setTextHistory(data.history)
+          setTotalPages(prev => ({
+            ...prev,
+            text: data.totalPages,
+          }))
+        }
+      } catch (err) {
+        console.error("Failed to fetch history:", err)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [activeTab, dateRange, pages, fetchImagesHistory, fetchTextHistory])
+
+    run()
+  }, [activeTab, dateRange, currentPage, fetchImagesHistory, fetchTextHistory])
 
   useEffect(() => {
     setPages(prev => ({
       ...prev,
       [activeTab]: 1,
     }))
-  }, [dateRange])
+  }, [dateRange, activeTab])
 
   const columns = isMobile ? 2 : isTablet ? 3 : 4
   const totalImages = imageHistory.reduce((acc, g) => acc + g.images.length, 0)
