@@ -1,13 +1,33 @@
-import { Link, useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LoginModal from './Login';
 import { Group, Divider, Text, Button, Drawer } from "@mantine/core";
 import History from "./History";
+import { getTargetTab, saveCurrentTab, getDashboardTab, type PlaygroundTab } from '../constants/tabs';
 
 export default function Header() {
   const { isLoggedIn, isAdmin, logout } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
+
+  // Store current playground tab when navigating to dashboard
+  const handleDashboardClick = () => {
+    const pathMatch = location.pathname.match(/^\/playground\/(\w+)$/)
+    const validTabs: PlaygroundTab[] = ['ImageGenerator', 'ImageEditor', 'TextGenerator'];
+    if (pathMatch && validTabs.includes(pathMatch[1] as PlaygroundTab)) {
+      saveCurrentTab(pathMatch[1] as PlaygroundTab)
+    }
+    // Navigate to the last used dashboard tab
+    const dashboardTab = getDashboardTab()
+    navigate(`/dashboard/${dashboardTab}`)
+  }
+
+  // Navigate to the last used playground tab, defaulting to ImageGenerator
+  const handlePlaygroundClick = () => {
+    const targetTab = getTargetTab()
+    navigate(`/playground/${targetTab}`)
+  }
 
   const [loginOpened, setLoginOpened] = useState(false);
   const [historyOpened, setHistoryOpened] = useState(false);
@@ -55,7 +75,7 @@ export default function Header() {
       <Group justify="space-between" p="md" bg="linear-gradient(135deg, #000F65, #0b1328)" style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Group gap="md">
           {isAdmin && (
-            <Button component={Link} to="/dashboard" variant="white" color="dark" style={{ flexShrink: 0 }}>
+            <Button variant="white" color="dark" onClick={handleDashboardClick} style={{ flexShrink: 0 }}>
               Dashboard
             </Button>
           )}
@@ -70,7 +90,7 @@ export default function Header() {
               History
             </Button>
           )}
-          <Button component={Link} to="/playground" variant="white" color="dark" style={{ flexShrink: 0 }}>
+          <Button variant="white" color="dark" onClick={handlePlaygroundClick} style={{ flexShrink: 0 }}>
             Playground
           </Button>
         </Group>

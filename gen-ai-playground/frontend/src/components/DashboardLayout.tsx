@@ -1,17 +1,30 @@
-import { Link, Outlet, useLocation } from "react-router-dom"
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { Group, Button, Text, Divider } from "@mantine/core"
 import { useAuth } from "../context/AuthContext"
+import { getTargetTab, type DashboardTab, saveDashboardTab } from "../constants/tabs"
 
 export default function DashboardLayout() {
   const location = useLocation()
+  const navigate = useNavigate()
   const { logout } = useAuth()
+
+  // Save current dashboard tab and navigate to playground
+  const handlePlaygroundClick = () => {
+    // Determine current dashboard tab from location
+    const currentTab: DashboardTab = location.pathname === '/dashboard/users' ? 'users' : 'containers'
+    saveDashboardTab(currentTab)
+    
+    // Navigate to the last used playground tab, defaulting to ImageGenerator
+    const targetTab = getTargetTab()
+    navigate(`/playground/${targetTab}`)
+  }
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa" }}>
       {/* Top Bar - Same style as main Header */}
       <Group justify="space-between" p="md" bg="#2C4E87">
         <Group gap="md">
-          <Button component={Link} to="/playground" variant="white" color="dark" style={{ flexShrink: 0 }}>
+          <Button variant="white" color="dark" onClick={handlePlaygroundClick} style={{ flexShrink: 0 }}>
             ← Playground
           </Button>
           <Text fw={500} c="white" style={{ flexShrink: 0 }}>Generative AI Playground</Text>
