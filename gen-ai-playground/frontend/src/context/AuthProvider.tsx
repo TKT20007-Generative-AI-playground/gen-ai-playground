@@ -36,17 +36,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If there's no csrf_token cookie, there's no past session to restore
       const hasCsrf = document.cookie.split("; ").some((c) => c.startsWith("csrf_token="));
       if (!hasCsrf) {
-        console.log("[Auth] No previous session, skipping refresh");
         setIsReady(true);
         return;
       }
 
-      console.log("[Auth] Rehydrating session...");
       try {
         const res = await refreshClient.post("/refresh");
         accessTokenRef.current = res.data.token;
         axios.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`;
-        console.log("[Auth] Refresh token valid, got new access token");
 
         const me = await axios.get(`${backendUrl}/me`, {
           withCredentials: true,
@@ -54,9 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         setUsername(me.data.username || null);
         setIsAdmin(me.data.is_admin || false);
-        console.log("[Auth] Session restored for:", me.data.username);
       } catch {
-        console.log("[Auth] No valid session found, starting logged out");
         clearSession();
       } finally {
         setIsReady(true); // render children only after we know auth state
@@ -85,7 +80,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!original) {
           return Promise.reject(error);
         }
-        console.warn("[Auth] Request failed:", original.url, "status:", error.response?.status);
 
         // Only attempt refresh once per request (avoid infinite loop)
         if (error.response?.status !== 401 || original._retried) {
@@ -93,7 +87,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (isRefreshing.current) {
-          console.log("[Auth] Refresh in progress, queuing request:", original.url);
           // Queue this request until the in-flight refresh completes
           return new Promise((resolve, reject) => {
             refreshQueue.current.push((token) => {
@@ -107,7 +100,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         original._retried = true;
         isRefreshing.current = true;
-        console.log("[Auth] Access token expired, attempting refresh...");
 
         try {
           const res = await refreshClient.post("/refresh");
@@ -117,10 +109,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           flushQueue(newToken);
           original.headers = original.headers ?? {};
           original.headers["Authorization"] = `Bearer ${newToken}`;
-          console.log("[Auth] Refresh successful, retrying original request:", original.url);
           return axios(original); // retry original request
         } catch {
-          console.error("[Auth] Refresh failed, clearing session");
           flushQueue(null);
           clearSession();
           return Promise.reject(error);
