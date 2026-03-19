@@ -57,6 +57,7 @@ def get_available_compute(current_user: UserInfo = Depends(get_current_user)):
 def deploy_model(
     request: DeployModelRequest,
     current_user: UserInfo = Depends(get_admin_user),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Deploy an LLM model on Verda Cloud using SGLang or vLLM.
@@ -526,6 +527,7 @@ def chat_with_model(
 def delete_deployment(
     deployment_name: str = Query(..., description="Name of the deployment to delete"),
     current_user: UserInfo = Depends(get_admin_user),
+    _csrf: None = Depends(validate_csrf_token),
 ):
     """
     Delete a specific deployment and clean up resources.
