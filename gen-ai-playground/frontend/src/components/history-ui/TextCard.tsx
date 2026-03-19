@@ -12,7 +12,7 @@ import {
 } from "@mantine/core"
 import { useState } from "react"
 import type { TextRecord } from "./historyInterfaces"
-import { formatDate } from "./imageUtils"
+import { formatDate } from "./ImageUtils"
 import { ClockIcon, CopyIcon } from "./Icons"
 
 export default function TextCard({ item }: { item: TextRecord }) {

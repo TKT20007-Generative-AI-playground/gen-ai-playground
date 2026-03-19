@@ -1,7 +1,7 @@
 import { Badge, Box, Card, Group, Overlay, Text } from "@mantine/core"
 import { useState } from "react"
 import type { ImageRecord } from "./historyInterfaces"
-import { getTypeColor, getTypeIcon, getTypeLabel } from "./imageUtils"
+import { getTypeColor, getTypeIcon, getTypeLabel } from "./ImageUtils"
 import { ClockIcon } from "./Icons"
 
 export default function ImageCard({ item, onClick }: { item: ImageRecord; onClick: () => void }) {

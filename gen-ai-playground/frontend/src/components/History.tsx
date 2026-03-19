@@ -7,7 +7,7 @@ import ImageCard from "./history-ui/ImageCard"
 import TextCard from "./history-ui/TextCard"
 import EmptyState from "./history-ui/EmptyState"
 import { TextIcon, ImageIcon, DownloadIcon, EditIcon } from "./history-ui/Icons"
-import { getTypeColor, getTypeIcon, getTypeLabel, formatDate } from "./history-ui/imageUtils"
+import { getTypeColor, getTypeIcon, getTypeLabel, formatDate } from "./history-ui/ImageUtils"
 import {
   Stack,
   Text,
