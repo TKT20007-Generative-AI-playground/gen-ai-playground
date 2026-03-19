@@ -10,6 +10,7 @@ import {
 import { useForm } from '@mantine/form'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import axios from 'axios'
 
 interface LoginModalProps {
   opened: boolean
@@ -30,25 +31,19 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      const res = await fetch(`${backendUrl}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      })
+      const res = await axios.post(
+        `${backendUrl}/login`,
+        values,
+        { withCredentials: true }
+      );
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        alert(data.detail || 'Login failed')
-        return
-      }
-
-      login(data.token, data.username, data.is_admin || false)
-      onClose()
-    } catch {
-      alert('Server unreachable')
+      login(res.data.token, res.data.username, res.data.is_admin || false);
+      onClose();
+    } catch (error: unknown) {
+      const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      alert(detail || 'Login failed');
     }
-  }
+  };
 
   return (
     <Modal opened={opened} onClose={onClose} title="Login" centered>

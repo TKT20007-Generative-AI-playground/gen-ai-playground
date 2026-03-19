@@ -14,7 +14,7 @@ import httpx
 
 from app.config import settings
 from app.database import get_database
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, validate_csrf_token
 from app.models import ImageRequestBody, HistoryResponse, UserInfo
 
 
@@ -88,7 +88,8 @@ def get_history(
 async def generate_image(
     image_request: ImageRequestBody,
     current_user: UserInfo = Depends(get_current_user),
-    db: Database = Depends(get_database)
+    db: Database = Depends(get_database),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Generate an image based on a prompt using Verda API
@@ -103,6 +104,9 @@ async def generate_image(
         
     Raises:
         HTTPException: If image generation fails
+
+    Notes:
+        Requires CSRF token validation for cookie-authenticated requests.
     """
     print(f"Image generation called at: {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}")
     print(f"Generating image for user: {current_user.username}...")
@@ -202,7 +206,8 @@ async def generate_image(
 async def edit_image(
     image_request: ImageRequestBody,
     current_user: UserInfo = Depends(get_current_user),
-    db: Database = Depends(get_database)
+    db: Database = Depends(get_database),
+    _: None = Depends(validate_csrf_token),
     ):
     
     """
@@ -211,6 +216,9 @@ async def edit_image(
         current_user: UserInfo = Depends(get_current_user), _description_ (user info from )
         db: Database = Depends(get_database), _description_
         image_request (ImageRequestBody): _description_
+    
+    Notes:
+        Requires CSRF token validation for cookie-authenticated requests.
     """
     prompt = image_request.prompt  # prompt from request body
     model = image_request.model    # model from req body
