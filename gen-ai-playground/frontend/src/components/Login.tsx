@@ -8,16 +8,18 @@ import {
   Anchor,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 interface LoginModalProps {
   opened: boolean
   onClose: () => void
+  redirectTo?: string | null
 }
 
-export default function LoginModal({ opened, onClose }: LoginModalProps) {
+export default function LoginModal({ opened, onClose, redirectTo }: LoginModalProps) {
   const { login } = useAuth()
+  const navigate = useNavigate()
 
   const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -45,6 +47,9 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
 
       login(data.token, data.username, data.is_admin || false)
       onClose()
+      if (redirectTo) {
+        navigate(redirectTo)
+      }
     } catch {
       alert('Server unreachable')
     }

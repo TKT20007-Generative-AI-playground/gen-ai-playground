@@ -2,8 +2,10 @@ import { Box, Button, Group, Image, Stack, Title } from "@mantine/core";
 import { Carousel } from "@mantine/carousel";
 import AutoScroll from "embla-carousel-auto-scroll";
 import { useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import HoverCard from "../components/HoverCard";
 import useFadeIn from "../hooks/useFadeIn";
+import { useAuth } from '../context/AuthContext';
 
 const showcaseFiles = import.meta.glob<string>("../assets/showcase/*.{png,jpg,jpeg,webp}", { eager: true, query: "?url", import: "default" });
 const showcaseImages = Object.entries(showcaseFiles).map(([path, url]) => ({
@@ -20,11 +22,20 @@ const titleStyle = {
 
 const headerColor = "#000F65"
 
-const Main = () => {
+const Front = () => {
     const autoplay = useRef(AutoScroll({ speed: 1, stopOnInteraction: false, stopOnMouseEnter: true }));
     const heroTitles = useFadeIn(0);
     const heroButton = useFadeIn(400);
     const carouselFade = useFadeIn(1500);
+    const { isLoggedIn } = useAuth()
+    const navigate = useNavigate();
+    const handleLoggedIn = (url: string) => {
+        if (isLoggedIn) {
+            navigate(`/playground/${url || 'ImageGenerator'}`);
+        } else {
+            navigate("/", { state: { openLoginModal: true, redirectTo: `/playground/${url || 'ImageGenerator'}` } });
+        }
+    };
 
     return (
         <>
@@ -52,7 +63,7 @@ const Main = () => {
                         <Title {...titleStyle} fz={{ base: "2rem", sm: "3rem", md: "4rem" }}>PLAYGROUND</Title>
                     </Stack>
                     <Box ref={heroButton.ref} className={`fade-in ${heroButton.isVisible ? "visible" : ""}`}>
-                        <Button size="lg" variant="white" style={{ color: headerColor, paddingLeft: "2rem", paddingRight: "2rem" }}>Get Started</Button>
+                        <Button size="lg" variant="white" onClick={() => handleLoggedIn('ImageGenerator')} style={{ color: headerColor, paddingLeft: "2rem", paddingRight: "2rem" }}>Get Started</Button>
                     </Box>
                 </Group>
             </Box>
@@ -66,6 +77,7 @@ const Main = () => {
                         description="Test different Flux image generation models and find the best one for your needs."
                         buttonText="Test image generators"
                         delay={800}
+                        onClick={() => handleLoggedIn("ImageGenerator")}
                     />
                     <HoverCard
                         image="/images/flux-edit.png"
@@ -73,6 +85,7 @@ const Main = () => {
                         description="Edit different images using Flux image editing models and find the best one for your needs."
                         buttonText="Test image editor"
                         delay={1000}
+                        onClick={() => handleLoggedIn("ImageEditor")}
                     />
                     <HoverCard
                         image="/images/text-generate.png"
@@ -80,6 +93,7 @@ const Main = () => {
                         description="Generate text using different text generation models and find the best one for your needs."
                         buttonText="Test text generators"
                         delay={1200}
+                        onClick={() => handleLoggedIn("TextGenerator")}
                     />
                 </Group>
             </Box>
@@ -123,6 +137,26 @@ const Main = () => {
                                             opacity: 0,
                                             transition: "opacity 0.2s",
                                         }}
+                                        onClick={async () => {
+                                            const res = await fetch(img.url);
+                                            const blob = await res.blob();
+                                            const reader = new FileReader();
+                                            reader.onloadend = () => {
+                                                const dataUrl = reader.result as string;
+                                                const base64 = dataUrl.split(",")[1];
+                                                navigate("/playground/ImageEditor", {
+                                                    state: {
+                                                        imageToEdit: {
+                                                            image_data: base64,
+                                                            image_type: blob.type,
+                                                            prompt: "",
+                                                            model: "",
+                                                        }
+                                                    }
+                                                });
+                                            };
+                                            reader.readAsDataURL(blob);
+                                        }}
                                     >
                                         Edit
                                     </Button>
@@ -137,4 +171,4 @@ const Main = () => {
 };
 
 
-export default Main;
+export default Front;

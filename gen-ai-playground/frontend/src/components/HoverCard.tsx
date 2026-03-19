@@ -7,9 +7,10 @@ interface HoverCardProps {
     description: string;
     buttonText: string;
     delay?: number;
+    onClick?: () => void;
 }
 
-const HoverCard = ({ image, title, description, buttonText, delay = 0 }: HoverCardProps) => {
+const HoverCard = ({ image, title, description, buttonText, delay = 0, onClick }: HoverCardProps) => {
     const { ref, isVisible } = useFadeIn(delay);
 
     return (
@@ -37,7 +38,7 @@ const HoverCard = ({ image, title, description, buttonText, delay = 0 }: HoverCa
                     {description}
                 </Text>
 
-                <Button color="#000F65" fullWidth mt="md" radius="md">
+                <Button color="#000F65" fullWidth mt="md" radius="md" onClick={onClick}>
                     {buttonText}
                 </Button>
             </Box>
