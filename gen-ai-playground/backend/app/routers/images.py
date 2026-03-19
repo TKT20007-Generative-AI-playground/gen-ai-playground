@@ -2,10 +2,13 @@
 Image generation and history routes
 """
 import traceback
+import uuid
+from pathlib import Path
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import Response
 from pymongo.database import Database
+from bson import ObjectId
 from datetime import datetime, timezone
 import base64
 import time
@@ -14,8 +17,11 @@ import requests
 
 from app.config import settings
 from app.database import get_database
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_admin_user
 from app.models import ImageRequestBody, HistoryResponse, UserInfo
+
+SHOWCASE_DIR = Path(__file__).resolve().parent.parent.parent / "showcase"
+SHOWCASE_DIR.mkdir(exist_ok=True)
 
 
 router = APIRouter(
@@ -60,7 +66,7 @@ def get_history(
 
         for item in history:
             if "_id" in item:
-                del item["_id"]
+                item["_id"] = str(item["_id"])
             if "parent_image_id" in item:
                 del item["parent_image_id"]
         
@@ -365,10 +371,56 @@ def build_request_data(model: str,  prompt: str, image_base64: Optional[str] = N
             base_data["image"] = image_base64
     if "KLEIN" not in model:
         base_data = {"input":base_data}
-    
+
     return base_data
-        
-        
-        
-    
-    
+
+
+@router.get("/showcase")
+def list_showcase_images():
+    """List all showcase images (public, no auth required)"""
+    if not SHOWCASE_DIR.exists():
+        return {"images": []}
+    files = sorted(SHOWCASE_DIR.glob("*.png"), key=lambda f: f.stat().st_mtime, reverse=True)
+    return {
+        "images": [
+            {"filename": f.name, "url": f"/showcase/{f.name}"}
+            for f in files
+        ]
+    }
+
+
+@router.post("/showcase/{image_id}")
+def feature_image(
+    image_id: str,
+    admin_user: UserInfo = Depends(get_admin_user),
+    db: Database = Depends(get_database)
+):
+    """Add an image to the showcase (admin only)"""
+    image = db.images.find_one({"_id": ObjectId(image_id)})
+    if not image:
+        raise HTTPException(status_code=404, detail="Image not found")
+
+    image_bytes = base64.b64decode(image["image_data"])
+    filename = f"{uuid.uuid4().hex}.png"
+    filepath = SHOWCASE_DIR / filename
+    filepath.write_bytes(image_bytes)
+
+    return {"message": "Image featured in showcase", "filename": filename}
+
+
+@router.delete("/showcase/{filename}")
+def remove_showcase_image(
+    filename: str,
+    admin_user: UserInfo = Depends(get_admin_user),
+):
+    """Remove an image from the showcase (admin only)"""
+    # Prevent path traversal
+    if filename != Path(filename).name or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    filepath = SHOWCASE_DIR / filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Showcase image not found")
+    filepath.unlink()
+    return {"message": "Image removed from showcase"}
+

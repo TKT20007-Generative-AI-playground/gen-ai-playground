@@ -1,9 +1,11 @@
 import { Box, Button, Group, Image, Stack, Title } from "@mantine/core";
 import { Carousel } from "@mantine/carousel";
 import AutoScroll from "embla-carousel-auto-scroll";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import HoverCard from "../components/HoverCard";
 import useFadeIn from "../hooks/useFadeIn";
+
+const backendUrl = import.meta.env.VITE_API_URL;
 
 const titleStyle = {
     c: "white",
@@ -14,10 +16,23 @@ const titleStyle = {
 
 const headerColor = "#000F65"
 
+interface ShowcaseImage {
+    filename: string;
+    url: string;
+}
+
 const Main = () => {
     const autoplay = useRef(AutoScroll({ speed: 1, stopOnInteraction: false, stopOnMouseEnter: true }));
     const heroTitles = useFadeIn(0);
     const heroButton = useFadeIn(400);
+    const [showcaseImages, setShowcaseImages] = useState<ShowcaseImage[]>([]);
+
+    useEffect(() => {
+        fetch(`${backendUrl}/images/showcase`)
+            .then((res) => res.json())
+            .then((data) => setShowcaseImages(data.images || []))
+            .catch(() => {});
+    }, []);
 
     return (
         <>
@@ -77,38 +92,27 @@ const Main = () => {
                 </Group>
             </Box>
 
-            <Box style={{ padding: "4rem 2rem" }}>
-                <Title order={2} ta="center" mb="xl" style={{ color: headerColor, fontFamily: "'Google sans', sans-serif" }}>
-                    Featured Works
-                </Title>
-                <Carousel
-                    withIndicators
-                    height={300}
-                    slideSize={{ base: "100%", sm: "50%", md: "33.333%" }}
-                    slideGap="md"
-                    emblaOptions={{ loop: true, align: "start" }}
-                    plugins={[autoplay.current]}
-                >
-                    <Carousel.Slide>
-                        <Image src="/images/flux-gen.png" h="100%" fit="cover" radius="md" />
-                    </Carousel.Slide>
-                    <Carousel.Slide>
-                        <Image src="/images/flux-edit.png" h="100%" fit="cover" radius="md" />
-                    </Carousel.Slide>
-                    <Carousel.Slide>
-                        <Image src="/images/text-generate.png" h="100%" fit="cover" radius="md" />
-                    </Carousel.Slide>
-                    <Carousel.Slide>
-                        <Image src="/images/flux-gen.png" h="100%" fit="cover" radius="md" />
-                    </Carousel.Slide>
-                    <Carousel.Slide>
-                        <Image src="/images/flux-edit.png" h="100%" fit="cover" radius="md" />
-                    </Carousel.Slide>
-                    <Carousel.Slide>
-                        <Image src="/images/text-generate.png" h="100%" fit="cover" radius="md" />
-                    </Carousel.Slide>
-                </Carousel>
-            </Box>
+            {showcaseImages.length > 0 && (
+                <Box style={{ padding: "4rem 2rem" }}>
+                    <Title order={2} ta="center" mb="xl" style={{ color: headerColor, fontFamily: "'Google sans', sans-serif" }}>
+                        Featured Works
+                    </Title>
+                    <Carousel
+                        withIndicators
+                        height={300}
+                        slideSize={{ base: "100%", sm: "50%", md: "33.333%" }}
+                        slideGap="md"
+                        emblaOptions={{ loop: true, align: "start" }}
+                        plugins={[autoplay.current]}
+                    >
+                        {showcaseImages.map((img) => (
+                            <Carousel.Slide key={img.filename}>
+                                <Image src={`${backendUrl}${img.url}`} h="100%" fit="cover" radius="md" />
+                            </Carousel.Slide>
+                        ))}
+                    </Carousel>
+                </Box>
+            )}
         </>
     );
 };
