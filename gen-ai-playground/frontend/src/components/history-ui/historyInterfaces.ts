@@ -1,4 +1,6 @@
 export interface ImageRecord {
+  id: string
+  username: string
   prompt: string
   model: string
   timestamp: string

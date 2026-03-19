@@ -12,6 +12,7 @@ class ImageRequestBody(BaseModel):
     model: str
     image: Optional[str] = None  
     image_to_edit: Optional[str] = None
+    id: Optional[str] = None
     parent_image_id: Optional[str] = None
 
 
@@ -45,6 +46,8 @@ class RegisterResponse(BaseModel):
 
 class HistoryItem(BaseModel):
     """Model for a single history item"""
+    id: str 
+    username: str
     prompt: str
     model: str
     timestamp: datetime

@@ -14,6 +14,7 @@ import {
 import { formatDurationMs } from "../utils/time"
 
 type ImageToEdit = {
+  id?: string
   image_data: string
   image_type: string | null | undefined
   model: string
@@ -23,6 +24,7 @@ type ImageToEdit = {
 export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit | null }) {
   const [prompt, setPrompt] = useState("")
   const [userImage, setUserImage] = useState<File | null>(null)
+  const [parentImageId, setParentImageId] = useState<string | null>(null)
 
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null)
   const [editedImageUrl, setEditedImageUrl] = useState<string | null>(null)
@@ -63,6 +65,7 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
 
       const file = new File([blob], "edited.png", { type: "image/png" })
       setUserImage(file)
+      setParentImageId(imageToEdit.id ?? null)
 
       replaceEditedUrl(null)
       setPrompt("")
@@ -129,7 +132,13 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
 
       const response = await axios.post(
         `${backendUrl}/images/edit-image`,
-        { image: base64, prompt: nextPrompt, model: selectedModel },
+        {
+          image: base64,
+          prompt: nextPrompt,
+          model: selectedModel,
+          // If the user started from a history image, its id (from db) is passed as parent.
+          parent_image_id: parentImageId ?? undefined,
+        },
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -187,6 +196,7 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
     reeditControllerRef.current = null
 
     setUserImage(file)
+    setParentImageId(null)
     replaceEditedUrl(null)
     setIsLoading(false)
     setEditTimeMs(null)
@@ -199,6 +209,7 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
     reeditControllerRef.current?.abort()
     const controller = new AbortController()
     reeditControllerRef.current = controller
+    setParentImageId(null)
     setError(null)
 
     axios

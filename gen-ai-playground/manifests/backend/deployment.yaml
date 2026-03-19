@@ -72,7 +72,11 @@ spec:
                 secretKeyRef:
                   name: genai-admin-credentials
                   key: ADMIN_PASSWORD
-                
+            - name: gen-ai-jwt-refresh-secret
+              valueFrom:
+                secretKeyRef:
+                  name: gen-ai-jwt-refresh-secret-key
+                  key: JWT_REFRESH_SECRET_KEY
           resources:
             limits:
               memory: "512Mi"
@@ -80,3 +84,4 @@ spec:
             requests:
               memory: "128Mi"
               cpu: "50m"
+

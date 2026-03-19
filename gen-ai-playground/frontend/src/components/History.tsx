@@ -25,7 +25,6 @@ import {
   Tooltip,
   Transition,
   SimpleGrid,
-  rem,
   Pagination,
 } from "@mantine/core"
 import { useMediaQuery } from "@mantine/hooks"
@@ -119,6 +118,7 @@ export default function History() {
             const key = item.prompt.trim().toLowerCase()
             if (!groups[key]) groups[key] = []
             groups[key].push(item)
+            console.log(item)
           })
           setImageHistory(Object.keys(groups).map(prompt => ({ prompt, images: groups[prompt] })))
           setTotalPages(prev => ({ ...prev, images: imgRes.data.total_pages || 1 }))
@@ -475,6 +475,7 @@ export default function History() {
                   navigate("/playground/ImageEditor", {
                     state: {
                       imageToEdit: {
+                        id: img.id,
                         image_data: img.image_data,
                         image_type: img.image_type,
                         prompt: img.prompt,

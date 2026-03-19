@@ -41,7 +41,7 @@ export default function ImageCard({ item, onClick }: { item: ImageRecord; onClic
           }}
         />
 
-        {/* Type badge – always visible, pinned top-right */}
+        {/* Type badge */}
         <Badge
           data-testid={item.image_type}
           size="xs"
