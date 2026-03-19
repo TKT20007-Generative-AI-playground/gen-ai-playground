@@ -6,9 +6,10 @@ export type PhotoAreaProps = {
   alt: string
   header?: ReactNode
   height?: number
+  placeholder?: ReactNode
 }
 
-export default function PhotoArea({ src, alt, header, height = 420 }: PhotoAreaProps) {
+export default function PhotoArea({ src, alt, header, height = 420, placeholder }: PhotoAreaProps) {
   const hasImage = Boolean(src)
 
   return (
@@ -40,9 +41,11 @@ export default function PhotoArea({ src, alt, header, height = 420 }: PhotoAreaP
             }}
           />
         ) : (
-          <Text c="dimmed" size="sm">
-            No image
-          </Text>
+          placeholder || (
+            <Text c="dimmed" size="sm">
+              No image
+            </Text>
+          )
         )}
       </div>
     </Card>

@@ -48,7 +48,7 @@ export default function Playground() {
       </Group>
 
       <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
-        <div style={{ width: "100%", maxWidth: 1100, padding: "0 16px" }}>
+        <div style={{ width: "100%", maxWidth: 1100, padding: "0 16px 24px" }}>
           {componentsMap[selectedComponent]}
         </div>
       </div>
