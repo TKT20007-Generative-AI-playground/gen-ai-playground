@@ -12,9 +12,10 @@
   },
   "dependencies": {
     "@mantine/carousel": "8.3.18",
-    "@mantine/core": "8.3.18",
-    "@mantine/form": "8.3.18",
-    "@mantine/hooks": "8.3.18",
+    "@mantine/core": "^8.3.14",
+    "@mantine/form": "^8.3.14",
+    "@mantine/hooks": "^8.3.14",
+    "@tabler/icons-react": "^3.28.1",
     "axios": "^1.13.5",
     "embla-carousel-auto-scroll": "^8.6.0",
     "embla-carousel-react": "^8.6.0",

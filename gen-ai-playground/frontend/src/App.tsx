@@ -6,6 +6,7 @@ import Playground from "./pages/Playground"
 import DashboardLayout from "./components/DashboardLayout"
 import DashboardContainers from "./pages/DashboardContainers"
 import DashboardUsers from "./pages/DashboardUsers"
+import DashboardInvitations from "./pages/DashboardInvitations"
 import History from "./components/History"
 // import { useAuth } from "./context/AuthContext"
 import { ProtectedRoute } from "./components/ProtectedRoute"
@@ -67,6 +68,7 @@ function AppContent() {
           <Route index element={<Navigate to="/dashboard/containers" replace />} />
           <Route path="containers" element={<DashboardContainers />} />
           <Route path="users" element={<DashboardUsers />} />
+          <Route path="invitations" element={<DashboardInvitations />} />
         </Route>
       </Routes>
     </>

@@ -95,11 +95,20 @@ def register(
     validate_password(user_data.password)
 
     try:
-        # Validate invitation code
-        if not settings.INVITATION_CODE or user_data.invitation_code != settings.INVITATION_CODE:
+        # Validate invitation code against database
+        now = datetime.utcnow()
+        # Check if code exists, is active, not expired, and has remaining uses
+        invitation = db.invitation_codes.find_one({
+            "code": user_data.invitation_code,
+            "is_active": True,
+            "expires_at": {"$gt": now},
+            "$expr": {"$lt": ["$uses_count", "$max_uses"]}
+        })
+        
+        if not invitation:
             raise HTTPException(
                 status_code=403,
-                detail="Invalid invitation code"
+                detail="Invalid, expired, or fully used invitation code"
             )
         
         # Check if user already exists
@@ -127,6 +136,16 @@ def register(
         
         # Insert user into database
         db.users.insert_one(user_doc)
+        
+        # Increment the invitation code usage count
+        if invitation:
+            db.invitation_codes.update_one(
+                {"_id": invitation["_id"]},
+                {
+                    "$inc": {"uses_count": 1},
+                    "$push": {"used_by": user_data.username}
+                }
+            )
         
         return RegisterResponse(
             message="User registered successfully",

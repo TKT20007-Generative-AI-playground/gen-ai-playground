@@ -39,6 +39,15 @@ export default function DashboardLayout() {
           </Button>
           <Button
             component={Link}
+            to="/dashboard/invitations"
+            variant={location.pathname.includes("/dashboard/invitations") ? "filled" : "white"}
+            color={location.pathname.includes("/dashboard/invitations") ? "blue" : "dark"}
+            style={{ flexShrink: 0 }}
+          >
+            Invitations
+          </Button>
+          <Button
+            component={Link}
             to="/dashboard/users"
             variant={location.pathname.includes("/dashboard/users") ? "filled" : "white"}
             color={location.pathname.includes("/dashboard/users") ? "blue" : "dark"}

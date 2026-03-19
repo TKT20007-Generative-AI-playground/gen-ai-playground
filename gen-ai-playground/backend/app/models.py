@@ -154,6 +154,43 @@ class ChatRequest(BaseModel):
     top_p: float = 0.9
 
 
+# ---- Invitation code models ----
+
+class InvitationCodeCreate(BaseModel):
+    """Request model for creating an invitation code"""
+    code: str = Field(min_length=5, max_length=64)
+    expiration_days: int = Field(default=30, ge=1, le=365)
+    max_uses: int = Field(default=1, ge=1, le=100)
+
+
+class InvitationCodeInfo(BaseModel):
+    """Model for invitation code information"""
+    code: str
+    created_at: datetime
+    expires_at: datetime
+    max_uses: int
+    uses_count: int = 0
+    is_active: bool = True
+    used_by: Optional[List[str]] = None
+
+
+class InvitationCodeCreateResponse(BaseModel):
+    """Response model for creating an invitation code"""
+    message: str
+    code: InvitationCodeInfo
+
+
+class InvitationCodeListResponse(BaseModel):
+    """Response model for listing invitation codes"""
+    codes: List[InvitationCodeInfo]
+
+
+class InvitationCodeDeleteResponse(BaseModel):
+    """Response model for deleting an invitation code"""
+    message: str
+    code: str
+
+
 class ChatResponse(BaseModel):
     """Response model for chat completions"""
     reply: str
