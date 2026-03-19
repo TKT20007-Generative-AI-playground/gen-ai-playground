@@ -45,16 +45,12 @@ class RegisterResponse(BaseModel):
 
 class HistoryItem(BaseModel):
     """Model for a single history item"""
-    id: Optional[str] = Field(None, alias="_id")
     prompt: str
     model: str
     timestamp: datetime
     image_size: int
     image_data: str
     image_type: str
-
-    model_config = {"populate_by_name": True}
-
 
 class HistoryResponse(BaseModel):
     """Response model for history endpoint"""

@@ -12,10 +12,8 @@ import {
   Button
 } from "@mantine/core";
 import { EDIT_MODELS } from "../constants/models"
-import { useAuth } from "../context/AuthContext"
 
 interface ImageRecord {
-  _id?: string;
   prompt: string;
   model: string;
   timestamp: string;
@@ -32,7 +30,6 @@ const backendUrl = import.meta.env.VITE_API_URL;
 
 export default function History() {
   const navigate = useNavigate();
-  const { isAdmin } = useAuth();
   const [history, setHistory] = useState<PromptGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null);
@@ -186,32 +183,6 @@ export default function History() {
       >
         Edit image
       </Button>
-
-      {isAdmin && selectedImage._id && (
-        <Button
-          variant="outline"
-          color="yellow"
-          fullWidth
-          onClick={async () => {
-            const res = await fetch(
-              `${backendUrl}/images/showcase/${selectedImage._id}`,
-              {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
-                },
-              }
-            );
-            if (res.ok) {
-              alert("Image featured in showcase!");
-            } else {
-              alert("Failed to feature image.");
-            }
-          }}
-        >
-          Feature in Showcase
-        </Button>
-      )}
     </Stack>
   )}
 </Modal>

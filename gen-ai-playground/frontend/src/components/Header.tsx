@@ -49,7 +49,9 @@ export default function Header() {
     <>
       <Group justify="space-between" p="md" bg="#000F65">
         <Group gap="md">
-          <Text fw={500} c="white">Generative AI Playground </Text>
+          <Text fw={500} c="white" component={Link} to="/">
+            Generative AI Playground
+          </Text>
           {isLoggedIn && (
             <Button
               variant="white"
