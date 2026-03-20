@@ -139,13 +139,23 @@ def register(
         
         # Increment the invitation code usage count
         if invitation:
-            db.invitation_codes.update_one(
-                {"_id": invitation["_id"]},
-                {
-                    "$inc": {"uses_count": 1},
-                    "$push": {"used_by": user_data.username}
-                }
-            )
+            # Ensure used_by is an array before pushing (handles null/empty cases)
+            if invitation.get("used_by") is None:
+                db.invitation_codes.update_one(
+                    {"_id": invitation["_id"]},
+                    {
+                        "$inc": {"uses_count": 1},
+                        "$set": {"used_by": [user_data.username]}
+                    }
+                )
+            else:
+                db.invitation_codes.update_one(
+                    {"_id": invitation["_id"]},
+                    {
+                        "$inc": {"uses_count": 1},
+                        "$push": {"used_by": user_data.username}
+                    }
+                )
         
         return RegisterResponse(
             message="User registered successfully",
@@ -154,9 +164,10 @@ def register(
     except HTTPException:
         raise
     except Exception as e:
+        # Show user-friendly message
         raise HTTPException(
             status_code=500,
-            detail=f"Registration failed: {str(e)}"
+            detail="Registration failed."
         )
 
 

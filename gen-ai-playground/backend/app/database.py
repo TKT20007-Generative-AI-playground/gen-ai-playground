@@ -1,7 +1,7 @@
 """
 Database connection and utilities
 """
-from pymongo import MongoClient
+from pymongo import MongoClient, DESCENDING
 from pymongo.database import Database
 from typing import Optional
 from app.config import settings
@@ -76,7 +76,11 @@ class DatabaseManager:
             return
         
         # Create index on invitation_codes.created_at for sorting
-        self.db.invitation_codes.create_index("created_at", descending=True)
+        # Use background=True to not block the application startup
+        self.db.invitation_codes.create_index(
+            [("created_at", DESCENDING)],
+            background=True
+        )
         print("Created index on invitation_codes.created_at")
     
     def get_db(self) -> Optional[Database]:
