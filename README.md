@@ -9,8 +9,8 @@ The project is carried out in cooperation with Verda
 
 - [Architecture](#architecture)
 - [Running the application locally](#running-the-application-locally)
-- [Environment variables and Docker Compose](#environment-variables-and-docker-compose)
-- [Running frontend and backend separately](#running-frontend-and-backend-separately)
+- [Environment variables](#environment-variables)
+- [Running frontend and backend separately (without docker compose)](#running-frontend-and-backend-separately-without-docker-compose)
 - [OpenShift instructions](#openshift-instructions)
 - [Verda documentation](#verda-documentation)
 ---
