@@ -119,6 +119,7 @@ HF_TOKEN="your-huggingface-token"
 JWT_SECRET_KEY="dev-secret-key-for-local-development"
 ADMIN_USERNAME="admin"
 ADMIN_PASSWORD="Localadmin123!"
+JWT_REFRESH_SECRET_KEY="dev-refresh-secret-key-for-local-development"
 
 # CORS
 ALLOWED_ORIGINS="http://localhost:5173"
