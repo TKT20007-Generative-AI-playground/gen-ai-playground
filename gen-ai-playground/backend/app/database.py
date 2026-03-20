@@ -17,6 +17,7 @@ class DatabaseManager:
         self.db: Optional[Database] = None
         self._connect()
         self._seed_admin()
+        self._create_indexes()
     
     def _connect(self):
         """Establish MongoDB connection"""
@@ -68,6 +69,15 @@ class DatabaseManager:
             "created_at": datetime.utcnow()
         })
         print(f"Admin user '{settings.ADMIN_USERNAME}' created from environment.")
+    
+    def _create_indexes(self):
+        """Create database indexes for optimal query performance"""
+        if self.db is None:
+            return
+        
+        # Create index on invitation_codes.created_at for sorting
+        self.db.invitation_codes.create_index("created_at", descending=True)
+        print("Created index on invitation_codes.created_at")
     
     def get_db(self) -> Optional[Database]:
         """Get database instance"""

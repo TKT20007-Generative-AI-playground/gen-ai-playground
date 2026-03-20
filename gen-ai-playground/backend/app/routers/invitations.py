@@ -1,10 +1,13 @@
 """
 Invitation code management routes (admin only)
 """
-from fastapi import APIRouter, HTTPException, Depends
+import logging
+from fastapi import APIRouter, HTTPException, Depends, Path
 from pymongo.database import Database
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from app.dependencies import get_admin_user
 from app.database import get_database
@@ -52,6 +55,9 @@ def create_invitation_code(
             existing = db.invitation_codes.find_one({"code": code_data.code})
         except Exception as col_err:
             # Collection might not exist, try to create it implicitly
+            # Log non-collection errors for debugging
+            if "namespace" not in str(col_err).lower() and "not found" not in str(col_err).lower():
+                logger.warning(f"Database error checking invitation code: {col_err}")
             existing = None
         
         if existing:
@@ -155,7 +161,7 @@ def list_invitation_codes(
 
 @router.delete("/codes/{code}", response_model=InvitationCodeDeleteResponse)
 def delete_invitation_code(
-    code: str,
+    code: str = Path(..., min_length=5, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$"),
     admin: UserInfo = Depends(get_admin_user),
     db: Database = Depends(get_database)
 ):
@@ -195,7 +201,7 @@ def delete_invitation_code(
 
 @router.post("/codes/{code}/deactivate", response_model=InvitationCodeDeleteResponse)
 def deactivate_invitation_code(
-    code: str,
+    code: str = Path(..., min_length=5, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$"),
     admin: UserInfo = Depends(get_admin_user),
     db: Database = Depends(get_database)
 ):
@@ -238,7 +244,7 @@ def deactivate_invitation_code(
 
 @router.post("/codes/{code}/reactivate", response_model=InvitationCodeDeleteResponse)
 def reactivate_invitation_code(
-    code: str,
+    code: str = Path(..., min_length=5, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$"),
     admin: UserInfo = Depends(get_admin_user),
     db: Database = Depends(get_database)
 ):
@@ -284,7 +290,7 @@ def reactivate_invitation_code(
 
 @router.post("/codes/{code}/add-uses", response_model=InvitationCodeDeleteResponse)
 def add_uses_to_code(
-    code: str,
+    code: str = Path(..., min_length=5, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$"),
     uses_data: AddUsesRequest,
     admin: UserInfo = Depends(get_admin_user),
     db: Database = Depends(get_database)
@@ -328,11 +334,4 @@ def add_uses_to_code(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to add uses to invitation code: {str(e)}"
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to reactivate invitation code: {str(e)}"
         )
