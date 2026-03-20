@@ -170,7 +170,7 @@ npm run dev
 
 4. The application will be available via the route address defined by OpenShift.
 
-5. The required environment variables for the backend (such as ALLOWED_ORIGINS, VERDA_API_KEY, MONGO_DB_URL, INVITATION_CODE, JWT_SECRET_KEY, VERDA_CLIENT_SECRET, VERDA_CLIENT_ID, HF_TOKEN, ADMIN_USERNAME, ADMIN_PASSWORD, and JWT_REFRESH_SECRET_KEY) are defined in the example [gen-ai-playground/manifests/backend/deployment.yaml](manifests/backend/deployment.yaml). Make sure to set these in your OpenShift environment, using secrets where appropriate for sensitive values.
+5. The required environment variables for the backend (such as ALLOWED_ORIGINS, VERDA_API_KEY, MONGO_DB_URL, INVITATION_CODE, JWT_SECRET_KEY, VERDA_CLIENT_SECRET, VERDA_CLIENT_ID, HF_TOKEN, ADMIN_USERNAME, ADMIN_PASSWORD, and JWT_REFRESH_SECRET_KEY) are defined in the example [gen-ai-playground/manifests/backend/deployment.yaml](gen-ai-playground/manifests/backend/deployment.yaml). Make sure to set these in your OpenShift environment, using secrets where appropriate for sensitive values.
 
 ---
 
