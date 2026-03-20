@@ -158,7 +158,7 @@ npm run dev
 ## OpenShift instructions
 
 1. Create the required imagestreams and volumes in your OpenShift cluster:
-   - Manifests can be found in the [manifests/backend/](manifests/backend/) and [manifests/frontend/](manifests/frontend/) directories.
+   - Manifests can be found in the [gen-ai-playground/manifests/backend/](gen-ai-playground/manifests/backend/) and [gen-ai-playground/manifests/frontend/](gen-ai-playground/manifests/frontend/) directories.
 2. Build and push Docker images to your registry (you can use OpenShift's internal registry or another one):
    - Edit imagestream names and tags in the manifest files if needed.
 3. Apply the manifests in OpenShift:
