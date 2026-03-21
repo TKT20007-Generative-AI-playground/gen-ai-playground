@@ -66,12 +66,12 @@ function App() {
         {historyOpen ? "←" : "→"}
       </button>
 
-      <div style={{ display: "flex", minHeight: "100vh" }}>
+      <div style={{ display: "flex", minHeight: "100vh" , height: "100%"}}>
         {historyOpen && (
           <div
             style={{
               width: sidebarWidth,
-              height: "100vh",
+              height: "100%",
               overflow: "hidden",
               borderRight: "1px solid #ddd",
               background: "#f8f9fa",
@@ -124,7 +124,7 @@ function App() {
               path="/playground/:tab"
               element={
                 <ProtectedRoute>
-                  <Playground />
+                  <Playground historyOpen={historyOpen} />
                 </ProtectedRoute>
               }
             />

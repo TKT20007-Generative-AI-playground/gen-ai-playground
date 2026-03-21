@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Stack, Text, Badge, ScrollArea, Loader, Center, Select, Group } from "@mantine/core";
+import { Stack, Text, Badge, ScrollArea, Loader, Center, Select, Group, Button } from "@mantine/core";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
+
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -25,45 +27,68 @@ const backendUrl = import.meta.env.VITE_API_URL;
 
 export default function HistorySidebar({ opened }: { opened: boolean }) {
   const [items, setItems] = useState<HistoryRecord[]>([]);
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [limit, setLimit] = useState(5);
   const [historyType, setHistoryType] = useState<"image" | "text">("image");
 
-  const conversations = items
-    .map((item) => {
-      const startPrompt =
-        item.type === "chat"
-          ? item.messages?.[0]?.content
-          : item.prompt;
+const grouped = items.reduce((acc, item) => {
+  const startPrompt =
+    item.type === "chat"
+      ? item.messages?.[0]?.content
+      : item.prompt;
 
-      return {
-        ...item,
-        startPrompt,
-      };
-    })
-    .filter((item, index, self) =>
-      index === self.findIndex((x) => x.startPrompt === item.startPrompt)
-    );
-  
+  if (!startPrompt) return acc;
 
-  async function refetch() {
-    setLoading(true);
-
-    try {
-      const url =
-        historyType === "image"
-          ? `${backendUrl}/images/history`
-          : `${backendUrl}/text/history`;
-
-      const res = await axios.get(url, { withCredentials: true });
-
-      setItems(res.data.history.slice(0, limit));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+  if (!acc[startPrompt]) {
+    acc[startPrompt] = {
+      startPrompt,
+      timestamp: item.timestamp,
+      models: [],
+    };
   }
+
+  acc[startPrompt].models.push(item.model);
+
+  return acc;
+}, {} as Record<string, { startPrompt: string; timestamp: string; models: string[] }>);
+
+// Convert to array
+let conversations = Object.values(grouped);
+
+// Sort newest → oldest
+conversations = conversations.sort(
+  (a, b) =>
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+);
+
+// Apply limit AFTER grouping
+conversations = conversations.slice(0, limit);
+
+    
+
+ async function refetch() {
+  setLoading(true);
+
+  try {
+    const url =
+      historyType === "image"
+        ? `${backendUrl}/images/history`
+        : `${backendUrl}/text/history`;
+
+    const res = await axios.get(url, { withCredentials: true });
+    const history: HistoryRecord[] = res.data.history;
+
+
+    setItems(history);
+
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+}
+
 
 
   // Fetch when sidebar opens
@@ -140,10 +165,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
     {historyType === "text" && (
       <>
         {conversations.map((item, i) => {
-          const startPrompt =
-            item.type === "chat"
-              ? item.messages?.[0]?.content
-              : item.prompt;
+          const startPrompt = item.startPrompt;
 
           return (
             <Stack
@@ -167,9 +189,13 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                 <Text size="sm">{startPrompt}</Text>
               </Stack>
 
-              <Badge variant="light" mt="xs" size="sm">
-                {item.model}
-              </Badge>
+              <Group gap="xs">
+              {item.models.map((m) => (
+                <Badge key={m} variant="light" size="sm">
+                  {m}
+                </Badge>
+                ))}
+              </Group>
             </Stack>
           );
         })}
@@ -205,6 +231,24 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                   <Text size="xs">
                     Type: {item.image_type || "generated"}
                   </Text>
+
+                   <Button
+                    mt="xs"
+                    onClick={() => {
+                      navigate("/playground/ImageEditor", {
+                        state: {
+                          imageToEdit: {
+                            image_data: item.image_data || item.user_base64_image,
+                            image_type: item.image_type,
+                            prompt: item.prompt,
+                            model: item.model
+                          }
+                        }
+                      });
+                    }}
+                  >
+                    Edit image
+                  </Button>
                 </Stack>
               );
             })}
