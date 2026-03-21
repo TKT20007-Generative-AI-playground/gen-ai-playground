@@ -75,3 +75,25 @@ body {
     opacity: 1 !important;
 }
 
+.btn-primary {
+    background-color: #000F65;
+    border-radius: var(--mantine-radius-md);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #001a8a;
+}
+
+.btn-outline {
+    background-color: white;
+    border: 1px solid #000F65;
+    border-radius: var(--mantine-radius-md);
+    color: #000F65;
+}
+
+.btn-outline:hover {
+    background-color: #d3d9ff;
+    color: #000F65;
+}
+

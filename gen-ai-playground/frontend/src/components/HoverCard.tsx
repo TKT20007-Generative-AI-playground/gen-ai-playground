@@ -1,28 +1,26 @@
 import { Box, Button, Card, Text, Title } from "@mantine/core";
-import useFadeIn from "../hooks/useFadeIn";
+import type { RefObject } from "react";
 
 interface HoverCardProps {
     image: string;
     title: string;
     description: string;
     buttonText: string;
-    delay?: number;
+    fadeIn: { ref: RefObject<HTMLDivElement | null>; isVisible: boolean };
     onClick?: () => void;
 }
 
-const HoverCard = ({ image, title, description, buttonText, delay = 0, onClick }: HoverCardProps) => {
-    const { ref, isVisible } = useFadeIn(delay);
-
+const HoverCard = ({ image, title, description, buttonText, fadeIn, onClick }: HoverCardProps) => {
     return (
         <Card
-            ref={ref}
+            ref={fadeIn.ref}
             shadow="sm"
             padding={0}
             radius="md"
             withBorder
             w={300}
             h={400}
-            className={`hover-card fade-in ${isVisible ? "visible" : ""}`}
+            className={`hover-card fade-in ${fadeIn.isVisible ? "visible" : ""}`}
         >
             <Box
                 className="hover-card-bg"
@@ -38,7 +36,7 @@ const HoverCard = ({ image, title, description, buttonText, delay = 0, onClick }
                     {description}
                 </Text>
 
-                <Button color="#000F65" fullWidth mt="md" radius="md" onClick={onClick}>
+                <Button className="btn-primary" fullWidth mt="md" onClick={onClick}>
                     {buttonText}
                 </Button>
             </Box>

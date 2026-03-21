@@ -75,7 +75,7 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
             {...form.getInputProps('password')}
           />
 
-          <Button type="submit" fullWidth>
+          <Button className="btn-primary" type="submit" fullWidth>
             Login
           </Button>
 

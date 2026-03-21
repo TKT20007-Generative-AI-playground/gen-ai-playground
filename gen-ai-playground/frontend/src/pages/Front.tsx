@@ -1,4 +1,4 @@
-import { Box, Button, Group, Image, Stack, Title } from "@mantine/core";
+import { Box, Button, Group, Image, Stack, Text, Title } from "@mantine/core";
 import { Carousel } from "@mantine/carousel";
 import AutoScroll from "embla-carousel-auto-scroll";
 import { useRef } from "react";
@@ -25,16 +25,47 @@ const headerColor = "#000F65"
 const Front = () => {
     const autoplay = useRef(AutoScroll({ speed: 1, stopOnInteraction: false, stopOnMouseEnter: true }));
     const heroTitles = useFadeIn(0);
-    const heroButton = useFadeIn(400);
-    const carouselFade = useFadeIn(1500);
+    const heroButton = useFadeIn(200);
+    const hoverCard1 = useFadeIn(200);
+    const hoverCard2 = useFadeIn(400);
+    const hoverCard3 = useFadeIn(600);
+    const bannerFade = useFadeIn(800);
+    const carouselFade = useFadeIn(400);
     const { isLoggedIn } = useAuth()
     const navigate = useNavigate();
+
+
     const handleLoggedIn = (url: string) => {
         if (isLoggedIn) {
             navigate(`/playground/${url || 'ImageGenerator'}`);
         } else {
             navigate("/", { state: { openLoginModal: true, redirectTo: `/playground/${url || 'ImageGenerator'}` } });
         }
+    };
+
+    const handleShowcaseClick = async (img: { url: string }) => {
+        if (!isLoggedIn) {
+            navigate("/", { state: { openLoginModal: true, redirectTo: `/` } });
+            return;
+        }
+        const res = await fetch(img.url);
+        const blob = await res.blob();
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(",")[1];
+            navigate("/playground/ImageEditor", {
+                state: {
+                    imageToEdit: {
+                        image_data: base64,
+                        image_type: blob.type,
+                        prompt: "",
+                        model: "",
+                    }
+                }
+            });
+        };
+        reader.readAsDataURL(blob);
     };
 
     return (
@@ -75,34 +106,55 @@ const Front = () => {
                         image="/images/flux-gen.png"
                         title="Image generators"
                         description="Test different Flux image generation models and find the best one for your needs."
-                        buttonText="Test image generators"
-                        delay={800}
+                        buttonText="Go to image generators"
+                        fadeIn={hoverCard1}
                         onClick={() => handleLoggedIn("ImageGenerator")}
                     />
                     <HoverCard
                         image="/images/flux-edit.png"
                         title="Image Editor"
-                        description="Edit different images using Flux image editing models and find the best one for your needs."
-                        buttonText="Test image editor"
-                        delay={1000}
+                        description="Edit different images using Flux image editing models and compare the results."
+                        buttonText="Go to image editor"
+                        fadeIn={hoverCard2}
                         onClick={() => handleLoggedIn("ImageEditor")}
                     />
                     <HoverCard
                         image="/images/text-generate.png"
                         title="Text generators"
-                        description="Generate text using different text generation models and find the best one for your needs."
-                        buttonText="Test text generators"
-                        delay={1200}
+                        description="Deploy different text generation models and test them with your own prompts to find the best one for your use case."
+                        buttonText="Go to text generators"
+                        fadeIn={hoverCard3}
                         onClick={() => handleLoggedIn("TextGenerator")}
                     />
                 </Group>
             </Box>
 
+            <Box ref={bannerFade.ref} className={`fade-in ${bannerFade.isVisible ? "visible" : ""}`} style={{ display: "flex", justifyContent: "center", padding: "0 1rem" }}>
+                <Box
+                    style={{
+                        width: "100%",
+                        maxWidth: 964,
+                        background: "linear-gradient(135deg, #000F65, #1a3a8a)",
+                        borderRadius: "var(--mantine-radius-md)",
+                        padding: "2rem 3rem",
+                        color: "white",
+                        fontFamily: "'Google sans', sans-serif",
+                    }}
+                >
+                    <Title order={3} mb="sm" style={{ color: "white" }}>
+                        Get started with the Generative AI Playground
+                    </Title>
+                    <Text size="md" style={{ opacity: 0.85, lineHeight: 1.6 }}>
+                        1. Click the "Get Started" button above or login from the top right corner <br />
+                        2. If you don't have an account, sign up <br />
+                        3. Start testing different models and find the best one for your needs! <br />
+                        4. Check out the featured works below for inspiration and see what others have created!
+                    </Text> 
+                </Box>
+            </Box>
+
             {showcaseImages.length > 0 && (
                 <Box style={{ padding: "4rem 2rem" }} ref={carouselFade.ref} className={`fade-in ${carouselFade.isVisible ? "visible" : ""}`}>
-                    <Title order={2} ta="center" mb="xl" style={{ color: headerColor, fontFamily: "'Google sans', sans-serif" }}>
-                        FEATURED WORKS
-                    </Title>
                     <Carousel
                         height={300}
                         slideSize={{ base: "100%", sm: "50%", md: "33.333%" }}
@@ -137,26 +189,7 @@ const Front = () => {
                                             opacity: 0,
                                             transition: "opacity 0.2s",
                                         }}
-                                        onClick={async () => {
-                                            const res = await fetch(img.url);
-                                            const blob = await res.blob();
-                                            const reader = new FileReader();
-                                            reader.onloadend = () => {
-                                                const dataUrl = reader.result as string;
-                                                const base64 = dataUrl.split(",")[1];
-                                                navigate("/playground/ImageEditor", {
-                                                    state: {
-                                                        imageToEdit: {
-                                                            image_data: base64,
-                                                            image_type: blob.type,
-                                                            prompt: "",
-                                                            model: "",
-                                                        }
-                                                    }
-                                                });
-                                            };
-                                            reader.readAsDataURL(blob);
-                                        }}
+                                        onClick={() => handleShowcaseClick(img)}
                                     >
                                         Edit
                                     </Button>
@@ -165,7 +198,33 @@ const Front = () => {
                         ))}
                     </Carousel>
                 </Box>
+            
             )}
+
+            <Box style={{ display: "flex", justifyContent: "center", padding: "0 1rem" }}>
+                <Group gap="xl" justify="center" wrap="wrap"
+                    style={{
+                        width: "100%",
+                        maxWidth: 964,
+                        borderRadius: "var(--mantine-radius-md)",
+                        padding: "2rem 3rem",
+                        color: "white",
+                        fontFamily: "'Google sans', sans-serif",
+                    }}
+                >
+                    <Button
+                        component="a"
+                        href="https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground"
+                        target="_blank"
+                        className="btn-outline"
+                        size="xl"
+                        px="xl"
+                        leftSection={<Image src="/images/github.png" w={24} h={24} />}
+                    >
+                        GitHub
+                    </Button>
+                </Group>
+            </Box>
         </>
     );
 };

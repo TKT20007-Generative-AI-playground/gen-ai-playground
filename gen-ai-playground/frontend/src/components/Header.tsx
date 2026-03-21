@@ -50,7 +50,7 @@ export default function Header() {
 
   return (
     <>
-      <Group justify="space-between" p="md" bg="#000F65">
+      <Group justify="space-between" p="md" bg="linear-gradient(135deg, #000F65, #0b1328)" style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Group gap="md">
           <Text fw={500} c="white" component={Link} to="/">
             Generative AI Playground
