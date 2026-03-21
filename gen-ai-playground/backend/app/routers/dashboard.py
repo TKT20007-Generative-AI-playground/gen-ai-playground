@@ -4,7 +4,7 @@ Dashboard routes: Verda deployment management (admin only)
 from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 
-from app.dependencies import get_admin_user
+from app.dependencies import get_admin_user, validate_csrf_token
 from app.models import UserInfo, ContainerInfo, ContainerActionResponse
 from app.verda_service import verda_service
 
@@ -51,7 +51,8 @@ def list_containers(
 @router.post("/containers/{deployment_name}/stop", response_model=ContainerActionResponse)
 def stop_container(
     deployment_name: str,
-    admin: UserInfo = Depends(get_admin_user)
+    admin: UserInfo = Depends(get_admin_user),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Delete/stop a Verda deployment (admin only)

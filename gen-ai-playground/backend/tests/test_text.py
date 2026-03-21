@@ -13,6 +13,8 @@ from unittest.mock import patch, MagicMock
 import os
 
 from server import app
+from app.dependencies import validate_csrf_token
+from app.config import settings
 
 
 # ---------------------------------------------------------------------------
@@ -30,9 +32,11 @@ def mock_db():
 @pytest.fixture
 def client(mock_db):
     """Create a test client with mocked database."""
+    app.dependency_overrides[validate_csrf_token] = lambda: None
     with patch('app.database.db_manager.db', mock_db):
         with patch('app.database.get_database', return_value=mock_db):
             yield TestClient(app)
+    app.dependency_overrides.pop(validate_csrf_token, None)
 
 
 @pytest.fixture
@@ -77,13 +81,14 @@ def admin_registered_user(mock_db, test_user_data):
 
 @pytest.fixture
 def auth_token(test_user_data):
-    """Generate a valid JWT token."""
-    secret_key = "dev-secret-key-for-local-development"
+    """Generate a valid JWT access token."""
     payload = {
         "username": test_user_data["username"],
+        "is_admin": False,
         "exp": datetime.utcnow() + timedelta(hours=24),
+        "type": "access",
     }
-    return jwt.encode(payload, secret_key, algorithm="HS256")
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
 
 
 @pytest.fixture
@@ -541,30 +546,30 @@ class TestAuthRequired:
 
     def test_deploy_requires_auth(self, client):
         response = client.post("/text/deploy", json={"model_path": "x"})
-        assert response.status_code == 422  # missing Authorization header
+        assert response.status_code == 401  # missing Authorization header
 
     def test_connect_requires_auth(self, client):
         response = client.post("/text/connect", json={"deployment_name": "x"})
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     def test_status_requires_auth(self, client):
         response = client.get("/text/status?deployment_name=x")
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     def test_generate_requires_auth(self, client):
         response = client.post("/text/generate", json={"prompt": "hi", "model_path": "deepseek-llm-7b"})
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     def test_chat_requires_auth(self, client):
         response = client.post(
             "/text/chat",
             json={"model_path": "deepseek-llm-7b", "messages": [{"role": "user", "content": "hi"}]},
         )
-        assert response.status_code == 422
+        assert response.status_code == 401
 
     def test_delete_requires_auth(self, client):
         response = client.delete("/text/deploy?deployment_name=x")
-        assert response.status_code == 422
+        assert response.status_code == 401
         
 class TestTemplateFiles:
     """Test that the command generation from templates works as expected."""
@@ -588,6 +593,3 @@ class TestTemplateFiles:
                     template_file.read_text(encoding="utf-8"))
             except Exception as e:
                 pytest.fail(f"Invalid template config {template_file.name}: {e}")
-            
-
-        

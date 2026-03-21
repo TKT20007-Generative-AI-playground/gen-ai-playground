@@ -9,6 +9,7 @@ services:
       - ALLOWED_ORIGINS=http://localhost:5173
       - MONGO_DB_URL=mongodb://mongodb:27017
       - JWT_SECRET_KEY=dev-secret-key-for-local-development
+      - JWT_REFRESH_SECRET_KEY=dev-refresh-secret-key-for-local-development
       - INVITATION_CODE=local-invitation-code
       - ADMIN_USERNAME=admin
       - ADMIN_PASSWORD=Localadmin123!
@@ -25,6 +26,7 @@ services:
       - ALLOWED_ORIGINS=http://localhost:5173
       - MONGO_DB_URL=mongodb://mongodb:27017
       - JWT_SECRET_KEY=dev-secret-key-for-local-development
+      - JWT_REFRESH_SECRET_KEY=dev-refresh-secret-key-for-local-development
       - INVITATION_CODE=local-invitation-code
     volumes:
       - ./backend:/app

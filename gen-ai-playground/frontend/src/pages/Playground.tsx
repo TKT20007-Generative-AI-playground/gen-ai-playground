@@ -7,15 +7,15 @@ import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
 import TextGenerator from "../components/TextGenerator"
 
+const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const
+type Tab = (typeof tabs)[number]
+
 export default function Playground() {
   const { tab } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
 
   const imageToEdit = location.state?.imageToEdit || null
-
-  const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const
-  type Tab = (typeof tabs)[number]
 
   const selectedComponent: Tab =
     tab && tabs.includes(tab as Tab) ? (tab as Tab) : "ImageGenerator"
@@ -48,7 +48,7 @@ export default function Playground() {
       </Group>
 
       <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
-        <div style={{ width: "100%", maxWidth: 1100, padding: "0 16px" }}>
+        <div style={{ width: "100%", maxWidth: 1100, padding: "0 16px 24px" }}>
           {componentsMap[selectedComponent]}
         </div>
       </div>

@@ -25,6 +25,8 @@ spec:
           ports:
             - containerPort: 8000
           env:
+            - name: ENV
+              value: "production"
             - name: ALLOWED_ORIGINS
               value: "https://gen-ai-frontend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi"
             - name: VERDA_API_KEY
@@ -72,7 +74,11 @@ spec:
                 secretKeyRef:
                   name: genai-admin-credentials
                   key: ADMIN_PASSWORD
-                
+            - name: JWT_REFRESH_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gen-ai-jwt-refresh-secret-key
+                  key: JWT_REFRESH_SECRET_KEY
           resources:
             limits:
               memory: "512Mi"

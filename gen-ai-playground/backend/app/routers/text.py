@@ -8,10 +8,11 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from pymongo.database import Database
 from datetime import datetime
 from typing import Optional
+import time
 
 
 from app.database import get_database
-from app.dependencies import get_current_user, get_admin_user
+from app.dependencies import get_current_user, get_admin_user, validate_csrf_token
 from app.models import (
     TextGenerateRequest,
     TextGenerateResponse,
@@ -38,7 +39,12 @@ router = APIRouter(
 
 @router.get("/models")
 def list_available_models(current_user: UserInfo = Depends(get_current_user)):
-    """List available models that can be deployed."""
+    """
+    List all models available for deployment, fetched from JSON templates.
+
+    Returns:
+        List of model objects with value, label, template, GPU count, and availability.
+    """
     available_models = verda_service.available_models()
     return {"available_models": available_models}
 
@@ -51,19 +57,24 @@ def get_available_compute(current_user: UserInfo = Depends(get_current_user)):
 def deploy_model(
     request: DeployModelRequest,
     current_user: UserInfo = Depends(get_admin_user),
+    _: None = Depends(validate_csrf_token),
 ):
     """
-    Deploy an LLM model on Verda Cloud using SGLang or vLLM.    
-    
+    Deploy an LLM model on Verda Cloud using SGLang or vLLM.
+
     This creates a new serverless container deployment running the specified model.
     The deployment may take several minutes to become healthy while the model downloads.
-    
+
     Args:
-        request: Deployment configuration (model, optional name)
-        current_user: Authenticated user
-        
+        request: Deployment configuration (model path).
+        current_user: Authenticated admin user.
+
     Returns:
-        Deployment status information
+        Deployment status information.
+
+    Raises:
+        HTTPException: 403 if the user is not an admin.
+        HTTPException: 500 if deployment fails.
     """
     print(f"User {current_user.username} requesting model deployment: {request.model_path}")
     
@@ -85,6 +96,7 @@ def deploy_model(
 def connect_to_deployment(
     request: ConnectDeploymentRequest,
     current_user: UserInfo = Depends(get_current_user),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Connect to an already-running Verda deployment.
@@ -98,6 +110,9 @@ def connect_to_deployment(
         
     Returns:
         Deployment status information
+    
+    Notes:
+        Requires CSRF token validation for cookie-authenticated requests.
     """
     print(f"User {current_user.username} connecting to deployment: {request.deployment_name}")
     try:
@@ -252,6 +267,7 @@ def generate_text(
     request: TextGenerateRequest,
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Generate text using a deployed LLM model.
@@ -266,6 +282,9 @@ def generate_text(
         
     Returns:
         Generated text and metadata
+    
+    Notes:
+        Requires CSRF token validation for cookie-authenticated requests.
     """
     print(f"Text generation for user: {current_user.username}, prompt: {request.prompt[:50]}...")
 
@@ -335,6 +354,7 @@ def generate_text(
         raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
 
     try:
+        gen_start_time = time.perf_counter()
         result = verda_service.generate_text(
             deployment_name=deployment_name,
             model_path=used_model_path or "",
@@ -343,6 +363,7 @@ def generate_text(
             temperature=request.temperature,
             top_p=request.top_p,
         )
+        gen_time_ms = int((time.perf_counter() - gen_start_time) * 1000)
 
         # Save to history in MongoDB
         try:
@@ -354,6 +375,7 @@ def generate_text(
                 "timestamp": datetime.utcnow(),
                 "username": current_user.username,
                 "usage": result.get("usage", {}),
+                "generation_time_ms": gen_time_ms,
             }
             db.text_generations.insert_one(history_record)
             print(f"Saved text generation to MongoDB for user: {current_user.username}")
@@ -365,6 +387,7 @@ def generate_text(
             model=result["model"],
             prompt=request.prompt,
             usage=result.get("usage", {}),
+            generation_time_ms=gen_time_ms,
         )
 
     except RuntimeError as e:
@@ -385,6 +408,7 @@ def chat_with_model(
     request: ChatRequest,
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
+    _: None = Depends(validate_csrf_token),
 ):
     """
     Chat with a deployed LLM using the OpenAI-compatible chat completions API.
@@ -399,6 +423,9 @@ def chat_with_model(
 
     Returns:
         Assistant's reply and metadata
+    
+    Notes:
+        Requires CSRF token validation for cookie-authenticated requests.
     """
     model_key = request.model_path
     model_path = choose_text_model_path(model_key)
@@ -449,6 +476,7 @@ def chat_with_model(
 
     # Chat
     try:
+        chat_start_time = time.perf_counter()
         result = verda_service.chat(
             messages=[msg.model_dump() for msg in request.messages],
             max_tokens=request.max_tokens,
@@ -457,6 +485,7 @@ def chat_with_model(
             deployment_name=deployment_name,
             model_path=model_path,
         )
+        chat_time_ms = int((time.perf_counter() - chat_start_time) * 1000)
 
         # Save to history
         try:
@@ -468,6 +497,7 @@ def chat_with_model(
                 "timestamp": datetime.utcnow(),
                 "username": current_user.username,
                 "usage": result.get("usage", {}),
+                "generation_time_ms": chat_time_ms,
             }
             db.text_generations.insert_one(history_record)
         except Exception as e:
@@ -477,6 +507,7 @@ def chat_with_model(
             reply=result["reply"],
             model=result["model"],
             usage=result.get("usage", {}),
+            generation_time_ms=chat_time_ms,
         )
 
     except RuntimeError as e:
@@ -496,14 +527,23 @@ def chat_with_model(
 def delete_deployment(
     deployment_name: str = Query(..., description="Name of the deployment to delete"),
     current_user: UserInfo = Depends(get_admin_user),
+    _csrf: None = Depends(validate_csrf_token),
 ):
     """
     Delete a specific deployment and clean up resources.
-    
+
     Important: Always clean up deployments when done to avoid unnecessary charges.
-    
+
+    Args:
+        deployment_name: Name of the Verda deployment to delete.
+        current_user: Authenticated admin user.
+
     Returns:
-        Deletion status
+        Deletion status.
+
+    Raises:
+        HTTPException: 403 if the user is not an admin.
+        HTTPException: 500 if deletion fails.
     """
     print(f"User {current_user.username} deleting deployment: {deployment_name}")
     result = verda_service.delete_deployment(deployment_name)

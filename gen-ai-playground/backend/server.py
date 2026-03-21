@@ -24,7 +24,8 @@ app.add_middleware(
     allow_origins=settings.ALLOWED_ORIGINS.split(","),
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    expose_headers=["X-Generation-Time-Ms"],
 )
 
 # Register routers

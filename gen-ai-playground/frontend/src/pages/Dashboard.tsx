@@ -30,14 +30,20 @@ export default function Dashboard() {
   const [textModelOptions, setTextModelOptions] = useState<{ value: string; label: string }[]>([])
 
   const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-  const token = localStorage.getItem('token')
+
+  const getCsrfToken = () =>
+    document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('csrf_token='))
+      ?.split('=')[1] ?? ''
 
   // Fetch available models from backend
   useEffect(() => {
     const fetchModels = async () => {
       try {
         const res = await axios.get(`${backendUrl}/text/models`, {
-          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+          headers: { 'X-CSRF-Token': getCsrfToken() },
         })
         const models = (res.data.available_models ?? []).map(
           (m: { value: string; label: string }) => ({
@@ -51,26 +57,24 @@ export default function Dashboard() {
       }
     }
     fetchModels()
-  }, [backendUrl, token])
+  }, [backendUrl])
 
   const fetchContainers = useCallback(async () => {
     try {
       setError(null)
-      const res = await fetch(`${backendUrl}/dashboard/containers`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await axios.get(`${backendUrl}/dashboard/containers`, {
+        withCredentials: true,
+        headers: { 'X-CSRF-Token': getCsrfToken() },
       })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.detail || 'Failed to fetch deployments')
-      }
-      const data = await res.json()
-      setContainers(data)
+      setContainers(res.data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch deployments')
+      if (axios.isAxiosError(err) && err.response?.status === 401) return
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
+      setError(detail || (err instanceof Error ? err.message : 'Failed to fetch deployments'))
     } finally {
       setLoading(false)
     }
-  }, [backendUrl, token])
+  }, [backendUrl])
 
   useEffect(() => {
     fetchContainers()
@@ -82,20 +86,19 @@ export default function Dashboard() {
     if (!confirm(`Delete deployment "${deploymentName}"? This cannot be undone.`)) return
     setActionLoading(deploymentName)
     try {
-      const res = await fetch(
+      await axios.post(
         `${backendUrl}/dashboard/containers/${deploymentName}/stop`,
+        null,
         {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
+          withCredentials: true,
+          headers: { 'X-CSRF-Token': getCsrfToken() },
         }
       )
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.detail || 'Failed to delete deployment')
-      }
       await fetchContainers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete deployment')
+      if (axios.isAxiosError(err) && err.response?.status === 401) return
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
+      setError(detail || (err instanceof Error ? err.message : 'Failed to delete deployment'))
     } finally {
       setActionLoading(null)
     }
@@ -106,21 +109,22 @@ export default function Dashboard() {
     setDeployLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${backendUrl}/text/deploy`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ model_path: selectedModel }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.detail || 'Failed to deploy model')
-      }
+      await axios.post(
+        `${backendUrl}/text/deploy`,
+        { model_path: selectedModel },
+        {
+          withCredentials: true,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': getCsrfToken(),
+          },
+        }
+      )
       await fetchContainers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to deploy model')
+      if (axios.isAxiosError(err) && err.response?.status === 401) return
+      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
+      setError(detail || (err instanceof Error ? err.message : 'Failed to deploy model'))
     } finally {
       setDeployLoading(false)
     }

@@ -16,8 +16,7 @@ test('logging in makes protected content available', async ({ page, request }) =
   await expect(page.getByText('You must be logged in to generate images.')).toBeVisible();
   await loginViaUI(page, user);
   await expectLoggedIn(page);
-  const token = await page.evaluate(() => localStorage.getItem('token'));
-  expect(token).toBeTruthy();
+  // Note: Authentication uses HTTPOnly cookies (not localStorage) for security
   await expect(page.getByText('You must be logged in to generate images.')).toBeHidden();
   await expect(page.getByText('Select playground component')).toBeVisible();
 });

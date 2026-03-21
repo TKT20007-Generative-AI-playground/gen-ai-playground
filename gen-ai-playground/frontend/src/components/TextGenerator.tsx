@@ -11,6 +11,8 @@ import {
   ScrollArea,
   TextInput,
 } from "@mantine/core"
+import ActionStatus from "./ActionStatus"
+import { formatDurationMs } from "../utils/time"
 
 type ModelOption = {
   value: string
@@ -22,6 +24,9 @@ type Message = {
   role: "user" | "assistant"
   content: string
   modelLabel?: string
+  generationTimeMs?: number
+  isPending?: boolean
+  pendingStartTime?: number
 }
 
 type ModelStatus = "live" | "starting" | "offline" | "unknown"
@@ -35,6 +40,19 @@ const makeMessageId = () => {
 }
 
 const MAX_MODELS = 4
+
+const getCsrfToken = (): string => {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; csrf_token=`)
+  if (parts.length === 2) return parts.pop()!.split(";").shift()!
+  return ""
+}
+
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  "X-CSRF-Token": getCsrfToken(),
+})
+
 
 function parseModelReply(rawReply: string): {
   thinking: string | null
@@ -182,26 +200,45 @@ function ChatPanel({
                   marginRight: message.role === "user" ? "0" : "15%",
                 }}
               >
-                <Text fw={700} size="xs" mb={4}>
-                  {message.role === "user" ? "You" : message.modelLabel ?? modelLabel}
-                </Text>
-                <Text
-                  size="sm"
+                <div
                   style={{
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    overflowWrap: "break-word",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    gap: "8px",
+                    marginBottom: "4px",
                   }}
                 >
-                  {message.content}
-                </Text>
+                  <Text fw={700} size="xs">
+                    {message.role === "user" ? "You" : message.modelLabel ?? modelLabel}
+                  </Text>
+                  {message.role === "assistant" && message.generationTimeMs != null && (
+                    <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+                      Response time: {formatDurationMs(message.generationTimeMs)}
+                    </Text>
+                  )}
+                </div>
+                {message.isPending ? (
+                  message.pendingStartTime ? (
+                    <div>
+                      <ActionStatus actionText="Generating" startTime={message.pendingStartTime} />
+                    </div>
+                  ) : null
+                ) : (
+                  <Text
+                    size="sm"
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      overflowWrap: "break-word",
+                    }}
+                  >
+                    {message.content}
+                  </Text>
+                )}
               </Paper>
             ))}
-            {isLoading && (
-              <Text c="dimmed" size="sm" ta="center">
-                Generating...
-              </Text>
-            )}
           </>
         )}
         <div ref={bottomRef} />
@@ -237,15 +274,6 @@ export default function TextGenerator() {
   const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
   const [statusMsgs, setStatusMsgs] = useState<Record<string, string | null>>({})
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token")
-    if (!token) throw new Error("Token puuttuu")
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    }
-  }
-
   // Fetch available models from backend
   useEffect(() => {
     if (!isLoggedIn) return
@@ -253,6 +281,7 @@ export default function TextGenerator() {
       try {
         const res = await axios.get(`${backendUrl}/text/models`, {
           headers: getAuthHeaders(),
+          withCredentials: true,
         })
         const models: ModelOption[] = (res.data.available_models ?? []).map(
           (m: { value: string; label: string }) => ({
@@ -262,7 +291,7 @@ export default function TextGenerator() {
         )
         setModelOptions(models)
       } catch {
-        // silent 
+        // silent
       }
     }
     fetchModels()
@@ -273,6 +302,7 @@ export default function TextGenerator() {
     try {
       const res = await axios.get(`${backendUrl}/text/model-statuses`, {
         headers: getAuthHeaders(),
+        withCredentials: true,
       })
       setModelStatuses(res.data)
     } catch {
@@ -297,37 +327,59 @@ export default function TextGenerator() {
   const sendToPanel = async (
     modelValue: string,
     messagesWithUser: Message[],
+    pendingMessageId: string,
   ) => {
     setLoadingByModel((prev) => ({ ...prev, [modelValue]: true }))
     console.log(`Sending to ${modelValue}:`, messagesWithUser)
 
     try {
+      const requestMessages = messagesWithUser
+        .filter((message) => !message.isPending)
+        .map((message) => ({ role: message.role, content: message.content }))
+
       const response = await axios.post(
         `${backendUrl}/text/chat`,
         {
           model_path: modelValue,
-          messages: messagesWithUser,
+          messages: requestMessages,
           max_tokens: 256,
           temperature: 0.7,
           top_p: 0.9,
         },
-        { headers: getAuthHeaders() }
+        { headers: getAuthHeaders(), withCredentials: true }
       )
 
       const result = response.data
       const parsed = parseModelReply(result.reply)
       if (parsed.thinking) console.log("Thinking:", parsed.thinking)
       const label = getModelLabel(modelValue)
-      const withReply = messagesWithUser.concat({
-        id: makeMessageId(),
-        role: "assistant",
-        content: parsed.actualReply,
-        modelLabel: label,
-      })
-      setMessagesForModel(modelValue, withReply)
+      const replaced = (messagesByModelRef.current[modelValue] ?? []).map((message) =>
+        message.id === pendingMessageId
+          ? {
+            ...message,
+            content: parsed.actualReply,
+            modelLabel: label,
+            generationTimeMs: result.generation_time_ms ?? undefined,
+            isPending: false,
+            pendingStartTime: undefined,
+          }
+          : message
+      )
+      setMessagesForModel(modelValue, replaced)
     } catch (error: unknown) {
       console.error("chat error:", error)
       const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      const replaced = (messagesByModelRef.current[modelValue] ?? []).map((message) =>
+        message.id === pendingMessageId
+          ? {
+            ...message,
+            content: "Failed to generate a response.",
+            isPending: false,
+            pendingStartTime: undefined,
+          }
+          : message
+      )
+      setMessagesForModel(modelValue, replaced)
       setStatusMsgs((prev) => ({ ...prev, [modelValue]: detail || "Failed to reach the server." }))
     } finally {
       setLoadingByModel((prev) => ({ ...prev, [modelValue]: false }))
@@ -347,9 +399,18 @@ export default function TextGenerator() {
 
     for (const modelValue of selectedModels) {
       const existingMessages = messagesByModelRef.current[modelValue] ?? []
-      const updatedMessages = existingMessages.concat(userMessage)
+      const pendingMessageId = makeMessageId()
+      const pendingAssistantMessage: Message = {
+        id: pendingMessageId,
+        role: "assistant",
+        content: "",
+        modelLabel: getModelLabel(modelValue),
+        isPending: true,
+        pendingStartTime: Date.now(),
+      }
+      const updatedMessages = existingMessages.concat(userMessage, pendingAssistantMessage)
       setMessagesForModel(modelValue, updatedMessages)
-      promises.push(sendToPanel(modelValue, updatedMessages))
+      promises.push(sendToPanel(modelValue, updatedMessages, pendingMessageId))
     }
 
     await Promise.all(promises)
