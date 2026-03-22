@@ -6,21 +6,22 @@ interface HoverCardProps {
     title: string;
     description: string;
     buttonText: string;
-    fadeIn: { ref: RefObject<HTMLDivElement | null>; isVisible: boolean };
+    cardRef: RefObject<HTMLDivElement | null>;
+    isVisible: boolean;
     onClick?: () => void;
 }
 
-const HoverCard = ({ image, title, description, buttonText, fadeIn, onClick }: HoverCardProps) => {
+const HoverCard = ({ image, title, description, buttonText, cardRef, isVisible, onClick }: HoverCardProps) => {
     return (
         <Card
-            ref={fadeIn.ref}
+            ref={cardRef}
             shadow="sm"
             padding={0}
             radius="md"
             withBorder
             w={300}
             h={400}
-            className={`hover-card fade-in ${fadeIn.isVisible ? "visible" : ""}`}
+            className={`hover-card fade-in ${isVisible ? "visible" : ""}`}
         >
             <Box
                 className="hover-card-bg"

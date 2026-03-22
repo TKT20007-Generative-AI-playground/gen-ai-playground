@@ -1,12 +1,14 @@
 import { test, expect, Page } from '@playwright/test';
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173/';
+const PLAYGROUND_URL = `${FRONTEND_URL}playground`;
 
 test.use({ storageState: 'playwright/.auth/user.json' });
 
 // Helper functions for test flows
 async function selectModels(page: Page, model1?: string, model2?: string) {
   if (model1) {
+    await page.goto(PLAYGROUND_URL);
     await page.getByTestId('model-1-selector').click();
 
     const option1 = page.locator('div[role="option"][data-combobox-option="true"]', { hasText: model1 }).first();
@@ -86,6 +88,8 @@ test.describe('Generator page flows', () => {
   });
 
   test('fails if no model selected', async ({ page }) => {
+    await page.goto(PLAYGROUND_URL);
+    
     await page.evaluate(() => {
         (window as any)._lastAlert = null;
         window.alert = (msg) => ((window as any)._lastAlert = msg);

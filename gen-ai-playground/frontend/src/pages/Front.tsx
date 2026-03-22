@@ -107,7 +107,8 @@ const Front = () => {
                         title="Image generators"
                         description="Test different Flux image generation models and find the best one for your needs."
                         buttonText="Go to image generators"
-                        fadeIn={hoverCard1}
+                        cardRef={hoverCard1.ref}
+                        isVisible={hoverCard1.isVisible}
                         onClick={() => handleLoggedIn("ImageGenerator")}
                     />
                     <HoverCard
@@ -115,7 +116,8 @@ const Front = () => {
                         title="Image Editor"
                         description="Edit different images using Flux image editing models and compare the results."
                         buttonText="Go to image editor"
-                        fadeIn={hoverCard2}
+                        cardRef={hoverCard2.ref}
+                        isVisible={hoverCard2.isVisible}
                         onClick={() => handleLoggedIn("ImageEditor")}
                     />
                     <HoverCard
@@ -123,7 +125,8 @@ const Front = () => {
                         title="Text generators"
                         description="Deploy different text generation models and test them with your own prompts to find the best one for your use case."
                         buttonText="Go to text generators"
-                        fadeIn={hoverCard3}
+                        cardRef={hoverCard3.ref}
+                        isVisible={hoverCard3.isVisible}
                         onClick={() => handleLoggedIn("TextGenerator")}
                     />
                 </Group>
