@@ -32,39 +32,36 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
   const [limit, setLimit] = useState(5);
   const [historyType, setHistoryType] = useState<"image" | "text">("image");
 
-const grouped = items.reduce((acc, item) => {
+const conversations = [];
+let last = null;
+
+for (const item of items) {
   const startPrompt =
     item.type === "chat"
       ? item.messages?.[0]?.content
       : item.prompt;
 
-  if (!startPrompt) return acc;
+  const ts = new Date(item.timestamp).getTime();
 
-  if (!acc[startPrompt]) {
-    acc[startPrompt] = {
+  if (
+    last &&
+    last.startPrompt === startPrompt &&
+    Math.abs(ts - last.timestamp) < 10000 
+  ) {
+    last.models.push(item.model);
+  } else {
+
+    last = {
       startPrompt,
-      timestamp: item.timestamp,
-      models: [],
+      timestamp: ts,
+      models: [item.model],
     };
+    conversations.push(last);
   }
+}
 
-  acc[startPrompt].models.push(item.model);
-
-  return acc;
-}, {} as Record<string, { startPrompt: string; timestamp: string; models: string[] }>);
-
-// Convert to array
-let conversations = Object.values(grouped);
-
-// Sort newest → oldest
-conversations = conversations.sort(
-  (a, b) =>
-    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-);
-
-// Apply limit AFTER grouping
-conversations = conversations.slice(0, limit);
-
+conversations.sort((a, b) => b.timestamp - a.timestamp);
+const limited = conversations.slice(0, limit);
     
 
  async function refetch() {
@@ -88,8 +85,6 @@ conversations = conversations.slice(0, limit);
     setLoading(false);
   }
 }
-
-
 
   // Fetch when sidebar opens
   useEffect(() => {
@@ -124,8 +119,13 @@ conversations = conversations.slice(0, limit);
     );
 
   return (
-    <ScrollArea h="100%">
-      <Stack gap="lg">
+    <ScrollArea 
+      h="100vh"
+      offsetScrollbars={false}
+      type="auto"
+      scrollbarSize={8}
+      >
+      <Stack gap="lg" p={0} m={0}>
         <Group grow>
           <Select
             label="Type: "
@@ -164,7 +164,7 @@ conversations = conversations.slice(0, limit);
 
     {historyType === "text" && (
       <>
-        {conversations.map((item, i) => {
+        {limited.map((item, i) => {
           const startPrompt = item.startPrompt;
 
           return (
@@ -190,11 +190,9 @@ conversations = conversations.slice(0, limit);
               </Stack>
 
               <Group gap="xs">
-              {item.models.map((m) => (
-                <Badge key={m} variant="light" size="sm">
-                  {m}
+                <Badge variant="light" size="sm">
+                  {item.models}
                 </Badge>
-                ))}
               </Group>
             </Stack>
           );
@@ -202,58 +200,65 @@ conversations = conversations.slice(0, limit);
       </>
     )}
 
-        {historyType === "image" && (
-          <>
-            {items.map((item, i) => {
-              const base64 = item.image_data || item.user_base64_image;
+  {historyType === "image" && (
+    <>
+      {items
+        .filter((item) => item.image_type !== "original")
+        .slice(0, limit)
+        .map((item, i) => {
+          const base64 = item.image_data || item.user_base64_image;
 
-              return (
-                <Stack key={i} gap="xs">
-                  {base64 && (
-                    <img
-                      src={`data:image/png;base64,${base64}`}
-                      alt={item.prompt}
-                      style={{
-                        width: "100%",
-                        aspectRatio: "1 / 1",
-                        objectFit: "cover",
-                        borderRadius: "6px",
-                      }}
-                    />
-                  )}
+          return (
+            <Stack key={i} gap="xs">
+              {base64 && (
+                <img
+                  src={`data:image/png;base64,${base64}`}
+                  alt={item.prompt}
+                  style={{
+                    width: "100%",
+                    aspectRatio: "1 / 1",
+                    objectFit: "cover",
+                    borderRadius: "6px",
+                  }}
+                />
+              )}
 
-                  <Text fw={500}>{item.prompt}</Text>
-                  <Badge variant="light">{item.model}</Badge>
-                  <Text size="xs" c="dimmed">
-                    {new Date(item.timestamp).toLocaleString()}
-                  </Text>
+              <Text fw={500}>{item.prompt}</Text>
 
-                  <Text size="xs">
-                    Type: {item.image_type || "generated"}
-                  </Text>
+              <Badge variant="light">{item.model}</Badge>
 
-                   <Button
-                    mt="xs"
-                    onClick={() => {
-                      navigate("/playground/ImageEditor", {
-                        state: {
-                          imageToEdit: {
-                            image_data: item.image_data || item.user_base64_image,
-                            image_type: item.image_type,
-                            prompt: item.prompt,
-                            model: item.model
-                          }
-                        }
-                      });
-                    }}
-                  >
-                    Edit image
-                  </Button>
-                </Stack>
-              );
-            })}
-          </>
-        )}
+              <Text size="xs" c="dimmed">
+                {new Date(item.timestamp).toLocaleString()}
+              </Text>
+
+              <Text size="xs">
+                Type: {item.image_type || "generated"}
+              </Text>
+
+              <Button
+                mt="xs"
+                onClick={() => {
+                  navigate("/playground/ImageEditor", {
+                    state: {
+                      imageToEdit: {
+                        image_data:
+                          item.image_data || item.user_base64_image,
+                        image_type: item.image_type,
+                        prompt: item.prompt,
+                        model: item.model,
+                      },
+                    },
+                  });
+                }}
+              >
+                Edit image
+              </Button>
+            </Stack>
+          );
+        })}
+    </>
+  )}
+
       </Stack>
     </ScrollArea>
   );
