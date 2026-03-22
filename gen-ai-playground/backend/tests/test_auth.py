@@ -19,6 +19,17 @@ def mock_db():
     """Create a mock MongoDB database for testing"""
     client = mongomock.MongoClient()
     db = client["gen_ai_playground"]
+    # Seed invitation code for registration tests
+    invitation_code = os.getenv("INVITATION_CODE", "local-invitation-code")
+    db.invitation_codes.insert_one({
+        "code": invitation_code,
+        "created_at": datetime.utcnow(),
+        "expires_at": datetime.utcnow() + timedelta(days=30),
+        "max_uses": 100,
+        "uses_count": 0,
+        "is_active": True,
+        "used_by": []
+    })
     return db
 
 
@@ -160,7 +171,7 @@ class TestRegisterEndpoint:
         response = client.post("/register", json=invalid_code_data)
         
         assert response.status_code == 403
-        assert "Invalid invitation code" in response.json()["detail"]
+        assert "Invalid, expired, or fully used invitation code" in response.json()["detail"]
     
     def test_missing_invitation_code(self, client):
         """Test registration without invitation code"""
