@@ -8,17 +8,19 @@ import {
   Anchor,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import axios from 'axios'
 
 interface LoginModalProps {
   opened: boolean
   onClose: () => void
+  redirectTo?: string | null
 }
 
-export default function LoginModal({ opened, onClose }: LoginModalProps) {
+export default function LoginModal({ opened, onClose, redirectTo }: LoginModalProps) {
   const { login } = useAuth()
+  const navigate = useNavigate()
 
   const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -39,6 +41,11 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
 
       login(res.data.token, res.data.username, res.data.is_admin || false);
       onClose();
+
+      if (redirectTo) {
+        navigate(redirectTo)
+      }
+      
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
       alert(detail || 'Login failed');
@@ -65,7 +72,7 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
             {...form.getInputProps('password')}
           />
 
-          <Button type="submit" fullWidth>
+          <Button className="btn-primary" type="submit" fullWidth>
             Login
           </Button>
 

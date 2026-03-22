@@ -174,7 +174,7 @@ export default function History() {
         fullWidth
         onClick={() => {
           const img = selectedImage;
-          setSelectedImage(null);  
+          setSelectedImage(null);
           setTimeout(() => {
             navigate("/playground/ImageEditor", {
               state: {
