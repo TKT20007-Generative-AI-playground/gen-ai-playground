@@ -58,7 +58,7 @@ const Front = () => {
                 state: {
                     imageToEdit: {
                         image_data: base64,
-                        image_type: blob.type,
+                        image_type: blob.type.split("/")[1],
                         prompt: "",
                         model: "",
                     }
@@ -219,6 +219,7 @@ const Front = () => {
                         component="a"
                         href="https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground"
                         target="_blank"
+                        rel="noopener noreferrer"
                         className="btn-outline"
                         size="xl"
                         px="xl"

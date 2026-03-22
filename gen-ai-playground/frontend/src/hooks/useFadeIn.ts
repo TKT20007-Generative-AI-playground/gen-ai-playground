@@ -8,10 +8,11 @@ const useFadeIn = (delay: number = 0) => {
         const element = ref.current;
         if (!element) return;
 
+        let timeoutId: ReturnType<typeof setTimeout>;
         const observer = new IntersectionObserver(
             ([entry]) => {
                 if (entry.isIntersecting) {
-                    setTimeout(() => setIsVisible(true), delay);
+                    timeoutId = setTimeout(() => setIsVisible(true), delay);
                     observer.unobserve(element);
                 }
             },
@@ -19,7 +20,10 @@ const useFadeIn = (delay: number = 0) => {
         );
 
         observer.observe(element);
-        return () => observer.disconnect();
+        return () => {
+            clearTimeout(timeoutId);
+            observer.disconnect();
+        };
     }, [delay]);
 
     return { ref, isVisible };

@@ -65,12 +65,6 @@ body {
     transform: translateY(0);
 }
 
-.hero {
-    background-image: url('/images/background.gif');
-    background-size: cover;
-    background-position: center;
-}
-
 .showcase-slide:hover .showcase-edit-btn {
     opacity: 1 !important;
 }

@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173/';
-const PLAYGROUND_URL = `${FRONTEND_URL}playground`;
+const PLAYGROUND_URL = new URL('playground', FRONTEND_URL).toString();
 
 test.use({ storageState: 'playwright/.auth/user.json' });
 
