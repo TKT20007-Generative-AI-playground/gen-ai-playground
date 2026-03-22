@@ -14,11 +14,14 @@ export default function Header() {
   const [drawerWidth, setDrawerWidth] = useState(420);
   const [resizing, setResizing] = useState(false);
 
-  const redirectTo = location.state?.redirectTo || null;
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
 
   useEffect(() => {
     if (location.state?.openLoginModal) {
-      queueMicrotask(() => setLoginOpened(true))
+      queueMicrotask(() => {
+        setRedirectTo(location.state?.redirectTo || null)
+        setLoginOpened(true)
+      })
       window.history.replaceState({}, document.title)
     }
   }, [location])
@@ -79,7 +82,7 @@ export default function Header() {
           <Button variant="white" color="dark" onClick={() => setLoginOpened(true)}>Login</Button>
         )}
 
-        <LoginModal opened={loginOpened} onClose={() => setLoginOpened(false)} redirectTo={redirectTo} />
+        <LoginModal opened={loginOpened} onClose={() => { setLoginOpened(false); setRedirectTo(null); }} redirectTo={redirectTo} />
       </Group>
       <Divider />
 
