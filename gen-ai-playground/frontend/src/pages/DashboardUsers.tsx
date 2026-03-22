@@ -35,7 +35,11 @@ export default function DashboardUsers() {
       })
       setUsers(res.data.users)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch users')
+      if (axios.isAxiosError(err) && err.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch users')
+      }
     } finally {
       setLoading(false)
     }

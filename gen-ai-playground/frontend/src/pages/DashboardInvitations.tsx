@@ -69,7 +69,11 @@ export default function DashboardInvitations() {
       })
       setCodes(res.data.codes)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch invitation codes')
+      if (axios.isAxiosError(err) && err.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to fetch invitation codes')
+      }
     } finally {
       setLoading(false)
     }
@@ -128,7 +132,11 @@ export default function DashboardInvitations() {
       setSuccess(`Invitation code "${code}" deleted successfully`)
       await fetchCodes()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete invitation code')
+      if (axios.isAxiosError(err) && err.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to delete invitation code')
+      }
     } finally {
       setActionLoading(null)
     }
@@ -148,7 +156,11 @@ export default function DashboardInvitations() {
       setSuccess(`Invitation code "${code}" deactivated successfully`)
       await fetchCodes()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to deactivate invitation code')
+      if (axios.isAxiosError(err) && err.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to deactivate invitation code')
+      }
     } finally {
       setActionLoading(null)
     }
@@ -168,7 +180,11 @@ export default function DashboardInvitations() {
       setSuccess(`Invitation code "${code}" reactivated successfully`)
       await fetchCodes()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to reactivate invitation code')
+      if (axios.isAxiosError(err) && err.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to reactivate invitation code')
+      }
     } finally {
       setActionLoading(null)
     }
@@ -198,7 +214,11 @@ export default function DashboardInvitations() {
       setAddUsesModalOpen(false)
       await fetchCodes()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add uses to invitation code')
+      if (axios.isAxiosError(err) && err.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to add uses to invitation code')
+      }
     } finally {
       setAddUsesLoading(false)
     }
@@ -228,7 +248,11 @@ export default function DashboardInvitations() {
       setExtendModalOpen(false)
       await fetchCodes()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to extend invitation code')
+      if (axios.isAxiosError(err) && err.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to extend invitation code')
+      }
     } finally {
       setExtendLoading(false)
     }
