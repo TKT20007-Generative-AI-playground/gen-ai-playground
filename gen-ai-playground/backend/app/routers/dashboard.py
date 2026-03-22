@@ -111,6 +111,13 @@ def delete_user(
     Delete a user and all their data (images, text generations) - admin only
     """
     try:
+        # Prevent self-deletion
+        if username == admin.username:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot delete your own account"
+            )
+        
         # Check if user exists
         user = db.users.find_one({"username": username})
         if not user:
@@ -118,6 +125,16 @@ def delete_user(
                 status_code=404,
                 detail=f"User '{username}' not found"
             )
+        
+        # Prevent deleting the last admin user
+        user_is_admin = user.get("is_admin", False)
+        if user_is_admin:
+            admin_count = db.users.count_documents({"is_admin": True})
+            if admin_count <= 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot delete the last admin user"
+                )
         
         # Delete user's images
         images_result = db.images.delete_many({"username": username})

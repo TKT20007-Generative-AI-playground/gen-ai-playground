@@ -58,7 +58,13 @@ export default function DashboardUsers() {
       setSuccess(`User "${username}" deleted successfully`)
       await fetchUsers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete user')
+      if (axios.isAxiosError(err) && err.response?.data?.detail) {
+        setError(err.response.data.detail)
+      } else if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError('Failed to delete user')
+      }
     } finally {
       setActionLoading(null)
     }
