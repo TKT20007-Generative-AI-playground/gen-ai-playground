@@ -38,8 +38,6 @@ export default function Header() {
             <Button 
               variant="white"
               color="dark"
-              component={Link}
-              to="/history"
             >
               History
             </Button>
@@ -50,7 +48,7 @@ export default function Header() {
               Dashboard
             </Button>
           )}
-          
+
           <Button component={Link} to="/playground" variant="white" color="dark">
             Playground
           </Button>
