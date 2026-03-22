@@ -17,7 +17,7 @@ import {
   Tooltip,
   Input,
 } from '@mantine/core'
-import { IconPlus, IconCopy, IconCheck, IconTrash, IconPower } from '@tabler/icons-react'
+import { IconPlus, IconCopy, IconCheck, IconTrash, IconPower, IconCalendarPlus } from '@tabler/icons-react'
 
 interface InvitationCode {
   code: string
@@ -42,6 +42,11 @@ export default function DashboardInvitations() {
   const [selectedCode, setSelectedCode] = useState<string>('')
   const [additionalUses, setAdditionalUses] = useState<number>(1)
   const [addUsesLoading, setAddUsesLoading] = useState(false)
+  
+  // Extend expiration modal state
+  const [extendModalOpen, setExtendModalOpen] = useState(false)
+  const [extendDays, setExtendDays] = useState<number>(30)
+  const [extendLoading, setExtendLoading] = useState(false)
   
   // Create form state
   const [customCode, setCustomCode] = useState<string>('')
@@ -197,6 +202,42 @@ export default function DashboardInvitations() {
     } finally {
       setAddUsesLoading(false)
     }
+  }
+
+  const handleExtend = (code: string) => {
+    setSelectedCode(code)
+    setExtendDays(30)
+    setExtendModalOpen(true)
+  }
+
+  const submitExtend = async () => {
+    if (extendDays < 1 || extendDays > 365) {
+      setError('Please enter a valid number between 1 and 365')
+      return
+    }
+    setExtendLoading(true)
+    setError(null)
+    setSuccess(null)
+    try {
+      await axios.post(
+        `${backendUrl}/dashboard/invitations/codes/${selectedCode}/extend`,
+        { expiration_days: extendDays },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+      setSuccess(`Extended expiration of invitation code "${selectedCode}" by ${extendDays} days`)
+      setExtendModalOpen(false)
+      await fetchCodes()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to extend invitation code')
+    } finally {
+      setExtendLoading(false)
+    }
+  }
+
+  const isCodeExpired = (code: InvitationCode): boolean => {
+    const now = new Date()
+    const expiresAt = new Date(code.expires_at)
+    return expiresAt < now
   }
 
   const formatDate = (dateString: string | null) => {
@@ -385,6 +426,17 @@ export default function DashboardInvitations() {
                           <IconPlus size={16} />
                         </ActionIcon>
                       </Tooltip>
+                    ) : isCodeExpired(code) ? (
+                      <Tooltip label="Extend">
+                        <ActionIcon
+                          color="blue"
+                          variant="subtle"
+                          loading={actionLoading === code.code}
+                          onClick={() => handleExtend(code.code)}
+                        >
+                          <IconCalendarPlus size={16} />
+                        </ActionIcon>
+                      </Tooltip>
                     ) : (
                       !code.is_active && (
                         <Tooltip label="Reactivate">
@@ -399,7 +451,7 @@ export default function DashboardInvitations() {
                         </Tooltip>
                       )
                     )}
-                    {code.is_active && code.uses_count < code.max_uses && (
+                    {code.is_active && code.uses_count < code.max_uses && !isCodeExpired(code) && (
                       <Tooltip label="Deactivate">
                         <ActionIcon
                           color="yellow"
@@ -503,6 +555,34 @@ export default function DashboardInvitations() {
             </Button>
             <Button onClick={submitAddUses} loading={addUsesLoading}>
               Add Uses
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Extend Expiration Modal */}
+      <Modal
+        opened={extendModalOpen}
+        onClose={() => setExtendModalOpen(false)}
+        title={`Extend Expiration - ${selectedCode}`}
+        centered
+      >
+        <Stack>
+          <NumberInput
+            label="Extension (days)"
+            description="Number of days to extend the expiration (1-365)"
+            value={extendDays}
+            onChange={(val) => setExtendDays(typeof val === 'number' ? val : 30)}
+            min={1}
+            max={365}
+            required
+          />
+          <Group justify="flex-end" mt="md">
+            <Button variant="default" onClick={() => setExtendModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={submitExtend} loading={extendLoading}>
+              Extend
             </Button>
           </Group>
         </Stack>

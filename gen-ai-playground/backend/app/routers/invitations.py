@@ -23,6 +23,11 @@ class AddUsesRequest(BaseModel):
     additional_uses: int = Field(default=1, ge=1, le=100)
 
 
+class ExtendExpirationRequest(BaseModel):
+    """Request model for extending invitation code expiration"""
+    expiration_days: int = Field(default=30, ge=1, le=365)
+
+
 router = APIRouter(
     prefix="/dashboard/invitations",
     tags=["invitations"]
@@ -279,6 +284,64 @@ def reactivate_invitation_code(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to reactivate invitation code: {str(e)}"
+        )
+
+
+@router.post("/codes/{code}/extend", response_model=InvitationCodeDeleteResponse)
+def extend_invitation_code(
+    code: str = Path(..., min_length=5, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$"),
+    extend_data: ExtendExpirationRequest = Body(...),
+    admin: UserInfo = Depends(get_admin_user),
+    db: Database = Depends(get_database)
+):
+    """
+    Extend the expiration date of an invitation code (admin only)
+    
+    Args:
+        code: The invitation code to extend
+        extend_data: Number of days to extend the expiration
+        admin: Admin user info
+        db: Database instance
+        
+    Returns:
+        InvitationCodeDeleteResponse: Extension confirmation
+    """
+    try:
+        # Find the invitation code first
+        invitation = db.invitation_codes.find_one({"code": code})
+        
+        if not invitation:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Invitation code '{code}' not found"
+            )
+        
+        # Calculate new expiration date
+        current_expires_at = invitation.get("expires_at", datetime.utcnow())
+        now = datetime.utcnow()
+        
+        # If already expired, extend from now; otherwise extend from current expiration
+        if current_expires_at < now:
+            new_expires_at = now + timedelta(days=extend_data.expiration_days)
+        else:
+            new_expires_at = current_expires_at + timedelta(days=extend_data.expiration_days)
+        
+        # Update the expiration date and set is_active to true
+        result = db.invitation_codes.update_one(
+            {"code": code},
+            {"$set": {"expires_at": new_expires_at, "is_active": True}}
+        )
+        
+        return InvitationCodeDeleteResponse(
+            message=f"Invitation code extended successfully. New expiration: {new_expires_at.strftime('%Y-%m-%d %H:%M:%S')}",
+            code=code
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to extend invitation code: {str(e)}"
         )
 
 
