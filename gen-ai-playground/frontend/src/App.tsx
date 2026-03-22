@@ -1,17 +1,16 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Header from "./components/Header";
+import Front from "./pages/Front";
 import Register from "./components/Register";
 import Playground from "./pages/Playground";
 import Dashboard from "./pages/Dashboard";
 import History from "./components/History";
-import { useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminRoute } from "./components/AdminRoute";
 import HistorySidebar from "./components/HistorySidebar";
 import { useState, useCallback, useEffect } from "react";
 
 function App() {
-  const { isLoggedIn } = useAuth();
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(420);
@@ -47,12 +46,14 @@ function App() {
   return (
     <BrowserRouter>
       <Header />
+
+      {/* Sidebar toggle button */}
       <button
         onClick={() => setHistoryOpen((prev) => !prev)}
         style={{
           position: "fixed",
           top: "50%",
-          transform: "translateY(-50%)", 
+          transform: "translateY(-50%)",
           left: historyOpen ? `${sidebarWidth + 10}px` : "10px",
           zIndex: 2000,
           background: "white",
@@ -66,7 +67,7 @@ function App() {
         {historyOpen ? "←" : "→"}
       </button>
 
-      <div style={{ display: "flex", minHeight: "100vh" , height: "100%"}}>
+      <div style={{ display: "flex", minHeight: "100vh", height: "100%" }}>
         {historyOpen && (
           <div
             style={{
@@ -100,18 +101,7 @@ function App() {
 
         <div style={{ flex: 1 }}>
           <Routes>
-            <Route
-              path="/"
-              element={
-                isLoggedIn ? (
-                  <Navigate to="/playground/ImageGenerator" replace />
-                ) : (
-                  <div style={{ textAlign: "center", paddingTop: 16 }}>
-                    <p>You must be logged in to generate images.</p>
-                  </div>
-                )
-              }
-            />
+            <Route path="/" element={<Front />} />
 
             <Route path="/register" element={<Register />} />
 
@@ -154,3 +144,4 @@ function App() {
 }
 
 export default App;
+

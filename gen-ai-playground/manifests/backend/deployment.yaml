@@ -49,11 +49,6 @@ spec:
                 secretKeyRef:
                   name: jwt-secret
                   key: JWT_SECRET_KEY
-            - name: JWT_REFRESH_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: jwt-secret
-                  key: JWT_REFRESH_SECRET_KEY
             - name: VERDA_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -79,11 +74,11 @@ spec:
                 secretKeyRef:
                   name: genai-admin-credentials
                   key: ADMIN_PASSWORD
-            - name: gen-ai-jwt-refresh-secret
+            - name: JWT_REFRESH_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: gen-ai-jwt-refresh-secret-key
-                  key: JWT_REFRESH_SECRET_KEY  
+                  key: JWT_REFRESH_SECRET_KEY
           resources:
             limits:
               memory: "512Mi"
