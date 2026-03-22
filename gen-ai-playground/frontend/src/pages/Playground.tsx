@@ -6,6 +6,7 @@ import type { ReactNode } from "react"
 import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
 import TextGenerator from "../components/TextGenerator"
+import { PLAYGROUND_TABS, type PlaygroundTab } from "../constants/tabs"
 
 const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const
 type Tab = (typeof tabs)[number]
@@ -17,8 +18,10 @@ export default function Playground() {
 
   const imageToEdit = location.state?.imageToEdit || null
 
+  type Tab = PlaygroundTab
+
   const selectedComponent: Tab =
-    tab && tabs.includes(tab as Tab) ? (tab as Tab) : "ImageGenerator"
+    tab && PLAYGROUND_TABS.includes(tab as Tab) ? (tab as Tab) : "ImageGenerator"
 
   const componentsMap: Record<Tab, ReactNode> = {
     ImageGenerator: <ImageGenerator />,
@@ -28,7 +31,7 @@ export default function Playground() {
 
   // If tab is invalid, redirect to default
   useEffect(() => {
-    if (!tab || !tabs.includes(tab as Tab)) {
+    if (!tab || !PLAYGROUND_TABS.includes(tab as Tab)) {
       navigate("/playground/ImageGenerator", { replace: true })
     }
   }, [tab, navigate])
@@ -38,7 +41,7 @@ export default function Playground() {
       <Group gap="md" p="md">
         <Select
           label="Select playground component"
-          data={tabs.map((t) => ({ value: t, label: t }))}
+          data={PLAYGROUND_TABS.map((t) => ({ value: t, label: t }))}
           value={selectedComponent}
           onChange={(value) => {
             if (value) navigate(`/playground/${value}`)

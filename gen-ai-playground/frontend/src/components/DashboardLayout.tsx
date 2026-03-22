@@ -11,7 +11,13 @@ export default function DashboardLayout() {
   // Save current dashboard tab and navigate to playground
   const handlePlaygroundClick = () => {
     // Determine current dashboard tab from location
-    const currentTab: DashboardTab = location.pathname === '/dashboard/users' ? 'users' : 'containers'
+    const path = location.pathname
+    let currentTab: DashboardTab = 'containers'
+    if (path === '/dashboard/invitations') {
+      currentTab = 'invitations'
+    } else if (path === '/dashboard/users') {
+      currentTab = 'users'
+    }
     saveDashboardTab(currentTab)
     
     // Navigate to the last used playground tab, defaulting to ImageGenerator

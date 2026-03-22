@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import LoginModal from './Login';
 import { Group, Divider, Text, Button, Drawer } from "@mantine/core";
 import History from "./History";
-import { getTargetTab, saveCurrentTab, getDashboardTab, type PlaygroundTab } from '../constants/tabs';
+import { getTargetTab, saveCurrentTab, getDashboardTab, type PlaygroundTab, PLAYGROUND_TABS } from '../constants/tabs';
 
 export default function Header() {
   const { isLoggedIn, isAdmin, logout } = useAuth()
@@ -14,8 +14,7 @@ export default function Header() {
   // Store current playground tab when navigating to dashboard
   const handleDashboardClick = () => {
     const pathMatch = location.pathname.match(/^\/playground\/(\w+)$/)
-    const validTabs: PlaygroundTab[] = ['ImageGenerator', 'ImageEditor', 'TextGenerator'];
-    if (pathMatch && validTabs.includes(pathMatch[1] as PlaygroundTab)) {
+    if (pathMatch && PLAYGROUND_TABS.includes(pathMatch[1] as PlaygroundTab)) {
       saveCurrentTab(pathMatch[1] as PlaygroundTab)
     }
     // Navigate to the last used dashboard tab

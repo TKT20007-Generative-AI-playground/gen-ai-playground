@@ -6,7 +6,7 @@ export type PlaygroundTab = typeof PLAYGROUND_TABS[number]
 export const LAST_TAB_STORAGE_KEY = 'lastPlaygroundTab'
 
 // Shared constants for dashboard tabs
-export const DASHBOARD_TABS = ['containers', 'users'] as const
+export const DASHBOARD_TABS = ['containers', 'invitations', 'users'] as const
 
 export type DashboardTab = typeof DASHBOARD_TABS[number]
 
