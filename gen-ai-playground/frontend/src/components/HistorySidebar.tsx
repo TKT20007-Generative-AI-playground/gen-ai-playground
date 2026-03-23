@@ -82,7 +82,7 @@ const limited = conversations.slice(0, limit);
     const url =
       historyType === "image"
         ? `${backendUrl}/images/history`
-        : `${backendUrl}/text/history`;
+        : `${backendUrl}/text/history-sidebar`;
 
     const res = await axios.get(url, { withCredentials: true });
     const history: HistoryRecord[] = res.data.history;

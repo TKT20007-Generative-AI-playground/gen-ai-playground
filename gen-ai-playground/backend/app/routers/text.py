@@ -525,7 +525,7 @@ def chat_with_model(
             detail=f"Chat failed: {str(e)}",
         )
 
-@router.get("/history")
+@router.get("/history-sidebar")
 def get_text_history(
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
