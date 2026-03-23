@@ -11,10 +11,15 @@ load_dotenv('.env.local')
 class Settings:
     """Application settings loaded from environment variables"""
     
+    # Is it production
+    ENV = os.getenv("ENV", "development")
+    IS_PROD = ENV == "production"
+
     # MongoDB
     MONGO_DB_URL: str = os.getenv("MONGO_DB_URL")
     
-    # API Keys
+    # External API Keys (Bearer Tokens - NEVER expose to frontend)
+    # These are used by backend to authenticate with external inference APIs
     VERDA_API_KEY: str = os.getenv("VERDA_API_KEY")
     VERDA_INFERENCE_KEY: str = os.getenv("VERDA_INFERENCE_KEY") or os.getenv("VERDA_API_KEY")
     
@@ -25,7 +30,9 @@ class Settings:
     
     # JWT
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY")
-    JWT_EXPIRY_HOURS: int = 24
+    JWT_REFRESH_SECRET_KEY: str = os.getenv("JWT_REFRESH_SECRET_KEY")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     
     # CORS
     ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS")

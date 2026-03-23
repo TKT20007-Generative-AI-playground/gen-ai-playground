@@ -55,7 +55,6 @@ class HistoryItem(BaseModel):
     image_data: str
     image_type: str
 
-
 class HistoryResponse(BaseModel):
     """Response model for history endpoint"""
     history: List[HistoryItem]

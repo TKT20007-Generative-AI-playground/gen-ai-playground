@@ -33,6 +33,19 @@ const makeMessageId = () => {
 
 const MAX_MODELS = 4
 
+const getCsrfToken = (): string => {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; csrf_token=`)
+  if (parts.length === 2) return parts.pop()!.split(";").shift()!
+  return ""
+}
+
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  "X-CSRF-Token": getCsrfToken(),
+})
+
+
 function parseModelReply(rawReply: string): {
   thinking: string | null
   actualReply: string
@@ -249,15 +262,6 @@ export default function TextGenerator() {
   const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
   const [statusMsgs, setStatusMsgs] = useState<Record<string, string | null>>({})
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token")
-    if (!token) throw new Error("Token puuttuu")
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    }
-  }
-
   // Fetch available models from backend
   useEffect(() => {
     if (!isLoggedIn) return
@@ -265,6 +269,7 @@ export default function TextGenerator() {
       try {
         const res = await axios.get(`${backendUrl}/text/models`, {
           headers: getAuthHeaders(),
+          withCredentials: true,
         })
         const models: ModelOption[] = (res.data.available_models ?? []).map(
           (m: { value: string; label: string }) => ({
@@ -285,6 +290,7 @@ export default function TextGenerator() {
     try {
       const res = await axios.get(`${backendUrl}/text/model-statuses`, {
         headers: getAuthHeaders(),
+        withCredentials: true,
       })
       setModelStatuses(res.data)
     } catch {
@@ -328,7 +334,7 @@ export default function TextGenerator() {
           temperature: 0.7,
           top_p: 0.9,
         },
-        { headers: getAuthHeaders() },
+        { headers: getAuthHeaders(), withCredentials: true }
       )
 
       const result = response.data

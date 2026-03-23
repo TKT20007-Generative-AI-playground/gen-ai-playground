@@ -1,6 +1,7 @@
 import { test, expect, Page } from "@playwright/test";
 
-const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173/";
+const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173/';
+const PLAYGROUND_URL = new URL('playground', FRONTEND_URL).toString();
 
 // Dummy image
 function getDummyImageBuffer() {
@@ -20,8 +21,8 @@ test.describe("Image Editor flows", () => {
       });
     });
 
-    await page.goto(FRONTEND_URL);
-    await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
+    await page.goto(PLAYGROUND_URL);
+    await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
 
     const playgroundSelector = page.getByTestId("playground-select");
     await playgroundSelector.click(); // opens dropdown

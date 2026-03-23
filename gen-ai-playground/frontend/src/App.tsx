@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Header from "./components/Header"
+import Front from "./pages/Front"
 import Register from "./components/Register"
 import Playground from "./pages/Playground"
 import Dashboard from "./pages/Dashboard"
@@ -9,7 +10,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
 
 function App() {
-  const { isLoggedIn } = useAuth()
+  // const { isLoggedIn } = useAuth()
 
   return (
     <BrowserRouter>
@@ -19,13 +20,7 @@ function App() {
         <Route
           path="/"
           element={
-            isLoggedIn ? (
-              <Navigate to="/playground/ImageGenerator" replace />
-            ) : (
-              <div style={{ width: "100%", textAlign: "center", paddingTop: 16 }}>
-                <p>You must be logged in to generate images.</p>
-              </div>
-            )
+              <Front />
           }
         />
 

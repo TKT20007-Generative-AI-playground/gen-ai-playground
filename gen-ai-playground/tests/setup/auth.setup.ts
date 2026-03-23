@@ -14,7 +14,7 @@ const STORAGE_STATE_PATH = "playwright/.auth/user.json";
 function makeTestUser() {
   return {
     username: `pw_auth_${Date.now()}`,
-    password: "pw-test-password-1234",
+    password: 'ValidPass1234!',
   };
 }
 

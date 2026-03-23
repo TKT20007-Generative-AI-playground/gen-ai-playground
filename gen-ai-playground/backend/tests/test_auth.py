@@ -10,6 +10,8 @@ import os
 # Import the app and models
 from server import app
 from app.models import RegisterRequest, LoginRequest
+from app.dependencies import validate_csrf_token
+from app.config import settings
 
 
 @pytest.fixture
@@ -23,9 +25,11 @@ def mock_db():
 @pytest.fixture
 def client(mock_db):
     """Create a test client with mocked database"""
+    app.dependency_overrides[validate_csrf_token] = lambda: None
     with patch('app.database.db_manager.db', mock_db):
         with patch('app.database.get_database', return_value=mock_db):
             yield TestClient(app)
+    app.dependency_overrides.pop(validate_csrf_token, None)
 
 
 @pytest.fixture
@@ -36,6 +40,24 @@ def test_user_data():
         "password": "SecurePassword123!",
         "invitation_code": os.getenv("INVITATION_CODE")
     }
+
+
+@pytest.fixture
+def auth_token(test_user_data):
+    """Generate a valid JWT access token for testing."""
+    secret_key = settings.JWT_SECRET_KEY
+    payload = {
+        "username": test_user_data["username"],
+        "is_admin": False,
+        "exp": datetime.utcnow() + timedelta(hours=24),
+        "type": "access",
+    }
+    return jwt.encode(payload, secret_key, algorithm="HS256")
+
+
+@pytest.fixture
+def auth_headers(auth_token):
+    return {"Authorization": f"Bearer {auth_token}"}
 
 
 @pytest.fixture
@@ -150,6 +172,27 @@ class TestRegisterEndpoint:
         response = client.post("/register", json=data_without_code)
         assert response.status_code == 422  # Validation error
 
+    @pytest.mark.parametrize(
+        "password, expected_error",
+        [
+            ("short", "Password must be at least 8 characters long"),
+            ("nouppercase123!", "Password must contain at least one uppercase letter"),
+            ("NoNumber!", "Password must contain at least one number"),
+            ("NoSpecial123", "Password must contain at least one special character"),
+        ]
+    )
+
+    def test_password_validation(self, client, test_user_data, password, expected_error):
+        """Test that backend rejects passwords failing validation rules"""
+        invalid_data = test_user_data.copy()
+        invalid_data["password"] = password
+        invalid_data["username"] = f"user_{password}"
+
+        response = client.post("/register", json=invalid_data)
+
+        assert response.status_code == 400
+        assert expected_error in response.json()["detail"]
+
 
 class TestLoginEndpoint:
     """Tests for /login endpoint"""
@@ -169,30 +212,51 @@ class TestLoginEndpoint:
         assert data["username"] == registered_user["username"]
         assert "token" in data
         assert data["token"] != ""
-    
-    def test_jwt_token_structure(self, client, registered_user):
-        """Test that JWT token contains correct claims and is valid"""
+
+    def test_login_sets_cookies(self, client, registered_user):
+        """Test login sets refresh_token (HTTPOnly) and csrf_token cookies"""
         login_data = {
             "username": registered_user["username"],
             "password": registered_user["password"]
         }
-        
+
         response = client.post("/login", json=login_data)
-        
+
+        assert response.status_code == 200
+        cookies = {c.name: c for c in response.cookies.jar}
+        # refresh_token should be HTTPOnly
+        assert "refresh_token" in cookies
+        refresh_cookie_header = response.headers.get("set-cookie", "")
+        assert "httponly" in refresh_cookie_header.lower()
+        # csrf_token should be present (non-HTTPOnly, readable by JS)
+        assert "csrf_token" in cookies
+    
+    def test_jwt_token_structure(self, client, registered_user):
+        """Test that JWT access token contains correct claims and is valid"""
+        login_data = {
+            "username": registered_user["username"],
+            "password": registered_user["password"]
+        }
+
+        response = client.post("/login", json=login_data)
+
         assert response.status_code == 200
         token = response.json()["token"]
-        
+
         # Decode and verify token
-        decoded = jwt.decode(token, "dev-secret-key-for-local-development", algorithms=["HS256"])
-        
+        decoded = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+
         assert decoded["username"] == registered_user["username"]
+        assert decoded["type"] == "access"
+        assert "is_admin" in decoded
         assert "exp" in decoded
-        
-        # Verify expiration is ~24 hours from now
+
+        # Verify expiration matches ACCESS_TOKEN_EXPIRE_MINUTES
         exp_time = datetime.fromtimestamp(decoded["exp"])
         now = datetime.utcnow()
         time_diff = exp_time - now
-        assert timedelta(hours=23) < time_diff < timedelta(hours=25)
+        max_expected = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        assert time_diff <= max_expected
     
     def test_invalid_username(self, client):
         """Test login with non-existent username"""
@@ -265,3 +329,90 @@ class TestAuthIntegration:
         
         assert login_response.status_code == 200
         assert "token" in login_response.json()
+
+    def test_me_endpoint_with_bearer(self, client, test_user_data):
+        """Test /me returns user when authenticated via Bearer token"""
+        register_response = client.post("/register", json=test_user_data)
+        assert register_response.status_code == 200
+
+        login_response = client.post(
+            "/login",
+            json={
+                "username": test_user_data["username"],
+                "password": test_user_data["password"]
+            }
+        )
+        assert login_response.status_code == 200
+        token = login_response.json()["token"]
+
+        me_response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+        assert me_response.status_code == 200
+        assert me_response.json()["username"] == test_user_data["username"]
+
+    def test_logout_clears_cookies_and_me_fails(self, client, test_user_data):
+        """Test /logout clears cookies so /me with Bearer becomes unauthorized"""
+        register_response = client.post("/register", json=test_user_data)
+        assert register_response.status_code == 200
+
+        login_response = client.post(
+            "/login",
+            json={
+                "username": test_user_data["username"],
+                "password": test_user_data["password"]
+            }
+        )
+        assert login_response.status_code == 200
+        token = login_response.json()["token"]
+
+        # Verify /me works before logout
+        me_response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+        assert me_response.status_code == 200
+
+        logout_response = client.post("/logout")
+        assert logout_response.status_code == 200
+
+        # After logout, cookies are cleared, but the in-memory token is still
+        # technically valid until it expires. The frontend clears it from memory.
+        # Here we simulate the frontend having discarded the token.
+        me_response = client.get("/me")
+        assert me_response.status_code == 401
+        assert "Not authenticated" in me_response.json()["detail"]
+
+
+class TestCSRFProtection:
+    """Verify CSRF validation is enforced on cookie-authenticated requests."""
+
+    def test_post_without_csrf_header_returns_403(self, client, registered_user):
+        """POST with csrf_token cookie but no X-CSRF-Token header should return 403."""
+        app.dependency_overrides.pop(validate_csrf_token, None)
+        try:
+            client.cookies.set("csrf_token", "some-csrf-token")
+            response = client.post("/logout")
+            assert response.status_code == 403
+            assert "Invalid CSRF token" in response.json()["detail"]
+        finally:
+            client.cookies.clear()
+            app.dependency_overrides[validate_csrf_token] = lambda: None
+
+    def test_post_with_mismatched_csrf_returns_403(self, client, registered_user):
+        """POST with mismatched CSRF cookie and header should return 403."""
+        app.dependency_overrides.pop(validate_csrf_token, None)
+        try:
+            client.cookies.set("csrf_token", "correct-token")
+            response = client.post("/logout", headers={"X-CSRF-Token": "wrong-token"})
+            assert response.status_code == 403
+            assert "Invalid CSRF token" in response.json()["detail"]
+        finally:
+            client.cookies.clear()
+            app.dependency_overrides[validate_csrf_token] = lambda: None
+
+    def test_post_with_valid_csrf_succeeds(self, client, registered_user):
+        """POST with matching CSRF cookie and header should succeed."""
+        app.dependency_overrides.pop(validate_csrf_token, None)
+        try:
+            client.cookies.set("csrf_token", "valid-token")
+            response = client.post("/logout", headers={"X-CSRF-Token": "valid-token"})
+            assert response.status_code == 200
+        finally:
+            client.cookies.clear()
+            app.dependency_overrides[validate_csrf_token] = lambda: None

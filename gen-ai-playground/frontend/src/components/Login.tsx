@@ -1,15 +1,26 @@
-import { Modal, TextInput, PasswordInput, Button, Stack, Text, Anchor } from "@mantine/core"
-import { useForm } from "@mantine/form"
-import { Link } from "react-router-dom"
-import { useAuth } from "../context/AuthContext"
+import {
+  Modal,
+  TextInput,
+  PasswordInput,
+  Button,
+  Stack,
+  Text,
+  Anchor,
+} from '@mantine/core'
+import { useForm } from '@mantine/form'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import axios from 'axios'
 
 interface LoginModalProps {
   opened: boolean
   onClose: () => void
+  redirectTo?: string | null
 }
 
-export default function LoginModal({ opened, onClose }: LoginModalProps) {
+export default function LoginModal({ opened, onClose, redirectTo }: LoginModalProps) {
   const { login } = useAuth()
+  const navigate = useNavigate()
 
   const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
@@ -22,25 +33,24 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      const res = await fetch(`${backendUrl}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      })
+      const res = await axios.post(
+        `${backendUrl}/login`,
+        values,
+        { withCredentials: true }
+      );
 
-      const data = await res.json()
+      login(res.data.token, res.data.username, res.data.is_admin || false);
+      onClose();
 
-      if (!res.ok) {
-        alert(data.detail || "Login failed")
-        return
+      if (redirectTo) {
+        navigate(redirectTo)
       }
-
-      login(data.token, data.username, data.is_admin || false)
-      onClose()
-    } catch {
-      alert("Server unreachable")
+      
+    } catch (error: unknown) {
+      const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
+      alert(detail || 'Login failed');
     }
-  }
+  };
 
   return (
     <Modal opened={opened} onClose={onClose} title="Login" centered>
@@ -62,7 +72,7 @@ export default function LoginModal({ opened, onClose }: LoginModalProps) {
             {...form.getInputProps("password")}
           />
 
-          <Button type="submit" fullWidth>
+          <Button className="btn-primary" type="submit" fullWidth>
             Login
           </Button>
 

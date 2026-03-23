@@ -130,6 +130,11 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
     try {
       const base64 = await fileToBase64(userImage)
 
+      const csrfToken = document.cookie
+        .split("; ")
+        .find((c) => c.startsWith("csrf_token="))
+        ?.split("=")[1] ?? ""
+
       const response = await axios.post(
         `${backendUrl}/images/edit-image`,
         {
@@ -141,8 +146,10 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
         },
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken,
           },
+          withCredentials: true,
           responseType: "blob",
           timeout: IMAGE_REQUEST_TIMEOUT_MS,
           signal: controller.signal,

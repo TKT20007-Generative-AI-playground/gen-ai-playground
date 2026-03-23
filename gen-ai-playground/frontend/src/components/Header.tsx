@@ -9,14 +9,19 @@ export default function Header() {
   const { isLoggedIn, isAdmin, logout } = useAuth()
   const location = useLocation()
 
-  const [loginOpened, setLoginOpened] = useState(false)
-  const [historyOpened, setHistoryOpened] = useState(false)
-  const [drawerWidth, setDrawerWidth] = useState(420)
-  const [resizing, setResizing] = useState(false)
+  const [loginOpened, setLoginOpened] = useState(false);
+  const [historyOpened, setHistoryOpened] = useState(false);
+  const [drawerWidth, setDrawerWidth] = useState(420);
+  const [resizing, setResizing] = useState(false);
+
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
 
   useEffect(() => {
     if (location.state?.openLoginModal) {
-      queueMicrotask(() => setLoginOpened(true))
+      queueMicrotask(() => {
+        setRedirectTo(location.state?.redirectTo || null)
+        setLoginOpened(true)
+      })
       window.history.replaceState({}, document.title)
     }
   }, [location])
@@ -50,10 +55,10 @@ export default function Header() {
 
   return (
     <>
-      <Group justify="space-between" p="md" bg="#2C4E87">
+      <Group justify="space-between" p="md" bg="linear-gradient(135deg, #000F65, #0b1328)" style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Group gap="md">
-          <Text fw={500} c="white">
-            Generative AI Playground{" "}
+          <Text fw={500} c="white" component={Link} to="/">
+            Generative AI Playground
           </Text>
           {isLoggedIn && (
             <Button component={Link} to="/history" variant="white" color="dark">
@@ -80,7 +85,7 @@ export default function Header() {
           </Button>
         )}
 
-        <LoginModal opened={loginOpened} onClose={() => setLoginOpened(false)} />
+        <LoginModal opened={loginOpened} onClose={() => { setLoginOpened(false); setRedirectTo(null); }} redirectTo={redirectTo} />
       </Group>
       <Divider />
 
