@@ -158,7 +158,7 @@ class ChatRequest(BaseModel):
 
 class InvitationCodeCreate(BaseModel):
     """Request model for creating an invitation code"""
-    code: str = Field(min_length=5, max_length=64)
+    code: str = Field(min_length=5, max_length=64, regex=r"^[a-zA-Z0-9_-]+$")
     expiration_days: int = Field(default=30, ge=1, le=365)
     max_uses: int = Field(default=1, ge=1, le=100)
 
