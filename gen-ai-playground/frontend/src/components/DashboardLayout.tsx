@@ -28,7 +28,7 @@ export default function DashboardLayout() {
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa" }}>
       {/* Top Bar - Same style as main Header */}
-      <Group justify="space-between" p="md" bg="#2C4E87">
+      <Group justify="space-between" p="md" bg="linear-gradient(135deg, #000F65, #0b1328)" style={{ position: "sticky", top: 0, zIndex: 100 }}>
         <Group gap="md">
           <Button variant="white" color="dark" onClick={handlePlaygroundClick} style={{ flexShrink: 0 }}>
             ← Playground

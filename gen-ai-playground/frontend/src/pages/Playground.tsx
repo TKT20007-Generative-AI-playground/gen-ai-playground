@@ -8,8 +8,7 @@ import ImageEditor from "../components/ImageEditor"
 import TextGenerator from "../components/TextGenerator"
 import { PLAYGROUND_TABS } from "../constants/tabs"
 
-const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const
-type Tab = (typeof tabs)[number]
+type Tab = (typeof PLAYGROUND_TABS)[number]
 
 export default function Playground() {
   const { tab } = useParams()
