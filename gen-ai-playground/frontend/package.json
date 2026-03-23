@@ -15,7 +15,7 @@
     "@mantine/core": "8.3.18",
     "@mantine/form": "8.3.18",
     "@mantine/hooks": "8.3.18",
-    "@mantine/dates": "^8.3.17",
+    "@mantine/dates": "^8.3.18",
     "axios": "^1.13.5",
     "embla-carousel-auto-scroll": "^8.6.0",
     "embla-carousel-react": "^8.6.0",

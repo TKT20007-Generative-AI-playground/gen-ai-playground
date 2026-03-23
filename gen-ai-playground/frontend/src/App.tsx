@@ -5,7 +5,7 @@ import Register from "./components/Register"
 import Playground from "./pages/Playground"
 import Dashboard from "./pages/Dashboard"
 import HistoryPage from "./pages/HistoryPage"
-import { useAuth } from "./context/AuthContext"
+//import { useAuth } from "./context/AuthContext"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
 
