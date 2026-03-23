@@ -166,12 +166,6 @@ const limited = conversations.slice(0, limit);
         </Group>
 
 
-        {items.length === 0 && (
-          <Center mt="md">
-            <Text c="dimmed">No history found.</Text>
-          </Center>
-        )}
-
     {historyType === "text" && (
       <>
         {limited.map((item, i) => {
