@@ -8,6 +8,7 @@ Security Model:
 - Cookie settings: samesite="strict", secure=IS_PROD
 """
 from fastapi import APIRouter, HTTPException, Depends, Response, Request
+from pymongo import ReturnDocument
 from pymongo.database import Database
 from datetime import datetime, timedelta
 import bcrypt
@@ -98,15 +99,22 @@ def register(
     validate_username(user_data.username)
 
     try:
-        # Validate invitation code against database
+        # Atomic operation: validates AND increments in one step
+        # This prevents race conditions where concurrent requests could exceed max_uses
         now = datetime.utcnow()
-        # Check if code exists, is active, not expired, and has remaining uses
-        invitation = db.invitation_codes.find_one({
-            "code": user_data.invitation_code,
-            "is_active": True,
-            "expires_at": {"$gt": now},
-            "$expr": {"$lt": ["$uses_count", "$max_uses"]}
-        })
+        invitation = db.invitation_codes.find_one_and_update(
+            {
+                "code": user_data.invitation_code,
+                "is_active": True,
+                "expires_at": {"$gt": now},
+                "$expr": {"$lt": ["$uses_count", "$max_uses"]}
+            },
+            {
+                "$inc": {"uses_count": 1},
+                "$push": {"used_by": user_data.username}
+            },
+            return_document=ReturnDocument.AFTER
+        )
         
         if not invitation:
             raise HTTPException(
@@ -139,26 +147,6 @@ def register(
         
         # Insert user into database
         db.users.insert_one(user_doc)
-        
-        # Increment the invitation code usage count
-        if invitation:
-            # Ensure used_by is an array before pushing (handles null/empty cases)
-            if invitation.get("used_by") is None:
-                db.invitation_codes.update_one(
-                    {"_id": invitation["_id"]},
-                    {
-                        "$inc": {"uses_count": 1},
-                        "$set": {"used_by": [user_data.username]}
-                    }
-                )
-            else:
-                db.invitation_codes.update_one(
-                    {"_id": invitation["_id"]},
-                    {
-                        "$inc": {"uses_count": 1},
-                        "$push": {"used_by": user_data.username}
-                    }
-                )
         
         return RegisterResponse(
             message="User registered successfully",
