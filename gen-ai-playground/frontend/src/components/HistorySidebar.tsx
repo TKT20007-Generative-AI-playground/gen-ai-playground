@@ -93,15 +93,25 @@ const limited = conversations.slice(0, limit);
 
   // Fetch when new image is generated
   useEffect(() => {
+    let timeoutId: number | null = null;
+
     const handler = () => {
-        setTimeout(() => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+      timeoutId = window.setTimeout(() => {
         refetch();
-        }, 300); 
+      }, 300);
     };
 
     window.addEventListener("history-update", handler);
-    return () => window.removeEventListener("history-update", handler);
-    }, [limit]);
+    return () => {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
+      window.removeEventListener("history-update", handler);
+    };
+  }, [limit, historyType, opened]);
 
 
   if (loading)
