@@ -3,12 +3,11 @@ Image generation and history routes
 """
 import traceback
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, Query, logger
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import Response
 from pymongo.database import Database
 from bson import ObjectId
 from datetime import datetime, timezone
-from bson import ObjectId, errors
 import math
 import base64
 import time
@@ -374,22 +373,18 @@ def save_image_to_db(db: Database, prompt: str, model:
         type (str): is the image returned by the AI edited or completely generated?
     """
     try:
-        original_id = None
         # If 'parent_image_id' is set, the original image already exists in DB.
         if user_base64_image and parent_image_id is None:
-            new_image = check_database_for_duplicate(db, parent_image_id, current_user.username)
-            if not new_image:
-                user_input_image_record = {
-                    "prompt": prompt,
-                    "model": model,
-                    "timestamp": datetime.now(timezone.utc),
-                    "image_size": len(base64.b64decode(user_base64_image)),
-                    "image_data": user_base64_image,
-                    "username": current_user.username,
-                    "image_type": "original"
-                }
-                res = db.images.insert_one(user_input_image_record)
-                original_id = res.inserted_id
+            user_input_image_record = {
+                "prompt": prompt,
+                "model": model,
+                "timestamp": datetime.now(timezone.utc),
+                "image_size": len(base64.b64decode(user_base64_image)),
+                "image_data": user_base64_image,
+                "username": current_user.username,
+                "image_type": "original"
+            }
+            db.images.insert_one(user_input_image_record)
         
         image_record = {
             "prompt": prompt,
@@ -446,26 +441,6 @@ def convert_objects_to_str(history: list, cur_user: UserInfo) -> list:
             doc["parent_image_id"] = str(doc["parent_image_id"])
         doc["username"] = cur_user.username
     return history
-    
-
-def check_database_for_duplicate(db: Database, parent_image_id: str | None, username: str) -> bool:
-    """Check if an edited image already exists for this user and parent image."""
-    query = {
-        "username": username,
-    }
-
-    if parent_image_id:
-        try:
-            query["parent_image_id"] = ObjectId(parent_image_id)
-        except errors.InvalidId:
-            return False  # Invalid parent_image_id, no duplicates
-
-    existing = db.images.find_one(query)
-    if existing:
-        logger.info(f"Duplicate found for parent_image_id: {parent_image_id}, username: {username}")
-        return True
-
-    return False
     
     
         
