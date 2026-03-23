@@ -525,6 +525,23 @@ def chat_with_model(
             detail=f"Chat failed: {str(e)}",
         )
 
+@router.get("/history")
+def get_text_history(
+    current_user: UserInfo = Depends(get_current_user),
+    db: Database = Depends(get_database),
+):
+    records = list(
+        db.text_generations.find(
+            {"username": current_user.username}
+        ).sort("timestamp", -1)
+    )
+
+    # Convert ObjectId to string
+    for r in records:
+        r["_id"] = str(r["_id"])
+
+    return {"history": records}
+
 
 @router.delete("/deploy")
 def delete_deployment(

@@ -237,7 +237,7 @@ function ChatPanel({
 
 // --- Main component ---
 
-export default function TextGenerator() {
+export default function TextGenerator({ opened }: { opened: boolean }) {  
   const { isLoggedIn } = useAuth()
   const backendUrl = import.meta.env.VITE_API_URL
 
@@ -246,6 +246,8 @@ export default function TextGenerator() {
   const [messagesByModel, setMessagesByModel] = useState<Record<string, Message[]>>({})
   const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
+
+  const sidebarOpen = opened
 
   // Keep a ref so async loops always see the latest messages.
   const messagesByModelRef = useRef<Record<string, Message[]>>({})
@@ -467,40 +469,37 @@ export default function TextGenerator() {
         <>
           {/* Panels */}
           {isBreakout ? (
-            // 3–4 models: allow full-width layout and wrap panels instead of cramping.
-            <div style={{ width: "100vw", marginLeft: "calc(50% - 50vw)" }}>
-              <div
-                style={{
-                  maxWidth: "1800px",
-                  margin: "0 auto",
-                  padding: "0 16px",
-                  boxSizing: "border-box",
-                }}
-              >
-                <div
-                  style={{
-                    display: "grid",
-                    gap: "20px",
-                    width: "100%",
-                    alignItems: "stretch",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
-                  }}
-                >
-                  {selectedModels.map(modelValue => (
-                    <ChatPanel
-                      key={modelValue}
-                      modelValue={modelValue}
-                      modelLabel={getModelLabel(modelValue)}
-                      messages={messagesByModel[modelValue] ?? []}
-                      onClearMessages={() => clearMessagesForModel(modelValue)}
-                      isLoading={loadingByModel[modelValue] ?? false}
-                      isBusy={isAnyLoading}
-                      modelStatus={modelStatuses[modelValue] ?? "unknown"}
-                      statusMessage={statusMsgs[modelValue] ?? null}
-                    />
-                  ))}
-                </div>
-              </div>
+            <div
+              style={{
+                display: "grid",
+                gap: "20px",
+                width: "100%",
+                alignItems: "stretch",
+
+                // If historysidebar open, show 2×2 grid
+                // Otherwise auto-fit layout
+                gridTemplateColumns:
+                  sidebarOpen && selectedModels.length >= 3
+                    ? "repeat(2, 1fr)"
+                    : "repeat(auto-fit, minmax(280px, 1fr))",
+
+                transition: "padding-right 0.3s ease",
+                paddingRight: sidebarOpen ? "260px" : "0px",
+              }}
+            >
+              {selectedModels.map((modelValue) => (
+                <ChatPanel
+                  key={modelValue}
+                  modelValue={modelValue}
+                  modelLabel={getModelLabel(modelValue)}
+                  messages={messagesByModel[modelValue] ?? []}
+                  onClearMessages={() => clearMessagesForModel(modelValue)}
+                  isLoading={loadingByModel[modelValue] ?? false}
+                  isBusy={isAnyLoading}
+                  modelStatus={modelStatuses[modelValue] ?? "unknown"}
+                  statusMessage={statusMsgs[modelValue] ?? null}
+                />
+              ))}
             </div>
           ) : (
             // 1–2 models: keep the compact layout.

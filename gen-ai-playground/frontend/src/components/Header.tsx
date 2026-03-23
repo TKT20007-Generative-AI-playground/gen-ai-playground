@@ -5,15 +5,11 @@ import LoginModal from "./Login"
 import { Group, Divider, Text, Button, Drawer } from "@mantine/core"
 import History from "./History"
 
-export default function Header() {
+export default function Header() {  
   const { isLoggedIn, isAdmin, logout } = useAuth()
   const location = useLocation()
 
   const [loginOpened, setLoginOpened] = useState(false);
-  const [historyOpened, setHistoryOpened] = useState(false);
-  const [drawerWidth, setDrawerWidth] = useState(420);
-  const [resizing, setResizing] = useState(false);
-
   const [redirectTo, setRedirectTo] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,21 +51,28 @@ export default function Header() {
 
   return (
     <>
-      <Group justify="space-between" p="md" bg="linear-gradient(135deg, #000F65, #0b1328)" style={{ position: "sticky", top: 0, zIndex: 100 }}>
+      <Group 
+        justify="space-between"   
+        p="md" 
+        bg="linear-gradient(135deg, #000F65, #0b1328)" 
+        style={{ position: "sticky", top: 0, zIndex: 100 }}
+        >
         <Group gap="md">
           <Text fw={500} c="white" component={Link} to="/">
-            Generative AI Playground
+            Generative AI Playground 
           </Text>
           {isLoggedIn && (
             <Button component={Link} to="/history" variant="white" color="dark">
               History
             </Button>
           )}
+
           {isAdmin && (
             <Button component={Link} to="/dashboard" variant="white" color="dark">
               Dashboard
             </Button>
           )}
+
           <Button component={Link} to="/playground" variant="white" color="dark">
             Playground
           </Button>
