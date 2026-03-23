@@ -158,12 +158,15 @@ export default function History() {
     run()
   }, [activeTab, dateRange, currentPage, fetchImagesHistory, fetchTextHistory])
 
-  useEffect(() => {
-    setPages(prev => ({
-      ...prev,
-      [activeTab]: 1,
-    }))
-  }, [dateRange])
+ 
+
+  const handleDateChange = (range: [Date | null, Date | null]) => {
+    setDateRange(range)
+    setPages({
+      images: 1,
+      text: 1,
+    })
+  }
 
   const columns = isMobile ? 2 : isTablet ? 3 : 4
   const totalImages = imageHistory.reduce((acc, g) => acc + g.images.length, 0)
@@ -250,8 +253,7 @@ export default function History() {
           <DateRangePicker
             dateRange={dateRange}
             setDateRange={range => {
-              setDateRange(range)
-              setPages(prev => ({ ...prev, [activeTab]: 1 }))
+              handleDateChange(range)
             }}
           />
         </Group>
