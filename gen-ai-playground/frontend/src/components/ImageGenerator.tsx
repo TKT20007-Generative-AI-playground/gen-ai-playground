@@ -32,6 +32,7 @@ type ModelRequestStateHandlers = {
   setIsLoading: Dispatch<SetStateAction<boolean>>
   setBlob: Dispatch<SetStateAction<Blob | null>>
   replaceImageUrl: (next: string | null) => void
+  imageIdRef: React.RefObject<string | null>
 }
 
 export default function ImageGenerator() {
@@ -67,6 +68,9 @@ export default function ImageGenerator() {
   const SELECTOR_WIDTH = 500
   const CONTROLS_MAX_WIDTH = SELECTOR_WIDTH * 2 + SELECTOR_GAP
   const PROMPT_MAX_WIDTH = CONTROLS_MAX_WIDTH
+
+  const firstImageIdRef = useRef<string | null>(null)
+  const secondImageIdRef = useRef<string | null>(null)
 
   function setModelAtIndex(index: 0 | 1, value: string | null) {
     setSelectedModels(prev => {
@@ -158,6 +162,7 @@ export default function ImageGenerator() {
         setIsLoading,
         setBlob,
         replaceImageUrl,
+        imageIdRef,
       }: ModelRequestStateHandlers,
     ) => {
       const controller = new AbortController()
@@ -169,9 +174,6 @@ export default function ImageGenerator() {
           `${backendUrl}/images/generate`,
           { prompt: nextPrompt, model },
           {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
             responseType: "blob",
             timeout: IMAGE_REQUEST_TIMEOUT_MS,
             signal: controller.signal,
@@ -181,6 +183,9 @@ export default function ImageGenerator() {
           if (controllerRef.current !== controller) return
 
           const timeMs = parseGenerationTimeMs(response.headers as Record<string, unknown>)
+          const imageId = response.headers["x-image-id"] as string | undefined
+          if (imageId) imageIdRef.current = imageId  
+
           setGenerationTime(timeMs)
           setError(null)
           // Stop the in-box timer as soon as backend confirms model generation is done.
@@ -225,6 +230,7 @@ export default function ImageGenerator() {
         setIsLoading: setIsLoading1,
         setBlob: setBlob1,
         replaceImageUrl,
+        imageIdRef: firstImageIdRef,
       })
     }
 
@@ -237,6 +243,7 @@ export default function ImageGenerator() {
         setIsLoading: setIsLoading2,
         setBlob: setBlob2,
         replaceImageUrl: replaceImageUrl2,
+        imageIdRef: secondImageIdRef,
       })
     }
   }
@@ -333,7 +340,7 @@ export default function ImageGenerator() {
                             image_type: "png",
                             prompt,
                             model: model1,
-                            id: null,
+                            id: firstImageIdRef.current,
                           },
                         },
                       })
@@ -392,7 +399,7 @@ export default function ImageGenerator() {
                             image_type: "png",
                             prompt,
                             model: model2,
-                            id: null,
+                            id: secondImageIdRef.current,
                           },
                         },
                       })

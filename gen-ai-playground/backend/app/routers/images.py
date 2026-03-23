@@ -43,7 +43,7 @@ def get_history(
     db: Database = Depends(get_database),
     from_date: Optional[int] = Query(None, alias="from"),  
     to_date: Optional[int] = Query(None, alias="to"),
-    page_num: Optional[int] = Query(1, alias="page")
+    page_num: Optional[int] = Query(1, alias="page", ge=1)
 ):
     """
     Get image generation history for authenticated user
@@ -344,7 +344,7 @@ def build_timed_image_response(
     image_bytes = base64.b64decode(image_base64)
     generation_time_ms = int((time.perf_counter() - start_time) * 1000)
 
-    save_image_to_db(
+    image_id = save_image_to_db(
         db,
         prompt,
         model,
@@ -359,7 +359,7 @@ def build_timed_image_response(
     return Response(
         content=image_bytes,
         media_type="image/png",
-        headers={"Content-Disposition": "inline", "X-Generation-Time-Ms": str(generation_time_ms)},
+        headers={"Content-Disposition": "inline", "X-Generation-Time-Ms": str(generation_time_ms), "X-Image-Id": image_id or ""},
     )
 
 
@@ -367,7 +367,7 @@ def save_image_to_db(db: Database, prompt: str, model:
                     str, image_base64: str, current_user:UserInfo,
                     image_type:str, user_base64_image: Optional[str] = None, 
                     parent_image_id: Optional[str] = None,
-                    generation_time_ms: Optional[int] = None ):
+                    generation_time_ms: Optional[int] = None )-> Optional[str]:
     """ Saves the image(s) to mongoDB.
         If the user has provided the original image, it is also saved to the database,
         and the edited image is referenced by the original record ID.
@@ -382,7 +382,7 @@ def save_image_to_db(db: Database, prompt: str, model:
     """
     try:
         # If 'parent_image_id' is set, the original image already exists in DB.
-        if user_base64_image and parent_image_id is None:
+        if user_base64_image and parent_image_id is None or parent_image_id in ["temp-id1", "temp-id2"]:
             user_input_image_record = {
                 "prompt": prompt,
                 "model": model,
@@ -407,14 +407,17 @@ def save_image_to_db(db: Database, prompt: str, model:
         if generation_time_ms is not None:
             image_record["generation_time_ms"] = generation_time_ms
         
-        if parent_image_id:
+        if parent_image_id and ObjectId.is_valid(parent_image_id):
             image_record["parent_image_id"] = ObjectId(parent_image_id)
+        
     
                 
-        db.images.insert_one(image_record)
+        result = db.images.insert_one(image_record)
         print(f"Saved image data to MongoDB for user: {current_user.username}")
+        return str(result.inserted_id)
     except Exception as e:
         print(f"Failed to save to MongoDB: {e}")
+        return None
         
 def choose_model_url(model: str)-> str:
     """ return the correct model URL """

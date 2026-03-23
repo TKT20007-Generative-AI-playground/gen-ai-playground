@@ -76,7 +76,6 @@ export default function History() {
   const fetchTextHistory = useCallback(
     async (range: [Date | null, Date | null], pageNum: number) => {
       const headers = {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
       }
 
@@ -98,7 +97,6 @@ export default function History() {
   const fetchImagesHistory = useCallback(
     async (range: [Date | null, Date | null], pageNum: number) => {
       const headers = {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
       }
       const params = buildParams(range, pageNum)
@@ -109,11 +107,11 @@ export default function History() {
       })
 
       const groups: { [prompt: string]: ImageRecord[] } = {}
-      ;(imgRes.data.history || []).forEach((item: ImageRecord) => {
-        const key = item.prompt.trim().toLowerCase()
-        if (!groups[key]) groups[key] = []
-        groups[key].push(item)
-      })
+        ; (imgRes.data.history || []).forEach((item: ImageRecord) => {
+          const key = item.prompt.trim().toLowerCase()
+          if (!groups[key]) groups[key] = []
+          groups[key].push(item)
+        })
 
       return {
         grouped: Object.keys(groups).map(prompt => ({
@@ -158,7 +156,7 @@ export default function History() {
     run()
   }, [activeTab, dateRange, currentPage, fetchImagesHistory, fetchTextHistory])
 
- 
+
 
   const handleDateChange = (range: [Date | null, Date | null]) => {
     setDateRange(range)
@@ -429,7 +427,7 @@ export default function History() {
             >
               <img
                 data-testid="modal-image"
-                src={`data:image/${selectedImage.image_type || "png"};base64,${selectedImage.image_data}`}
+                src={`data:image/png;base64,${selectedImage.image_data}`}
                 alt={selectedImage.prompt}
                 style={{
                   width: "100%",
@@ -466,7 +464,7 @@ export default function History() {
                   size="md"
                   onClick={() => {
                     const link = document.createElement("a")
-                    link.href = `data:image/${selectedImage.image_type || "png"};base64,${selectedImage.image_data}`
+                    link.href = `data:image/png;base64,${selectedImage.image_data}`
                     link.download = `${selectedImage.prompt.slice(0, 40).replace(/[^a-z0-9]/gi, "_")}.png`
                     link.click()
                   }}

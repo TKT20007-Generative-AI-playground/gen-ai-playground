@@ -560,7 +560,7 @@ def history(
     db: Database = Depends(get_database),
     from_date: Optional[int] = Query(None, alias="from"),
     to_date: Optional[int] = Query(None, alias="to"),
-    page: int = Query(1, alias="page"),
+    page: int = Query(1, alias="page", ge=1),
 ):
     page_size = 10
 
