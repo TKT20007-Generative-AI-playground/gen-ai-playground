@@ -163,7 +163,7 @@ export default function History() {
       ...prev,
       [activeTab]: 1,
     }))
-  }, [dateRange, activeTab])
+  }, [dateRange])
 
   const columns = isMobile ? 2 : isTablet ? 3 : 4
   const totalImages = imageHistory.reduce((acc, g) => acc + g.images.length, 0)
