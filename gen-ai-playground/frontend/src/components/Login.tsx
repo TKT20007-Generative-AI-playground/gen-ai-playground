@@ -8,19 +8,17 @@ import {
   Anchor,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import axios from 'axios'
 
 interface LoginModalProps {
   opened: boolean
   onClose: () => void
-  redirectTo?: string | null
 }
 
-export default function LoginModal({ opened, onClose, redirectTo }: LoginModalProps) {
+export default function LoginModal({ opened, onClose }: LoginModalProps) {
   const { login } = useAuth()
-  const navigate = useNavigate()
 
   const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -38,19 +36,9 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
         values,
         { withCredentials: true }
       );
-      localStorage.setItem("token", res.data.token);
 
       login(res.data.token, res.data.username, res.data.is_admin || false);
       onClose();
-
-      if (redirectTo) {
-        navigate(redirectTo);
-      }
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 50)
-      
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
       alert(detail || 'Login failed');
@@ -77,7 +65,7 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
             {...form.getInputProps('password')}
           />
 
-          <Button className="btn-primary" type="submit" fullWidth>
+          <Button type="submit" fullWidth>
             Login
           </Button>
 
@@ -96,4 +84,3 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
     </Modal>
   )
 }
-
