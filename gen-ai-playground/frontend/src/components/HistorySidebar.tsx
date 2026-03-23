@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Stack, Text, Badge, ScrollArea, Loader, Center, Select, Group, Button } from "@mantine/core";
+import { Stack, Text, Badge, ScrollArea, Loader, Center, Select, Group, Button, Paper } from "@mantine/core";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -16,6 +16,7 @@ interface HistoryRecord {
   generated_text?: string;
   messages?: ChatMessage[];
   reply?: string;
+  response?: string;
   model: string;
   timestamp: string;
   image_data?: string;
@@ -48,13 +49,23 @@ for (const item of items) {
     last.startPrompt === startPrompt &&
     Math.abs(ts - last.timestamp) < 10000 
   ) {
-    last.models.push(item.model);
+    last.models.push({
+      model: item.model,
+      response: item.generated_text ?? item.reply ?? null,
+    });
+
+
   } else {
 
     last = {
       startPrompt,
       timestamp: ts,
-      models: [item.model],
+      models: [
+        {
+          model: item.model,
+          response: item.generated_text ?? item.reply ?? null,
+        }
+      ],
     };
     conversations.push(last);
   }
@@ -165,40 +176,49 @@ const limited = conversations.slice(0, limit);
           />
         </Group>
 
-
     {historyType === "text" && (
       <>
         {limited.map((item, i) => {
           const startPrompt = item.startPrompt;
 
           return (
-            <Stack
+            <Paper
               key={i}
-              gap="xs"
-              style={{
-                padding: "14px",
-                borderRadius: "8px",
-                background: "rgba(255,255,255,0.06)",
-                border: "1px solid rgba(255,255,255,0.1)",
-              }}
+              p="md"
+              radius="xl"
+              shadow="sm"
+              withBorder
+              bg="rgba(0,0,0,0.06)"
             >
-              <Text size="xs" c="dimmed">
-                {new Date(item.timestamp).toLocaleString()}
-              </Text>
-
-              <Stack gap={4}>
-                <Text fw={600} size="sm" c="gray.5">
-                  Conversation started with:
+              <Stack gap="xs">
+                <Text size="xs" c="dimmed">
+                  {new Date(item.timestamp).toLocaleString()}
                 </Text>
-                <Text size="sm">{startPrompt}</Text>
-              </Stack>
 
-              <Group gap="xs">
-                <Badge variant="light" size="sm">
-                  {item.models}
-                </Badge>
-              </Group>
-            </Stack>
+                <Stack gap={4}>
+                  <Text fw={400} size="sx" c="gray.5">
+                    Conversation started with:
+                  </Text>
+
+                  <Text size="md" fw={600}>
+                    {startPrompt}
+                  </Text>
+
+                  <Stack gap={2} mt={4}>
+                    {item.models.map((m, idx) => (
+                      <Text key={idx} size="sm" c="gray.6">
+                        <strong>{m.model}:</strong>{" "}
+                        {m.response
+                          ? m.response.length > 50
+                            ? m.response.slice(0, 50) + "..."
+                            : m.response
+                          : "(no response)"}
+                      </Text>
+                    ))}
+                  </Stack>
+                </Stack>
+              </Stack>
+            </Paper>
           );
         })}
       </>
@@ -213,56 +233,63 @@ const limited = conversations.slice(0, limit);
           const base64 = item.image_data || item.user_base64_image;
 
           return (
-            <Stack key={i} gap="xs">
-              {base64 && (
-                <img
-                  src={`data:image/png;base64,${base64}`}
-                  alt={item.prompt}
-                  style={{
-                    width: "100%",
-                    aspectRatio: "1 / 1",
-                    objectFit: "cover",
-                    borderRadius: "6px",
-                  }}
-                />
-              )}
+            <Paper
+              key={i}
+              p="md"
+              radius="xl"
+              shadow="sm"
+              withBorder
+              bg="rgba(0,0,0,0.06)"
+            >
+              <Stack gap="xs">
+                {base64 && (
+                  <img
+                    src={`data:image/png;base64,${base64}`}
+                    alt={item.prompt}
+                    style={{
+                      width: "100%",
+                      aspectRatio: "1 / 1",
+                      objectFit: "cover",
+                      borderRadius: "6px",
+                    }}
+                  />
+                )}
 
-              <Text fw={500}>{item.prompt}</Text>
+                <Text fw={500}>{item.prompt}</Text>
 
-              <Badge variant="light">{item.model}</Badge>
+                <Badge variant="light">{item.model}</Badge>
 
-              <Text size="xs" c="dimmed">
-                {new Date(item.timestamp).toLocaleString()}
-              </Text>
+                <Text size="xs" c="dimmed">
+                  {new Date(item.timestamp).toLocaleString()}
+                </Text>
 
-              <Text size="xs">
-                Type: {item.image_type || "generated"}
-              </Text>
+                <Text size="xs">
+                  Type: {item.image_type || "generated"}
+                </Text>
 
-              <Button
-                mt="xs"
-                onClick={() => {
-                  navigate("/playground/ImageEditor", {
-                    state: {
-                      imageToEdit: {
-                        image_data:
-                          item.image_data || item.user_base64_image,
-                        image_type: item.image_type,
-                        prompt: item.prompt,
-                        model: item.model,
+                <Button
+                  mt="xs"
+                  onClick={() => {
+                    navigate("/playground/ImageEditor", {
+                      state: {
+                        imageToEdit: {
+                          image_data: item.image_data || item.user_base64_image,
+                          image_type: item.image_type,
+                          prompt: item.prompt,
+                          model: item.model,
+                        },
                       },
-                    },
-                  });
-                }}
-              >
-                Edit image
-              </Button>
-            </Stack>
+                    });
+                  }}
+                >
+                  Edit image
+                </Button>
+              </Stack>
+            </Paper>
           );
         })}
     </>
   )}
-
       </Stack>
     </ScrollArea>
   );

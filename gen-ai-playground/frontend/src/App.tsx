@@ -9,12 +9,14 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { AdminRoute } from "./components/AdminRoute";
 import HistorySidebar from "./components/HistorySidebar";
 import { useState, useCallback, useEffect } from "react";
+import { useAuth } from "./context/AuthContext";
 
 function App() {
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [resizing, setResizing] = useState(false);
+  const auth = useAuth();
 
   const startResize = () => setResizing(true);
 
@@ -28,6 +30,7 @@ function App() {
     },
     [resizing]
   );
+
 
   const onMouseUp = useCallback(() => {
     if (resizing) setResizing(false);
@@ -48,27 +51,31 @@ function App() {
       <Header />
 
       {/* Sidebar toggle button */}
-      <button
-        onClick={() => setHistoryOpen((prev) => !prev)}
-        style={{
-          position: "fixed",
-          top: "50%",
-          transform: "translateY(-50%)",
-          left: historyOpen ? `${sidebarWidth + 10}px` : "10px",
-          zIndex: 2000,
-          background: "white",
-          border: "1px solid #ddd",
-          borderRadius: "4px",
-          padding: "6px 10px",
-          cursor: "pointer",
-          transition: "left 0.25s ease",
-        }}
-      >
-        {historyOpen ? "←" : "→"}
-      </button>
+      {auth.isLoggedIn && (
+        <button
+          type="button"
+          aria-label="Toggle history sidebar"
+          onClick={() => setHistoryOpen((prev) => !prev)}
+          style={{
+            position: "fixed",
+            top: "50%",
+            transform: "translateY(-50%)",
+            left: historyOpen ? `${sidebarWidth + 10}px` : "10px",
+            zIndex: 2000,
+            background: "white",
+            border: "1px solid #ddd",
+            borderRadius: "4px",
+            padding: "6px 10px",
+            cursor: "pointer",
+            transition: "left 0.25s ease",
+          }}
+        >
+          {historyOpen ? "←" : "→"}
+        </button>
+      )}
 
       <div style={{ display: "flex", minHeight: "100vh", height: "100%" }}>
-        {historyOpen && (
+        {auth.isLoggedIn && historyOpen && (
           <div
             style={{
               width: sidebarWidth,

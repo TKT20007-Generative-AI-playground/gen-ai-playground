@@ -38,13 +38,18 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
         values,
         { withCredentials: true }
       );
+      localStorage.setItem("token", res.data.token);
 
       login(res.data.token, res.data.username, res.data.is_admin || false);
       onClose();
 
       if (redirectTo) {
-        navigate(redirectTo)
+        navigate(redirectTo);
       }
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 50)
       
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
