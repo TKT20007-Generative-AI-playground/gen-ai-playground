@@ -17,7 +17,7 @@ import secrets
 from app.config import settings
 from app.database import get_database
 from app.models import RegisterRequest, LoginRequest, RegisterResponse, LoginResponse
-from app.utils.validation import validate_password
+from app.utils.validation import validate_password, validate_username
 from app.dependencies import get_current_user, validate_csrf_token
 
 router = APIRouter(
@@ -93,6 +93,9 @@ def register(
 
     # Password validation
     validate_password(user_data.password)
+    
+    # Username validation
+    validate_username(user_data.username)
 
     try:
         # Validate invitation code against database

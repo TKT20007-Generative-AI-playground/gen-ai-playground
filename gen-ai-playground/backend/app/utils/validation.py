@@ -1,4 +1,5 @@
 from fastapi import HTTPException
+import re
 
 def validate_password(password: str) -> None:
     """
@@ -18,3 +19,18 @@ def validate_password(password: str) -> None:
         raise HTTPException(status_code=400, detail="Password must contain at least one number")
     if not any(c in "!@#$%^&*(),.?\":{}|<>" for c in password):
         raise HTTPException(status_code=400, detail="Password must contain at least one special character")
+
+def validate_username(username: str) -> None:
+    """
+    Validates username according to requirements.
+    
+    Args:
+        username (str): The username to validate.
+    
+    Raises:
+        HTTPException: If the username does not meet length or character requirements.
+    """
+    if len(username) < 4:
+        raise HTTPException(status_code=400, detail="Username must be at least 4 characters long")
+    if not re.match(r'^[A-Za-z0-9]+$', username):
+        raise HTTPException(status_code=400, detail="Username must contain only letters and numbers")

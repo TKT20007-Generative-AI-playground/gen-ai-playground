@@ -204,6 +204,39 @@ class TestRegisterEndpoint:
         assert response.status_code == 400
         assert expected_error in response.json()["detail"]
 
+    @pytest.mark.parametrize(
+        "username,expected_error",
+        [
+            ("abc", "Username must be at least 4 characters long"),
+            ("ab", "Username must be at least 4 characters long"),
+            ("a", "Username must be at least 4 characters long"),
+            ("test@user", "Username must contain only letters and numbers"),
+            ("test.user", "Username must contain only letters and numbers"),
+            ("test_user", "Username must contain only letters and numbers"),
+            ("test-user", "Username must contain only letters and numbers"),
+            ("test user", "Username must contain only letters and numbers"),
+        ]
+    )
+    def test_username_validation(self, client, test_user_data, username, expected_error):
+        """Test that backend rejects usernames failing validation rules"""
+        invalid_data = test_user_data.copy()
+        invalid_data["username"] = username
+
+        response = client.post("/register", json=invalid_data)
+
+        assert response.status_code == 400
+        assert expected_error in response.json()["detail"]
+
+    def test_username_valid(self, client, test_user_data):
+        """Test that backend accepts valid usernames"""
+        valid_data = test_user_data.copy()
+        valid_data["username"] = "ValidUser123"
+
+        response = client.post("/register", json=valid_data)
+
+        # Should succeed (or fail for other reasons like invitation code, but not username validation)
+        assert response.status_code != 400 or "Username must" not in response.json().get("detail", "")
+
 
 class TestLoginEndpoint:
     """Tests for /login endpoint"""
