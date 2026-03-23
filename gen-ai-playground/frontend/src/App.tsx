@@ -8,12 +8,10 @@ import DashboardContainers from "./pages/DashboardContainers"
 import DashboardUsers from "./pages/DashboardUsers"
 import DashboardInvitations from "./pages/DashboardInvitations"
 import History from "./components/History"
-// import { useAuth } from "./context/AuthContext"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
 
 function AppContent() {
-  const { isLoggedIn } = useAuth()
   const location = useLocation()
   
   // Hide Header on dashboard routes

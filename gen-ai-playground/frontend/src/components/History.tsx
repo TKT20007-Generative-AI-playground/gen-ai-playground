@@ -12,7 +12,6 @@ import {
   Modal,
   Button
 } from "@mantine/core";
-import axios from "axios";
 import { EDIT_MODELS } from "../constants/models"
 import { useAuth } from "../context/AuthContext";
 
@@ -51,7 +50,6 @@ export default function History() {
         const res = await axios.get(`${backendUrl}/images/history`, {
           withCredentials: true,
         });
-        const data = res.data;
         const groups: { [prompt: string]: ImageRecord[] } = {};
         (res.data.history || []).forEach((item: ImageRecord) => {
           if (!groups[item.prompt]) groups[item.prompt] = [];

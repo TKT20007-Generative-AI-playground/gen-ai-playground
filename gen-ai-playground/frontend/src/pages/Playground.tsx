@@ -6,7 +6,7 @@ import type { ReactNode } from "react"
 import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
 import TextGenerator from "../components/TextGenerator"
-import { PLAYGROUND_TABS, type PlaygroundTab } from "../constants/tabs"
+import { PLAYGROUND_TABS } from "../constants/tabs"
 
 const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const
 type Tab = (typeof tabs)[number]
@@ -17,8 +17,6 @@ export default function Playground() {
   const location = useLocation()
 
   const imageToEdit = location.state?.imageToEdit || null
-
-  type Tab = PlaygroundTab
 
   const selectedComponent: Tab =
     tab && PLAYGROUND_TABS.includes(tab as Tab) ? (tab as Tab) : "ImageGenerator"
