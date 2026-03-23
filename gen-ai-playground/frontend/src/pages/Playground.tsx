@@ -10,7 +10,7 @@ import TextGenerator from "../components/TextGenerator"
 const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const
 type Tab = (typeof tabs)[number]
 
-export default function Playground() {
+export default function Playground({ historyOpen }: { historyOpen: boolean }) {
   const { tab } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
@@ -23,7 +23,7 @@ export default function Playground() {
   const componentsMap: Record<Tab, ReactNode> = {
     ImageGenerator: <ImageGenerator />,
     ImageEditor: <ImageEditor imageToEdit={imageToEdit} />,
-    TextGenerator: <TextGenerator />,
+    TextGenerator: <TextGenerator opened={historyOpen} />,
   }
 
   // If tab is invalid, redirect to default
