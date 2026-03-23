@@ -41,12 +41,3 @@
   color: #888;
 }
 
-
-.app-content {
-  transition: margin-left 0.2s ease;
-}
-
-body.sidebar-open .app-content {
-  margin-left: var(--drawer-width, 420px);
-}
-
