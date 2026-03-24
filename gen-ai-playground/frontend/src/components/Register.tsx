@@ -82,8 +82,12 @@ export default function Register() {
       setTimeout(() => {
         navigate("/", { state: { openLoginModal: true } })
       }, 1500) // timeout so that the user can see that registration was successful
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Registration failed")
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail || "Registration failed")
+      } else {
+        setError("Registration failed")
+      }
     }
   }
 
