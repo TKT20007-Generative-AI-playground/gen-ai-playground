@@ -17,8 +17,7 @@ export default function Playground({ historyOpen }: { historyOpen: boolean }) {
 
   const imageToEdit = location.state?.imageToEdit || null
 
-  const selectedComponent: Tab =
-    tab && tabs.includes(tab as Tab) ? (tab as Tab) : "ImageGenerator"
+  const selectedComponent: Tab = tab && tabs.includes(tab as Tab) ? (tab as Tab) : "ImageGenerator"
 
   const componentsMap: Record<Tab, ReactNode> = {
     ImageGenerator: <ImageGenerator />,
@@ -38,12 +37,12 @@ export default function Playground({ historyOpen }: { historyOpen: boolean }) {
       <Group gap="md" p="md">
         <Select
           label="Select playground component"
-          data={tabs.map((t) => ({ value: t, label: t }))}
+          data={tabs.map(t => ({ value: t, label: t }))}
           value={selectedComponent}
-          onChange={(value) => {
+          onChange={value => {
             if (value) navigate(`/playground/${value}`)
           }}
-        data-testid="playground-select" 
+          data-testid="playground-select"
         />
       </Group>
 
@@ -55,4 +54,3 @@ export default function Playground({ historyOpen }: { historyOpen: boolean }) {
     </>
   )
 }
-

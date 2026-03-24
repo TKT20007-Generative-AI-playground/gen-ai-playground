@@ -276,8 +276,8 @@ class TestHistoryEndpoint:
         finally:
             app.dependency_overrides.clear()
     
-    def test_get_history_limit_50_items(self, client, registered_user, auth_token, mock_db, sample_image_data):
-        """Test that history returns maximum 50 items"""
+    def test_get_history_limit_10_items(self, client, registered_user, auth_token, mock_db, sample_image_data):
+        """Test that history returns maximum 10 items"""
         # Add 60 images for the user
         for i in range(60):
             image_record = {
@@ -296,7 +296,7 @@ class TestHistoryEndpoint:
         
         assert response.status_code == 200
         data = response.json()
-        assert len(data["history"]) == 50  # Should be limited to 50
+        assert len(data["history"]) == 10  # Should be limited to 10
 
 
 class TestGenerateImageWithAuth:

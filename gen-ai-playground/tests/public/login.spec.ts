@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 import {
   FRONTEND_URL,
   gotoHome,
@@ -7,10 +7,12 @@ import {
   loginViaUI,
   expectLoggedIn,
   expectLoggedOut,
-} from '../helpers/auth';
+} from "../helpers/auth";
 
-
-test('logging in makes protected content available', async ({ page, request }) => {
+test("logging in makes protected content available", async ({
+  page,
+  request,
+}) => {
   const user = await createAndRegisterUser(request);
   await gotoHome(page);
   await expect(page.getByRole('heading', { name: 'GENERATIVE AI', exact: true })).toBeVisible();
@@ -21,7 +23,7 @@ test('logging in makes protected content available', async ({ page, request }) =
   await expect(page.locator('#root')).toContainText('Logout');
 });
 
-test('login persists after reload', async ({ page }) => {
+test("login persists after reload", async ({ page }) => {
   const user = await createAndRegisterUser(page.request);
   await gotoHome(page);
   await loginViaUI(page, user);
@@ -32,14 +34,17 @@ test('login persists after reload', async ({ page }) => {
   await expect(page.locator('#root')).toContainText('Logout');
 });
 
-test('shows error on invalid credentials (alert dialog)', async ({ page, request }) => {
+test("shows error on invalid credentials (alert dialog)", async ({
+  page,
+  request,
+}) => {
   const user = await createAndRegisterUser(request);
   await gotoHome(page);
   const loginDialog = await openLoginDialog(page);
-  const dialogPromise = page.waitForEvent('dialog');
-  await loginDialog.getByTestId('login-username').fill(user.username);
-  await loginDialog.getByTestId('login-password').fill('wrong-password');
-  await loginDialog.getByRole('button', { name: 'Login' }).click();
+  const dialogPromise = page.waitForEvent("dialog");
+  await loginDialog.getByTestId("login-username").fill(user.username);
+  await loginDialog.getByTestId("login-password").fill("wrong-password");
+  await loginDialog.getByRole("button", { name: "Login" }).click();
   const dialog = await dialogPromise;
   const msg = dialog.message();
   expect(msg.length).toBeGreaterThan(0);
@@ -48,12 +53,14 @@ test('shows error on invalid credentials (alert dialog)', async ({ page, request
   await expect(loginDialog).toBeVisible();
 });
 
-test('logout clears auth and protected content requires login again', async ({ page }) => {
+test("logout clears auth and protected content requires login again", async ({
+  page,
+}) => {
   const user = await createAndRegisterUser(page.request);
   await gotoHome(page);
   await loginViaUI(page, user);
   await expectLoggedIn(page);
-  await page.getByRole('button', { name: 'Logout' }).click();
+  await page.getByRole("button", { name: "Logout" }).click();
   await expectLoggedOut(page);
   await page.goto(`${FRONTEND_URL}/playground`);
   await expect(page).not.toHaveURL(/\/playground$/);

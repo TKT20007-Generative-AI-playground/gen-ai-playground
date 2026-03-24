@@ -1,32 +1,32 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react"
 
 const useFadeIn = (delay: number = 0) => {
-    const ref = useRef<HTMLDivElement>(null);
-    const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null)
+  const [isVisible, setIsVisible] = useState(false)
 
-    useEffect(() => {
-        const element = ref.current;
-        if (!element) return;
+  useEffect(() => {
+    const element = ref.current
+    if (!element) return
 
-        let timeoutId: ReturnType<typeof setTimeout>;
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (entry.isIntersecting) {
-                    timeoutId = setTimeout(() => setIsVisible(true), delay);
-                    observer.unobserve(element);
-                }
-            },
-            { threshold: 0.1 }
-        );
+    let timeoutId: ReturnType<typeof setTimeout>
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          timeoutId = setTimeout(() => setIsVisible(true), delay)
+          observer.unobserve(element)
+        }
+      },
+      { threshold: 0.1 },
+    )
 
-        observer.observe(element);
-        return () => {
-            clearTimeout(timeoutId);
-            observer.disconnect();
-        };
-    }, [delay]);
+    observer.observe(element)
+    return () => {
+      clearTimeout(timeoutId)
+      observer.disconnect()
+    }
+  }, [delay])
 
-    return { ref, isVisible };
-};
+  return { ref, isVisible }
+}
 
-export default useFadeIn;
+export default useFadeIn

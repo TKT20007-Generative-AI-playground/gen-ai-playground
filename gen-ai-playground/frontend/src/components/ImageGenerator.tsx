@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react"
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react"
 import axios from "axios"
 import { PromptTextBox } from "./PromptTextBox"
 import { Text, SimpleGrid, Stack, Button } from "@mantine/core"
@@ -24,10 +32,10 @@ type ModelRequestStateHandlers = {
   setIsLoading: Dispatch<SetStateAction<boolean>>
   setBlob: Dispatch<SetStateAction<Blob | null>>
   replaceImageUrl: (next: string | null) => void
+  imageIdRef: React.RefObject<string | null>
 }
 
 export default function ImageGenerator() {
-
   const navigate = useNavigate()
 
   const [prompt, setPrompt] = useState("")
@@ -61,8 +69,11 @@ export default function ImageGenerator() {
   const CONTROLS_MAX_WIDTH = SELECTOR_WIDTH * 2 + SELECTOR_GAP
   const PROMPT_MAX_WIDTH = CONTROLS_MAX_WIDTH
 
+  const firstImageIdRef = useRef<string | null>(null)
+  const secondImageIdRef = useRef<string | null>(null)
+
   function setModelAtIndex(index: 0 | 1, value: string | null) {
-    setSelectedModels((prev) => {
+    setSelectedModels(prev => {
       const next: SelectedModels = [...prev] as SelectedModels
       next[index] = value
       return next
@@ -86,7 +97,7 @@ export default function ImageGenerator() {
   }, [abortActiveRequests])
 
   function replaceImageUrl(next: string | null) {
-    setImageUrl((prev) => {
+    setImageUrl(prev => {
       if (prev) URL.revokeObjectURL(prev)
       imageUrlRef.current = next
       return next
@@ -94,7 +105,7 @@ export default function ImageGenerator() {
   }
 
   function replaceImageUrl2(next: string | null) {
-    setImageUrl2((prev) => {
+    setImageUrl2(prev => {
       if (prev) URL.revokeObjectURL(prev)
       imageUrl2Ref.current = next
       return next
@@ -102,7 +113,7 @@ export default function ImageGenerator() {
   }
 
   async function blobToBase64(blob: Blob): Promise<string> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const reader = new FileReader()
       reader.onloadend = () => resolve((reader.result as string).split(",")[1])
       reader.readAsDataURL(blob)
@@ -151,59 +162,64 @@ export default function ImageGenerator() {
         setIsLoading,
         setBlob,
         replaceImageUrl,
+        imageIdRef,
       }: ModelRequestStateHandlers,
     ) => {
       const controller = new AbortController()
       controllerRef.current = controller
       setStartTime(Date.now())
 
-      axios.post(
-        `${backendUrl}/images/generate`,
-        { prompt: nextPrompt, model },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
+      axios
+        .post(
+          `${backendUrl}/images/generate`,
+          { prompt: nextPrompt, model },
+          {
+            responseType: "blob",
+            timeout: IMAGE_REQUEST_TIMEOUT_MS,
+            signal: controller.signal,
           },
-          responseType: "blob",
-          timeout: IMAGE_REQUEST_TIMEOUT_MS,
-          signal: controller.signal,
-        },
-      ).then((response) => {
-        window.dispatchEvent(new Event("history-update"));
-        if (controllerRef.current !== controller) return
-
-        const timeMs = parseGenerationTimeMs(response.headers as Record<string, unknown>)
-        setGenerationTime(timeMs)
-        setError(null)
-        // Stop the in-box timer as soon as backend confirms model generation is done.
-        setIsLoading(false)
-        setStartTime(null)
-
-        const blob = response.data as Blob
-        setBlob(blob)
-        replaceImageUrl(URL.createObjectURL(blob))
-      }).catch((err) => {
-        if (controllerRef.current !== controller) return
-
-        if (axios.isCancel(err)) {
-          return
-        }
-
-        console.error(err)
-        setError(
-          getAxiosRequestErrorMessage(
-            err,
-            "Image generation timed out",
-            "Image generation failed",
-          ),
         )
-        setIsLoading(false)
-        setStartTime(null)
-      }).finally(() => {
-        if (controllerRef.current === controller) {
-          controllerRef.current = null
-        }
-      })
+        .then(response => {
+          window.dispatchEvent(new Event("history-update"))
+          if (controllerRef.current !== controller) return
+
+          const timeMs = parseGenerationTimeMs(response.headers as Record<string, unknown>)
+          const imageId = response.headers["x-image-id"] as string | undefined
+          if (imageId) imageIdRef.current = imageId
+
+          setGenerationTime(timeMs)
+          setError(null)
+          // Stop the in-box timer as soon as backend confirms model generation is done.
+          setIsLoading(false)
+          setStartTime(null)
+
+          const blob = response.data as Blob
+          setBlob(blob)
+          replaceImageUrl(URL.createObjectURL(blob))
+        })
+        .catch(err => {
+          if (controllerRef.current !== controller) return
+
+          if (axios.isCancel(err)) {
+            return
+          }
+
+          console.error(err)
+          setError(
+            getAxiosRequestErrorMessage(
+              err,
+              "Image generation timed out",
+              "Image generation failed",
+            ),
+          )
+          setIsLoading(false)
+          setStartTime(null)
+        })
+        .finally(() => {
+          if (controllerRef.current === controller) {
+            controllerRef.current = null
+          }
+        })
     }
 
     if (model1) {
@@ -215,6 +231,7 @@ export default function ImageGenerator() {
         setIsLoading: setIsLoading1,
         setBlob: setBlob1,
         replaceImageUrl,
+        imageIdRef: firstImageIdRef,
       })
     }
 
@@ -227,6 +244,7 @@ export default function ImageGenerator() {
         setIsLoading: setIsLoading2,
         setBlob: setBlob2,
         replaceImageUrl: replaceImageUrl2,
+        imageIdRef: secondImageIdRef,
       })
     }
   }
@@ -248,7 +266,7 @@ export default function ImageGenerator() {
             data-testid="model-1-selector"
             models={models}
             value={model1}
-            onChange={(value) => setModelAtIndex(0, value)}
+            onChange={value => setModelAtIndex(0, value)}
             width={SELECTOR_WIDTH}
           />
 
@@ -257,7 +275,7 @@ export default function ImageGenerator() {
             data-testid="model-2-selector"
             models={models}
             value={model2}
-            onChange={(value) => setModelAtIndex(1, value)}
+            onChange={value => setModelAtIndex(1, value)}
             width={SELECTOR_WIDTH}
             placeholder="Select model (optional)"
           />
@@ -265,20 +283,32 @@ export default function ImageGenerator() {
       </div>
 
       <div style={{ width: "100%", maxWidth: PROMPT_MAX_WIDTH }}>
-        <PromptTextBox onSubmit={fetchTwoGeneratedImages} value={prompt} onChange={setPrompt} usage="Create image" />
+        <PromptTextBox
+          onSubmit={fetchTwoGeneratedImages}
+          value={prompt}
+          onChange={setPrompt}
+          usage="Create image"
+        />
       </div>
 
       {(showBox1 || showBox2) && (
         <div style={{ width: "100%", maxWidth: CONTROLS_MAX_WIDTH }}>
           <SimpleGrid cols={{ base: 1, md: showBox1 && showBox2 ? 2 : 1 }} spacing="md">
-
             {showBox1 && (
               <Stack gap="xs" align="center">
                 <PhotoArea
                   src={imageUrl}
                   alt="Generated image 1"
                   header={
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 8 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        gap: 8,
+                      }}
+                    >
                       <Text fw={600}>Model: {getModelDisplayName(model1)}</Text>
                       {generationTime1 != null && (
                         <Text size="sm" c="dimmed">
@@ -289,11 +319,13 @@ export default function ImageGenerator() {
                   }
                   height={420}
                   placeholder={
-                    isLoading1 && startTime1
-                      ? <ActionStatus actionText="Generating" startTime={startTime1} />
-                      : error1
-                        ? <Text size="sm" c="red" ta="center">{error1}</Text>
-                        : undefined
+                    isLoading1 && startTime1 ? (
+                      <ActionStatus actionText="Generating" startTime={startTime1} />
+                    ) : error1 ? (
+                      <Text size="sm" c="red" ta="center">
+                        {error1}
+                      </Text>
+                    ) : undefined
                   }
                 />
 
@@ -309,9 +341,9 @@ export default function ImageGenerator() {
                             image_type: "png",
                             prompt,
                             model: model1,
-                            id: null
-                          }
-                        }
+                            id: firstImageIdRef.current,
+                          },
+                        },
                       })
                     }}
                   >
@@ -327,7 +359,15 @@ export default function ImageGenerator() {
                   src={imageUrl2}
                   alt="Generated image 2"
                   header={
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 8 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        width: "100%",
+                        gap: 8,
+                      }}
+                    >
                       <Text fw={600}>Model: {getModelDisplayName(model2)}</Text>
                       {generationTime2 != null && (
                         <Text size="sm" c="dimmed">
@@ -338,11 +378,13 @@ export default function ImageGenerator() {
                   }
                   height={420}
                   placeholder={
-                    isLoading2 && startTime2
-                      ? <ActionStatus actionText="Generating" startTime={startTime2} />
-                      : error2
-                        ? <Text size="sm" c="red" ta="center">{error2}</Text>
-                        : undefined
+                    isLoading2 && startTime2 ? (
+                      <ActionStatus actionText="Generating" startTime={startTime2} />
+                    ) : error2 ? (
+                      <Text size="sm" c="red" ta="center">
+                        {error2}
+                      </Text>
+                    ) : undefined
                   }
                 />
 
@@ -358,9 +400,9 @@ export default function ImageGenerator() {
                             image_type: "png",
                             prompt,
                             model: model2,
-                            id: null
-                          }
-                        }
+                            id: secondImageIdRef.current,
+                          },
+                        },
                       })
                     }}
                   >
@@ -369,7 +411,6 @@ export default function ImageGenerator() {
                 )}
               </Stack>
             )}
-
           </SimpleGrid>
         </div>
       )}
