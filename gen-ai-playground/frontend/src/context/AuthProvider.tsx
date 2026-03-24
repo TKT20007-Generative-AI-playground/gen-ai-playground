@@ -33,13 +33,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("isAdmin")
 
     async function rehydrate() {
-      // If there's no csrf_token cookie, there's no past session to restore
-      const hasCsrf = document.cookie.split("; ").some(c => c.startsWith("csrf_token="))
-      if (!hasCsrf) {
-        setIsReady(true)
-        return
-      }
-
       try {
         const res = await refreshClient.post("/refresh")
         accessTokenRef.current = res.data.token
