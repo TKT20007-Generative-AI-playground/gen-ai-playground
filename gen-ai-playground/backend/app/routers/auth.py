@@ -8,6 +8,7 @@ Security Model:
 - Cookie settings: samesite="strict", secure=IS_PROD
 """
 from fastapi import APIRouter, HTTPException, Depends, Response, Request
+from pymongo import ReturnDocument
 from pymongo.database import Database
 from datetime import datetime, timedelta
 import bcrypt
@@ -17,7 +18,7 @@ import secrets
 from app.config import settings
 from app.database import get_database
 from app.models import RegisterRequest, LoginRequest, RegisterResponse, LoginResponse
-from app.utils.validation import validate_password
+from app.utils.validation import validate_password, validate_username
 from app.dependencies import get_current_user, validate_csrf_token
 
 router = APIRouter(
@@ -93,13 +94,32 @@ def register(
 
     # Password validation
     validate_password(user_data.password)
+    
+    # Username validation
+    validate_username(user_data.username)
 
     try:
-        # Validate invitation code
-        if not settings.INVITATION_CODE or user_data.invitation_code != settings.INVITATION_CODE:
+        # Atomic operation: validates AND increments in one step
+        # This prevents race conditions where concurrent requests could exceed max_uses
+        now = datetime.utcnow()
+        invitation = db.invitation_codes.find_one_and_update(
+            {
+                "code": user_data.invitation_code,
+                "is_active": True,
+                "expires_at": {"$gt": now},
+                "$expr": {"$lt": ["$uses_count", "$max_uses"]}
+            },
+            {
+                "$inc": {"uses_count": 1},
+                "$push": {"used_by": user_data.username}
+            },
+            return_document=ReturnDocument.AFTER
+        )
+        
+        if not invitation:
             raise HTTPException(
                 status_code=403,
-                detail="Invalid invitation code"
+                detail="Invalid, expired, or fully used invitation code"
             )
         
         # Check if user already exists
@@ -135,9 +155,10 @@ def register(
     except HTTPException:
         raise
     except Exception as e:
+        # Show user-friendly message
         raise HTTPException(
             status_code=500,
-            detail=f"Registration failed: {str(e)}"
+            detail="Registration failed."
         )
 
 

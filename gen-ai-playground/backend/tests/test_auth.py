@@ -19,6 +19,17 @@ def mock_db():
     """Create a mock MongoDB database for testing"""
     client = mongomock.MongoClient()
     db = client["gen_ai_playground"]
+    # Seed invitation code for registration tests
+    invitation_code = os.getenv("INVITATION_CODE", "local-invitation-code")
+    db.invitation_codes.insert_one({
+        "code": invitation_code,
+        "created_at": datetime.utcnow(),
+        "expires_at": datetime.utcnow() + timedelta(days=30),
+        "max_uses": 100,
+        "uses_count": 0,
+        "is_active": True,
+        "used_by": []
+    })
     return db
 
 
@@ -160,7 +171,7 @@ class TestRegisterEndpoint:
         response = client.post("/register", json=invalid_code_data)
         
         assert response.status_code == 403
-        assert "Invalid invitation code" in response.json()["detail"]
+        assert "Invalid, expired, or fully used invitation code" in response.json()["detail"]
     
     def test_missing_invitation_code(self, client):
         """Test registration without invitation code"""
@@ -192,6 +203,39 @@ class TestRegisterEndpoint:
 
         assert response.status_code == 400
         assert expected_error in response.json()["detail"]
+
+    @pytest.mark.parametrize(
+        "username,expected_error",
+        [
+            ("abc", "Username must be at least 4 characters long"),
+            ("ab", "Username must be at least 4 characters long"),
+            ("a", "Username must be at least 4 characters long"),
+            ("test@user", "Username must contain only letters and numbers"),
+            ("test.user", "Username must contain only letters and numbers"),
+            ("test_user", "Username must contain only letters and numbers"),
+            ("test-user", "Username must contain only letters and numbers"),
+            ("test user", "Username must contain only letters and numbers"),
+        ]
+    )
+    def test_username_validation(self, client, test_user_data, username, expected_error):
+        """Test that backend rejects usernames failing validation rules"""
+        invalid_data = test_user_data.copy()
+        invalid_data["username"] = username
+
+        response = client.post("/register", json=invalid_data)
+
+        assert response.status_code == 400
+        assert expected_error in response.json()["detail"]
+
+    def test_username_valid(self, client, test_user_data):
+        """Test that backend accepts valid usernames"""
+        valid_data = test_user_data.copy()
+        valid_data["username"] = "ValidUser123"
+
+        response = client.post("/register", json=valid_data)
+
+        # Should succeed (or fail for other reasons like invitation code, but not username validation)
+        assert response.status_code != 400 or "Username must" not in response.json().get("detail", "")
 
 
 class TestLoginEndpoint:

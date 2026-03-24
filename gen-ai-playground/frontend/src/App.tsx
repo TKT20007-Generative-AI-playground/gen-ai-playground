@@ -1,23 +1,32 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom"
 import Header from "./components/Header"
 import Front from "./pages/Front"
 import Register from "./components/Register"
 import Playground from "./pages/Playground"
-import Dashboard from "./pages/Dashboard"
-import HistoryPage from "./pages/HistoryPage"
+import DashboardLayout from "./components/DashboardLayout"
+import DashboardContainers from "./pages/DashboardContainers"
+import DashboardUsers from "./pages/DashboardUsers"
+import DashboardInvitations from "./pages/DashboardInvitations"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
-import HistorySidebar from "./components/HistorySidebar"
-import { useState, useCallback, useEffect } from "react"
-import { useAuth } from "./context/AuthContext"
+import HistorySidebar from "./components/HistorySidebar";
+import { useState, useCallback, useEffect } from "react";
+import { useAuth } from "./context/AuthContext";
+import HistoryPage from "./pages/HistoryPage"
 
-function App() {
-  const [historyOpen, setHistoryOpen] = useState(false)
-  const [sidebarWidth, setSidebarWidth] = useState(420)
-  const [resizing, setResizing] = useState(false)
-  const auth = useAuth()
 
-  const startResize = () => setResizing(true)
+
+function AppContent() {
+  const location = useLocation()
+  
+  // Hide Header on dashboard routes
+  const isDashboardRoute = location.pathname.startsWith('/dashboard')
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(420);
+  const [resizing, setResizing] = useState(false);
+  const auth = useAuth();
+
+  const startResize = () => setResizing(true);
 
   const onMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -45,8 +54,8 @@ function App() {
   }, [onMouseMove, onMouseUp])
 
   return (
-    <BrowserRouter>
-      <Header />
+    <>
+      {!isDashboardRoute && <Header />}
 
       {/* Sidebar toggle button */}
       {auth.isLoggedIn && (
@@ -107,7 +116,7 @@ function App() {
         <div style={{ flex: 1 }}>
           <Routes>
             <Route path="/" element={<Front />} />
-
+            
             <Route path="/register" element={<Register />} />
 
             <Route
@@ -133,17 +142,31 @@ function App() {
               }
             />
 
+            {/* Dashboard routes with standalone layout */}
             <Route
               path="/dashboard"
               element={
                 <AdminRoute>
-                  <Dashboard />
+                  <DashboardLayout />
                 </AdminRoute>
               }
-            />
+            >
+              <Route index element={<Navigate to="/dashboard/containers" replace />} />
+              <Route path="containers" element={<DashboardContainers />} />
+              <Route path="users" element={<DashboardUsers />} />
+              <Route path="invitations" element={<DashboardInvitations />} />
+            </Route>
           </Routes>
         </div>
       </div>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   )
 }

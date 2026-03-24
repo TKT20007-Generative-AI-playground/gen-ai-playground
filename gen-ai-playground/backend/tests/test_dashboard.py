@@ -289,3 +289,306 @@ class TestStopContainer:
         """Requests without an auth token should be rejected."""
         response = unauthenticated_client.post("/dashboard/containers/my-deploy/stop")
         assert response.status_code in (401, 422)
+
+
+# ===========================================================================
+# GET /dashboard/users
+# ===========================================================================
+
+
+class TestListUsers:
+    """Tests for GET /dashboard/users"""
+
+    def test_list_users_as_admin(self, admin_client, mock_db):
+        """Admin can list all users."""
+        # Insert additional users
+        mock_db.users.insert_one({
+            "username": "user1",
+            "password": b"hashed",
+            "is_admin": False,
+            "created_at": datetime.utcnow(),
+        })
+        mock_db.users.insert_one({
+            "username": "user2",
+            "password": b"hashed",
+            "is_admin": False,
+            "created_at": datetime.utcnow(),
+        })
+
+        response = admin_client.get("/dashboard/users")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "users" in data
+        usernames = [u["username"] for u in data["users"]]
+        assert "admin" in usernames
+        assert "user1" in usernames
+        assert "user2" in usernames
+
+    def test_list_users_forbidden_for_regular_user(self, regular_client):
+        """Non-admin users should receive a 403."""
+        response = regular_client.get("/dashboard/users")
+        assert response.status_code == 403
+        assert "Admin access required" in response.json()["detail"]
+
+    def test_list_users_unauthorized_without_token(self, unauthenticated_client):
+        """Requests without an auth token should be rejected."""
+        response = unauthenticated_client.get("/dashboard/users")
+        assert response.status_code in (401, 422)
+
+
+# ===========================================================================
+# DELETE /dashboard/users/{username}
+# ===========================================================================
+
+
+class TestDeleteUser:
+    """Tests for DELETE /dashboard/users/{username}"""
+
+    def test_delete_user_success(self, admin_client, mock_db):
+        """Admin can successfully delete a user."""
+        # Insert a user to delete
+        mock_db.users.insert_one({
+            "username": "user_to_delete",
+            "password": b"hashed",
+            "is_admin": False,
+            "created_at": datetime.utcnow(),
+        })
+
+        response = admin_client.delete("/dashboard/users/user_to_delete")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "deleted successfully" in data["message"]
+        assert data["username"] == "user_to_delete"
+
+        # Verify user is actually deleted from database
+        deleted_user = mock_db.users.find_one({"username": "user_to_delete"})
+        assert deleted_user is None
+
+    def test_delete_user_removes_images(self, admin_client, mock_db):
+        """Deleting a user should also delete their images."""
+        # Insert a user
+        mock_db.users.insert_one({
+            "username": "user_with_images",
+            "password": b"hashed",
+            "is_admin": False,
+            "created_at": datetime.utcnow(),
+        })
+
+        # Insert images for this user
+        mock_db.images.insert_many([
+            {
+                "username": "user_with_images",
+                "prompt": "test prompt 1",
+                "image_data": "base64data1",
+                "timestamp": datetime.utcnow(),
+            },
+            {
+                "username": "user_with_images",
+                "prompt": "test prompt 2",
+                "image_data": "base64data2",
+                "timestamp": datetime.utcnow(),
+            },
+            {
+                "username": "other_user",
+                "prompt": "other prompt",
+                "image_data": "base64data3",
+                "timestamp": datetime.utcnow(),
+            },
+        ])
+
+        response = admin_client.delete("/dashboard/users/user_with_images")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "2 images" in data["message"]
+
+        # Verify user's images are deleted
+        user_images = list(mock_db.images.find({"username": "user_with_images"}))
+        assert len(user_images) == 0
+
+        # Verify other user's images are NOT deleted
+        other_images = list(mock_db.images.find({"username": "other_user"}))
+        assert len(other_images) == 1
+
+    def test_delete_user_removes_text_generations(self, admin_client, mock_db):
+        """Deleting a user should also delete their text generations."""
+        # Insert a user
+        mock_db.users.insert_one({
+            "username": "user_with_text",
+            "password": b"hashed",
+            "is_admin": False,
+            "created_at": datetime.utcnow(),
+        })
+
+        # Insert text generations for this user
+        mock_db.text_generations.insert_many([
+            {
+                "username": "user_with_text",
+                "type": "text",
+                "prompt": "generate something",
+                "generated_text": "result 1",
+                "model": "llama",
+                "timestamp": datetime.utcnow(),
+            },
+            {
+                "username": "user_with_text",
+                "type": "text",
+                "prompt": "generate another",
+                "generated_text": "result 2",
+                "model": "llama",
+                "timestamp": datetime.utcnow(),
+            },
+            {
+                "username": "other_user",
+                "type": "text",
+                "prompt": "other prompt",
+                "generated_text": "other result",
+                "model": "llama",
+                "timestamp": datetime.utcnow(),
+            },
+        ])
+
+        response = admin_client.delete("/dashboard/users/user_with_text")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "2 text generations" in data["message"]
+
+        # Verify user's text generations are deleted
+        user_texts = list(mock_db.text_generations.find({"username": "user_with_text"}))
+        assert len(user_texts) == 0
+
+        # Verify other user's text generations are NOT deleted
+        other_texts = list(mock_db.text_generations.find({"username": "other_user"}))
+        assert len(other_texts) == 1
+
+    def test_delete_user_removes_chats(self, admin_client, mock_db):
+        """Deleting a user should also delete their chat history."""
+        # Insert a user
+        mock_db.users.insert_one({
+            "username": "user_with_chats",
+            "password": b"hashed",
+            "is_admin": False,
+            "created_at": datetime.utcnow(),
+        })
+
+        # Insert chat records for this user (stored in text_generations with type=chat)
+        mock_db.text_generations.insert_many([
+            {
+                "username": "user_with_chats",
+                "type": "chat",
+                "messages": [{"role": "user", "content": "Hello"}],
+                "reply": "Hi there!",
+                "model": "llama",
+                "timestamp": datetime.utcnow(),
+            },
+            {
+                "username": "user_with_chats",
+                "type": "chat",
+                "messages": [{"role": "user", "content": "How are you?"}],
+                "reply": "I'm good!",
+                "model": "llama",
+                "timestamp": datetime.utcnow(),
+            },
+        ])
+
+        response = admin_client.delete("/dashboard/users/user_with_chats")
+
+        assert response.status_code == 200
+        data = response.json()
+        # Chats are counted as text generations
+        assert "2 text generations" in data["message"]
+
+        # Verify user's chats are deleted
+        user_chats = list(mock_db.text_generations.find({"username": "user_with_chats"}))
+        assert len(user_chats) == 0
+
+    def test_delete_user_removes_all_data_types(self, admin_client, mock_db):
+        """Deleting a user should remove images, text generations, and chats."""
+        # Insert a user
+        mock_db.users.insert_one({
+            "username": "user_with_all_data",
+            "password": b"hashed",
+            "is_admin": False,
+            "created_at": datetime.utcnow(),
+        })
+
+        # Insert images
+        mock_db.images.insert_one({
+            "username": "user_with_all_data",
+            "prompt": "image prompt",
+            "image_data": "base64data",
+            "timestamp": datetime.utcnow(),
+        })
+
+        # Insert text generation
+        mock_db.text_generations.insert_one({
+            "username": "user_with_all_data",
+            "type": "text",
+            "prompt": "text prompt",
+            "generated_text": "result",
+            "model": "llama",
+            "timestamp": datetime.utcnow(),
+        })
+
+        # Insert chat
+        mock_db.text_generations.insert_one({
+            "username": "user_with_all_data",
+            "type": "chat",
+            "messages": [{"role": "user", "content": "Hello"}],
+            "reply": "Hi!",
+            "model": "llama",
+            "timestamp": datetime.utcnow(),
+        })
+
+        response = admin_client.delete("/dashboard/users/user_with_all_data")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "1 images" in data["message"]
+        assert "2 text generations" in data["message"]
+
+        # Verify all data is deleted
+        assert mock_db.users.find_one({"username": "user_with_all_data"}) is None
+        assert len(list(mock_db.images.find({"username": "user_with_all_data"}))) == 0
+        assert len(list(mock_db.text_generations.find({"username": "user_with_all_data"}))) == 0
+
+    def test_delete_user_not_found(self, admin_client):
+        """Deleting a non-existent user should return 404."""
+        response = admin_client.delete("/dashboard/users/nonexistent_user")
+
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+    def test_delete_user_forbidden_for_regular_user(self, regular_client):
+        """Non-admin users should receive a 403."""
+        response = regular_client.delete("/dashboard/users/some_user")
+        assert response.status_code == 403
+        assert "Admin access required" in response.json()["detail"]
+
+    def test_delete_user_unauthorized_without_token(self, unauthenticated_client):
+        """Requests without an auth token should be rejected."""
+        response = unauthenticated_client.delete("/dashboard/users/some_user")
+        assert response.status_code in (401, 422)
+
+    def test_delete_user_with_no_data(self, admin_client, mock_db):
+        """Deleting a user with no images or text generations should succeed."""
+        # Insert a user with no associated data
+        mock_db.users.insert_one({
+            "username": "clean_user",
+            "password": b"hashed",
+            "is_admin": False,
+            "created_at": datetime.utcnow(),
+        })
+
+        response = admin_client.delete("/dashboard/users/clean_user")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "0 images" in data["message"]
+        assert "0 text generations" in data["message"]
+
+        # Verify user is deleted
+        assert mock_db.users.find_one({"username": "clean_user"}) is None
