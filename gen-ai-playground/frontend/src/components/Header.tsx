@@ -55,7 +55,9 @@ export default function Header() {
               Dashboard
             </Button>
           )}
-          <Text fw={500} c="white" style={{ flexShrink: 0 }}>Generative AI Playground</Text>
+          <Text fw={500} c="white" component={Link} to="/" style={{ flexShrink: 0 }}>
+            Generative AI Playground
+          </Text>
           {isLoggedIn && (
             <Button component={Link} to="/history" variant="white" color="dark">
               History
