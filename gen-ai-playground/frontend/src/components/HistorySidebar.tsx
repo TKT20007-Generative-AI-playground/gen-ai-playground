@@ -22,6 +22,7 @@ interface HistoryRecord {
   image_data?: string;
   user_base64_image?: string | null;
   image_type: string | null | undefined;
+  id?: string;
 }
 
 const backendUrl = import.meta.env.VITE_API_URL;
@@ -87,9 +88,8 @@ const limited = conversations.slice(0, limit);
     const res = await axios.get(url, { withCredentials: true });
     const history: HistoryRecord[] = res.data.history;
 
-
     setItems(history);
-
+    
   } catch (err) {
     console.error(err);
   } finally {
@@ -277,6 +277,7 @@ const limited = conversations.slice(0, limit);
                           image_type: item.image_type,
                           prompt: item.prompt,
                           model: item.model,
+                          id: item.id,
                         },
                       },
                     });
