@@ -45,7 +45,6 @@ const getAuthHeaders = () => ({
   "X-CSRF-Token": getCsrfToken(),
 })
 
-
 function parseModelReply(rawReply: string): {
   thinking: string | null
   actualReply: string
@@ -237,7 +236,7 @@ function ChatPanel({
 
 // --- Main component ---
 
-export default function TextGenerator({ opened }: { opened: boolean }) {  
+export default function TextGenerator({ opened }: { opened: boolean }) {
   const { isLoggedIn } = useAuth()
   const backendUrl = import.meta.env.VITE_API_URL
 
@@ -336,7 +335,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
           temperature: 0.7,
           top_p: 0.9,
         },
-        { headers: getAuthHeaders(), withCredentials: true }
+        { headers: getAuthHeaders(), withCredentials: true },
       )
 
       const result = response.data
@@ -487,7 +486,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                 paddingRight: sidebarOpen ? "260px" : "0px",
               }}
             >
-              {selectedModels.map((modelValue) => (
+              {selectedModels.map(modelValue => (
                 <ChatPanel
                   key={modelValue}
                   modelValue={modelValue}

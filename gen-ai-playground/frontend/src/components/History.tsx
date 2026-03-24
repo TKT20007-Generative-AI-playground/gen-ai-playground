@@ -107,11 +107,11 @@ export default function History() {
       })
 
       const groups: { [prompt: string]: ImageRecord[] } = {}
-        ; (imgRes.data.history || []).forEach((item: ImageRecord) => {
-          const key = item.prompt.trim().toLowerCase()
-          if (!groups[key]) groups[key] = []
-          groups[key].push(item)
-        })
+      ;(imgRes.data.history || []).forEach((item: ImageRecord) => {
+        const key = item.prompt.trim().toLowerCase()
+        if (!groups[key]) groups[key] = []
+        groups[key].push(item)
+      })
 
       return {
         grouped: Object.keys(groups).map(prompt => ({
@@ -155,8 +155,6 @@ export default function History() {
 
     run()
   }, [activeTab, dateRange, currentPage, fetchImagesHistory, fetchTextHistory])
-
-
 
   const handleDateChange = (range: [Date | null, Date | null]) => {
     setDateRange(range)

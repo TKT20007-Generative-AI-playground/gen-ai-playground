@@ -130,10 +130,11 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
     try {
       const base64 = await fileToBase64(userImage)
 
-      const csrfToken = document.cookie
-        .split("; ")
-        .find((c) => c.startsWith("csrf_token="))
-        ?.split("=")[1] ?? ""
+      const csrfToken =
+        document.cookie
+          .split("; ")
+          .find(c => c.startsWith("csrf_token="))
+          ?.split("=")[1] ?? ""
 
       const response = await axios.post(
         `${backendUrl}/images/edit-image`,

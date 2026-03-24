@@ -4,8 +4,8 @@ import App from "./App.tsx"
 import { MantineProvider, createTheme } from "@mantine/core"
 import "@mantine/core/styles.css"
 import "@mantine/dates/styles.css"
-import '@mantine/carousel/styles.css'
-import './styles/index.css'
+import "@mantine/carousel/styles.css"
+import "./styles/index.css"
 import { AuthProvider } from "./context/AuthProvider"
 
 const theme = createTheme({

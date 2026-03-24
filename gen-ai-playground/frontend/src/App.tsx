@@ -7,50 +7,42 @@ import Dashboard from "./pages/Dashboard"
 import HistoryPage from "./pages/HistoryPage"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
-import HistorySidebar from "./components/HistorySidebar";
-import { useState, useCallback, useEffect } from "react";
-import { useAuth } from "./context/AuthContext";
-
-
-
-
-
-
+import HistorySidebar from "./components/HistorySidebar"
+import { useState, useCallback, useEffect } from "react"
+import { useAuth } from "./context/AuthContext"
 
 function App() {
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(420)
+  const [resizing, setResizing] = useState(false)
+  const auth = useAuth()
 
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(420);
-  const [resizing, setResizing] = useState(false);
-  const auth = useAuth();
-
-  const startResize = () => setResizing(true);
+  const startResize = () => setResizing(true)
 
   const onMouseMove = useCallback(
     (e: MouseEvent) => {
-      if (!resizing) return;
-      const newWidth = e.clientX;
+      if (!resizing) return
+      const newWidth = e.clientX
       if (newWidth > 250 && newWidth < 800) {
-        setSidebarWidth(newWidth);
+        setSidebarWidth(newWidth)
       }
     },
-    [resizing]
-  );
-
+    [resizing],
+  )
 
   const onMouseUp = useCallback(() => {
-    if (resizing) setResizing(false);
-  }, [resizing]);
+    if (resizing) setResizing(false)
+  }, [resizing])
 
   useEffect(() => {
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("mousemove", onMouseMove)
+    window.addEventListener("mouseup", onMouseUp)
 
     return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [onMouseMove, onMouseUp]);
+      window.removeEventListener("mousemove", onMouseMove)
+      window.removeEventListener("mouseup", onMouseUp)
+    }
+  }, [onMouseMove, onMouseUp])
 
   return (
     <BrowserRouter>
@@ -61,7 +53,7 @@ function App() {
         <button
           type="button"
           aria-label="Toggle history sidebar"
-          onClick={() => setHistoryOpen((prev) => !prev)}
+          onClick={() => setHistoryOpen(prev => !prev)}
           style={{
             position: "fixed",
             top: "50%",
@@ -118,7 +110,10 @@ function App() {
 
             <Route path="/register" element={<Register />} />
 
-        <Route path="/playground" element={<Navigate to="/playground/ImageGenerator" replace />} />
+            <Route
+              path="/playground"
+              element={<Navigate to="/playground/ImageGenerator" replace />}
+            />
 
             <Route
               path="/playground/:tab"
@@ -129,14 +124,14 @@ function App() {
               }
             />
 
-        <Route
-          path="/history"
-          element={
-            <ProtectedRoute>
-              <HistoryPage />
-            </ProtectedRoute>
-          }
-        />
+            <Route
+              path="/history"
+              element={
+                <ProtectedRoute>
+                  <HistoryPage />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="/dashboard"
@@ -150,8 +145,7 @@ function App() {
         </div>
       </div>
     </BrowserRouter>
-  );
+  )
 }
 
-export default App;
-
+export default App

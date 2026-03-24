@@ -1,16 +1,8 @@
-import {
-  Modal,
-  TextInput,
-  PasswordInput,
-  Button,
-  Stack,
-  Text,
-  Anchor,
-} from '@mantine/core'
-import { useForm } from '@mantine/form'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-import axios from 'axios'
+import { Modal, TextInput, PasswordInput, Button, Stack, Text, Anchor } from "@mantine/core"
+import { useForm } from "@mantine/form"
+import { Link, useNavigate } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
+import axios from "axios"
 
 interface LoginModalProps {
   opened: boolean
@@ -33,22 +25,18 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      const res = await axios.post(
-        `${backendUrl}/login`,
-        values,
-        { withCredentials: true }
-      );
+      const res = await axios.post(`${backendUrl}/login`, values, { withCredentials: true })
 
-      login(res.data.token, res.data.username, res.data.is_admin || false);
-      onClose();
+      login(res.data.token, res.data.username, res.data.is_admin || false)
+      onClose()
       if (redirectTo) {
-        navigate(redirectTo);
+        navigate(redirectTo)
       }
     } catch (error: unknown) {
-      const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
-      alert(detail || 'Login failed');
+      const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
+      alert(detail || "Login failed")
     }
-  };
+  }
 
   return (
     <Modal opened={opened} onClose={onClose} title="Login" centered>

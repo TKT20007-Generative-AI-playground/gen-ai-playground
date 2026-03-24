@@ -169,21 +169,23 @@ export default function ImageGenerator() {
       controllerRef.current = controller
       setStartTime(Date.now())
 
-      axios.post(
-        `${backendUrl}/images/generate`,
-        { prompt: nextPrompt, model },
-        {
-          responseType: "blob",
-          timeout: IMAGE_REQUEST_TIMEOUT_MS,
-          signal: controller.signal,
-        },
-      ).then((response) => {
-        window.dispatchEvent(new Event("history-update"));
-        if (controllerRef.current !== controller) return
+      axios
+        .post(
+          `${backendUrl}/images/generate`,
+          { prompt: nextPrompt, model },
+          {
+            responseType: "blob",
+            timeout: IMAGE_REQUEST_TIMEOUT_MS,
+            signal: controller.signal,
+          },
+        )
+        .then(response => {
+          window.dispatchEvent(new Event("history-update"))
+          if (controllerRef.current !== controller) return
 
           const timeMs = parseGenerationTimeMs(response.headers as Record<string, unknown>)
           const imageId = response.headers["x-image-id"] as string | undefined
-          if (imageId) imageIdRef.current = imageId  
+          if (imageId) imageIdRef.current = imageId
 
           setGenerationTime(timeMs)
           setError(null)

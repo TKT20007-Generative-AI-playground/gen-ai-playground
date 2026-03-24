@@ -1,15 +1,15 @@
 import { Link, useLocation } from "react-router-dom"
-import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import LoginModal from './Login';
-import { Group, Divider, Text, Button } from "@mantine/core";
+import { useState, useEffect } from "react"
+import { useAuth } from "../context/AuthContext"
+import LoginModal from "./Login"
+import { Group, Divider, Text, Button } from "@mantine/core"
 
-export default function Header() {  
+export default function Header() {
   const { isLoggedIn, isAdmin, logout } = useAuth()
   const location = useLocation()
 
-  const [loginOpened, setLoginOpened] = useState(false);
-  const [redirectTo, setRedirectTo] = useState<string | null>(null);
+  const [loginOpened, setLoginOpened] = useState(false)
+  const [redirectTo, setRedirectTo] = useState<string | null>(null)
 
   useEffect(() => {
     if (location.state?.openLoginModal) {
@@ -21,18 +21,17 @@ export default function Header() {
     }
   }, [location])
 
-
   return (
     <>
-      <Group 
-        justify="space-between"   
-        p="md" 
-        bg="linear-gradient(135deg, #000F65, #0b1328)" 
+      <Group
+        justify="space-between"
+        p="md"
+        bg="linear-gradient(135deg, #000F65, #0b1328)"
         style={{ position: "sticky", top: 0, zIndex: 100 }}
-        >
+      >
         <Group gap="md">
           <Text fw={500} c="white" component={Link} to="/">
-            Generative AI Playground 
+            Generative AI Playground
           </Text>
           {isLoggedIn && (
             <Button component={Link} to="/history" variant="white" color="dark">
@@ -52,14 +51,25 @@ export default function Header() {
         </Group>
 
         {isLoggedIn ? (
-          <Button variant="white" color="dark" onClick={logout}>Logout</Button>
+          <Button variant="white" color="dark" onClick={logout}>
+            Logout
+          </Button>
         ) : (
-          <Button variant="white" color="dark" onClick={() => setLoginOpened(true)}>Login</Button>
+          <Button variant="white" color="dark" onClick={() => setLoginOpened(true)}>
+            Login
+          </Button>
         )}
 
-        <LoginModal opened={loginOpened} onClose={() => { setLoginOpened(false); setRedirectTo(null); }} redirectTo={redirectTo} />
+        <LoginModal
+          opened={loginOpened}
+          onClose={() => {
+            setLoginOpened(false)
+            setRedirectTo(null)
+          }}
+          redirectTo={redirectTo}
+        />
       </Group>
       <Divider />
     </>
-  );
+  )
 }
