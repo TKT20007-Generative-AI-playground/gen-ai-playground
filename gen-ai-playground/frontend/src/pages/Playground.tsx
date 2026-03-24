@@ -40,10 +40,10 @@ export default function Playground({ historyOpen }: { historyOpen: boolean }) {
           label="Select playground component"
           data={PLAYGROUND_TABS.map((t) => ({ value: t, label: t }))}
           value={selectedComponent}
-          onChange={(value) => {
+          onChange={value => {
             if (value) navigate(`/playground/${value}`)
           }}
-        data-testid="playground-select" 
+          data-testid="playground-select"
         />
       </Group>
 
@@ -55,4 +55,3 @@ export default function Playground({ historyOpen }: { historyOpen: boolean }) {
     </>
   )
 }
-

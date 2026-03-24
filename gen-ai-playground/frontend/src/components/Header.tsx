@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from "react-router-dom"
+import { useLocation, useNavigate, Link } from "react-router-dom"
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LoginModal from './Login';
@@ -6,7 +6,7 @@ import { Group, Divider, Text, Button } from "@mantine/core";
 import { getTargetTab, saveCurrentTab, getDashboardTab, type PlaygroundTab, PLAYGROUND_TABS } from '../constants/tabs';
 
 
-export default function Header() {  
+export default function Header() {
   const { isLoggedIn, isAdmin, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -28,8 +28,8 @@ export default function Header() {
     navigate(`/playground/${targetTab}`)
   }
 
-  const [loginOpened, setLoginOpened] = useState(false);
-  const [redirectTo, setRedirectTo] = useState<string | null>(null);
+  const [loginOpened, setLoginOpened] = useState(false)
+  const [redirectTo, setRedirectTo] = useState<string | null>(null)
 
   useEffect(() => {
     if (location.state?.openLoginModal) {
@@ -41,15 +41,14 @@ export default function Header() {
     }
   }, [location])
 
-
   return (
     <>
-      <Group 
-        justify="space-between"   
-        p="md" 
-        bg="linear-gradient(135deg, #000F65, #0b1328)" 
+      <Group
+        justify="space-between"
+        p="md"
+        bg="linear-gradient(135deg, #000F65, #0b1328)"
         style={{ position: "sticky", top: 0, zIndex: 100 }}
-        >
+      >
         <Group gap="md">
           {isAdmin && (
             <Button variant="white" color="dark" onClick={handleDashboardClick} style={{ flexShrink: 0 }}>
@@ -58,10 +57,7 @@ export default function Header() {
           )}
           <Text fw={500} c="white" style={{ flexShrink: 0 }}>Generative AI Playground</Text>
           {isLoggedIn && (
-            <Button 
-              variant="white"
-              color="dark"
-            >
+            <Button component={Link} to="/history" variant="white" color="dark">
               History
             </Button>
           )}
@@ -76,9 +72,16 @@ export default function Header() {
           <Button variant="white" color="dark" onClick={() => setLoginOpened(true)} style={{ flexShrink: 0 }}>Login</Button>
         )}
 
-        <LoginModal opened={loginOpened} onClose={() => { setLoginOpened(false); setRedirectTo(null); }} redirectTo={redirectTo} />
+        <LoginModal
+          opened={loginOpened}
+          onClose={() => {
+            setLoginOpened(false)
+            setRedirectTo(null)
+          }}
+          redirectTo={redirectTo}
+        />
       </Group>
       <Divider />
     </>
-  );
+  )
 }

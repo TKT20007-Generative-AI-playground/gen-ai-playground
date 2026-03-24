@@ -34,21 +34,21 @@ export default function ModelSelector({
 
   const selectData = useMemo(
     () =>
-      models.map((m) => ({
+      models.map(m => ({
         value: m,
         label: getModelDisplayName(m),
       })),
-    [models]
+    [models],
   )
 
   const measurementCards = useMemo(() => {
-    return models.map((m) => {
+    return models.map(m => {
       const title = getModelDisplayName(m)
       const price = getModelPrice(m)
       const raw = MODEL_DESCRIPTIONS[m] ?? ""
       const paragraphs = raw
         .split(/\n\s*\n/g)
-        .map((p) => p.trim())
+        .map(p => p.trim())
         .filter(Boolean)
 
       return { key: m, title, price, paragraphs }
@@ -73,7 +73,7 @@ export default function ModelSelector({
       const BUFFER = 14
       const next = max + BUFFER
 
-      setDescHeight((prev) => (prev === next ? prev : next))
+      setDescHeight(prev => (prev === next ? prev : next))
     }
 
     // Schedule the measurement/update asynchronously to avoid "setState in effect" lint rule.
@@ -96,7 +96,7 @@ export default function ModelSelector({
     if (!root) return
 
     const inputs = root.querySelectorAll("input")
-    inputs.forEach((input) => {
+    inputs.forEach(input => {
       input.setAttribute("spellcheck", "false")
       input.setAttribute("autocorrect", "off")
       input.setAttribute("autocapitalize", "none")
@@ -128,7 +128,7 @@ export default function ModelSelector({
             pointerEvents: "none",
           }}
         >
-          {measurementCards.map((card) => (
+          {measurementCards.map(card => (
             <div
               key={card.key}
               data-measure-card

@@ -3,11 +3,12 @@ Image generation and history routes
 """
 import traceback
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import Response
 from pymongo.database import Database
 from bson import ObjectId
 from datetime import datetime, timezone
+import math
 import base64
 import time
 import httpx
@@ -39,7 +40,10 @@ def normalize_base64_image(image_data: Optional[str]) -> Optional[str]:
 @router.get("/history", response_model=HistoryResponse)
 def get_history(
     current_user: UserInfo = Depends(get_current_user),
-    db: Database = Depends(get_database)
+    db: Database = Depends(get_database),
+    from_date: Optional[int] = Query(None, alias="from"),  
+    to_date: Optional[int] = Query(None, alias="to"),
+    page_num: Optional[int] = Query(1, alias="page", ge=1)
 ):
     """
     Get image generation history for authenticated user
@@ -47,17 +51,37 @@ def get_history(
     Args:
         current_user: Authenticated user information
         db: Database instance
-        
+        time_period: Optional[str]: time period to get history for
+        page_num: Optional[int]: page number to get history for
     Returns:
         HistoryResponse: List of image generation history items
         
     Raises:
         HTTPException: If fetching history fails
     """
+    
+    page_size = 10
+    page = int(page_num)
+    query = {"username": current_user.username}
+    
+    if from_date or to_date:
+        date_filter = {}
+        if from_date:
+            date_filter["$gte"] = datetime.fromtimestamp(from_date / 1000, tz=timezone.utc)
+        if to_date:
+            date_filter["$lte"] = datetime.fromtimestamp(to_date / 1000, tz=timezone.utc)
+        query["timestamp"] = date_filter
+    
+    total = db.images.count_documents(query)
+    if total == 0:
+        return HistoryResponse(history=[], total=0, page=page, total_pages=0)
+    total_pages = math.ceil(total / page_size)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+    
     try:
-        # Get last 50 image generations for this user, sorted by newest first
         history = list(db.images.find(
-            {"username": current_user.username},
+            query,
             {
                 "_id": 1,
                 "prompt": 1,
@@ -67,21 +91,15 @@ def get_history(
                 "image_data": 1,
                 "image_type": 1,
                 "parent_image_id": 1,
-            }
-        ).sort("timestamp", -1).limit(50))
-
-        for item in history:
-            if "_id" in item:
-                del item["_id"]
-            if "parent_image_id" in item:
-                del item["parent_image_id"]
-        
-        return HistoryResponse(history=history)
+            }).sort("timestamp", -1).skip(start).limit(page_size))
+       
+        history = convert_objects_to_str(history, current_user)
+        return HistoryResponse(history=history, total=total, page=page, total_pages=total_pages)
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to fetch history: {str(e)}"
-        )
+        print(f"Error getting history: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting history: {e}")
+
+
 
 
 @router.post('/generate')
@@ -224,13 +242,14 @@ async def edit_image(
     model = image_request.model    # model from req body
     image_base64 = image_request.image # base64 image from req body
     image_type = "edited"
+    parent_image_id = image_request.parent_image_id or image_request.id
     
     # Start timing
     start_time = time.perf_counter()
     
     image_base64 = normalize_base64_image(image_base64)
-    print("editing image...")
     url = choose_model_url(model)
+
      # Prepare request
     headers = {
         "Content-Type": "application/json",
@@ -244,6 +263,9 @@ async def edit_image(
     try:
         resp.raise_for_status()
         print(f"Response status: {resp.status_code}")
+
+        # Avoid saving the original image again when we already know its DB id.
+        user_base64_image_for_db = image_base64 if not parent_image_id else None
 
         # Process response
         resp_data = resp.json()
@@ -260,7 +282,8 @@ async def edit_image(
                     current_user=current_user,
                     image_type=image_type,
                     start_time=start_time,
-                    user_base64_image=image_base64,
+                    user_base64_image=user_base64_image_for_db,
+                    parent_image_id=parent_image_id,
                 )
         else:
             if resp_data.get("status") == "COMPLETED" and resp_data.get("output", {}).get("outputs"):
@@ -275,7 +298,8 @@ async def edit_image(
                     current_user=current_user,
                     image_type=image_type,
                     start_time=start_time,
-                    user_base64_image=image_base64,
+                    user_base64_image=user_base64_image_for_db,
+                    parent_image_id=parent_image_id,
                 )
             else:
                 print(f"Condition failed, status: {resp_data.get('status')}, outputs: {resp_data.get('output')}")
@@ -320,7 +344,7 @@ def build_timed_image_response(
     image_bytes = base64.b64decode(image_base64)
     generation_time_ms = int((time.perf_counter() - start_time) * 1000)
 
-    save_image_to_db(
+    image_id = save_image_to_db(
         db,
         prompt,
         model,
@@ -335,7 +359,7 @@ def build_timed_image_response(
     return Response(
         content=image_bytes,
         media_type="image/png",
-        headers={"Content-Disposition": "inline", "X-Generation-Time-Ms": str(generation_time_ms)},
+        headers={"Content-Disposition": "inline", "X-Generation-Time-Ms": str(generation_time_ms), "X-Image-Id": image_id or ""},
     )
 
 
@@ -343,7 +367,7 @@ def save_image_to_db(db: Database, prompt: str, model:
                     str, image_base64: str, current_user:UserInfo,
                     image_type:str, user_base64_image: Optional[str] = None, 
                     parent_image_id: Optional[str] = None,
-                    generation_time_ms: Optional[int] = None ):
+                    generation_time_ms: Optional[int] = None )-> Optional[str]:
     """ Saves the image(s) to mongoDB.
         If the user has provided the original image, it is also saved to the database,
         and the edited image is referenced by the original record ID.
@@ -357,8 +381,8 @@ def save_image_to_db(db: Database, prompt: str, model:
         type (str): is the image returned by the AI edited or completely generated?
     """
     try:
-        original_id = None
-        if user_base64_image:
+        # If 'parent_image_id' is set, the original image already exists in DB.
+        if user_base64_image and parent_image_id is None or parent_image_id in ["temp-id1", "temp-id2"]:
             user_input_image_record = {
                 "prompt": prompt,
                 "model": model,
@@ -368,8 +392,7 @@ def save_image_to_db(db: Database, prompt: str, model:
                 "username": current_user.username,
                 "image_type": "original"
             }
-            res = db.images.insert_one(user_input_image_record)
-            original_id = res.inserted_id
+            db.images.insert_one(user_input_image_record)
         
         image_record = {
             "prompt": prompt,
@@ -384,14 +407,17 @@ def save_image_to_db(db: Database, prompt: str, model:
         if generation_time_ms is not None:
             image_record["generation_time_ms"] = generation_time_ms
         
-        if parent_image_id:
+        if parent_image_id and ObjectId.is_valid(parent_image_id):
             image_record["parent_image_id"] = ObjectId(parent_image_id)
+        
     
                 
-        db.images.insert_one(image_record)
+        result = db.images.insert_one(image_record)
         print(f"Saved image data to MongoDB for user: {current_user.username}")
+        return str(result.inserted_id)
     except Exception as e:
         print(f"Failed to save to MongoDB: {e}")
+        return None
         
 def choose_model_url(model: str)-> str:
     """ return the correct model URL """
@@ -415,5 +441,19 @@ def build_request_data(model: str,  prompt: str, image_base64: Optional[str] = N
             base_data["image"] = image_base64
     if "KLEIN" not in model:
         base_data = {"input":base_data}
-
+    
     return base_data
+
+def convert_objects_to_str(history: list, cur_user: UserInfo) -> list:
+    """Convert ObjectId to string for JSON serialization, also for parent_image_id if it exists."""
+    for doc in history:
+        doc["id"] = str(doc["_id"])
+        if "parent_image_id" in doc and doc["parent_image_id"]:
+            doc["parent_image_id"] = str(doc["parent_image_id"])
+        doc["username"] = cur_user.username
+    return history
+    
+        
+        
+    
+    

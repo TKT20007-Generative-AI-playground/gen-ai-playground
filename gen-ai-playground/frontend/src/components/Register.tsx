@@ -11,23 +11,23 @@ import {
   Title,
   Alert,
   Stack,
-} from "@mantine/core";
+} from "@mantine/core"
 
 export default function Register() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [inviteCode, setInviteCode] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [passwordError, setPasswordError] = useState("");
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [inviteCode, setInviteCode] = useState("")
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+  const [passwordError, setPasswordError] = useState("")
   const { isLoggedIn } = useAuth()
   const navigate = useNavigate()
 
-  const backendUrl = import.meta.env.VITE_API_URL;
+  const backendUrl = import.meta.env.VITE_API_URL
 
   if (!backendUrl) {
-    throw new Error("VITE_API_URL is not defined");
+    throw new Error("VITE_API_URL is not defined")
   }
 
   if (isLoggedIn) {
@@ -36,19 +36,19 @@ export default function Register() {
 
   const validatePassword = (password: string): string | null => {
     if (password.length < 8) {
-      return "Password must be at least 8 characters long";
+      return "Password must be at least 8 characters long"
     }
     if (!/[A-Z]/.test(password)) {
-      return "Password must contain at least one uppercase letter";
+      return "Password must contain at least one uppercase letter"
     }
     if (!/[0-9]/.test(password)) {
-      return "Password must contain at least one number";
+      return "Password must contain at least one number"
     }
     if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      return "Password must contain at least one special character";
+      return "Password must contain at least one special character"
     }
-    return null;
-  };
+    return null
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,10 +60,10 @@ export default function Register() {
       return
     }
 
-    const validationError = validatePassword(password);
+    const validationError = validatePassword(password)
     if (validationError) {
-      setError(validationError);
-      return;
+      setError(validationError)
+      return
     }
 
     try {
@@ -73,22 +73,17 @@ export default function Register() {
         invitation_code: inviteCode,
       })
 
-      setSuccess("User registered successfully!");
-      setUsername("");
-      setPassword("");
-      setConfirmPassword("");
-      setInviteCode("");
-      setPasswordError("");
+      setSuccess("User registered successfully!")
+      setUsername("")
+      setPassword("")
+      setConfirmPassword("")
+      setInviteCode("")
+      setPasswordError("")
       setTimeout(() => {
         navigate("/", { state: { openLoginModal: true } })
       }, 1500) // timeout so that the user can see that registration was successful
-
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError("Server unreachable");
-      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Registration failed")
     }
   }
 
@@ -105,7 +100,7 @@ export default function Register() {
               label="Username"
               placeholder="Your username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={e => setUsername(e.target.value)}
               required
               data-testid="register-username"
             />
@@ -114,12 +109,12 @@ export default function Register() {
               label="Password"
               placeholder="Your password"
               value={password}
-              onChange={(e) => {
-                const value = e.target.value;
-                setPassword(value);
+              onChange={e => {
+                const value = e.target.value
+                setPassword(value)
 
-                const err = validatePassword(value);
-                setPasswordError(err || "");
+                const err = validatePassword(value)
+                setPasswordError(err || "")
               }}
               error={passwordError}
               required
@@ -130,7 +125,7 @@ export default function Register() {
               label="Confirm password"
               placeholder="Repeat your password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={e => setConfirmPassword(e.target.value)}
               required
             />
 
@@ -138,7 +133,7 @@ export default function Register() {
               label="Invitation code"
               placeholder="Required to register"
               value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
+              onChange={e => setInviteCode(e.target.value)}
               required
             />
 
@@ -161,5 +156,5 @@ export default function Register() {
         )}
       </Paper>
     </Container>
-  );
+  )
 }

@@ -7,12 +7,12 @@ import DashboardLayout from "./components/DashboardLayout"
 import DashboardContainers from "./pages/DashboardContainers"
 import DashboardUsers from "./pages/DashboardUsers"
 import DashboardInvitations from "./pages/DashboardInvitations"
-import History from "./components/History"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
 import HistorySidebar from "./components/HistorySidebar";
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "./context/AuthContext";
+import HistoryPage from "./pages/HistoryPage"
 
 
 
@@ -30,29 +30,28 @@ function AppContent() {
 
   const onMouseMove = useCallback(
     (e: MouseEvent) => {
-      if (!resizing) return;
-      const newWidth = e.clientX;
+      if (!resizing) return
+      const newWidth = e.clientX
       if (newWidth > 250 && newWidth < 800) {
-        setSidebarWidth(newWidth);
+        setSidebarWidth(newWidth)
       }
     },
-    [resizing]
-  );
-
+    [resizing],
+  )
 
   const onMouseUp = useCallback(() => {
-    if (resizing) setResizing(false);
-  }, [resizing]);
+    if (resizing) setResizing(false)
+  }, [resizing])
 
   useEffect(() => {
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
+    window.addEventListener("mousemove", onMouseMove)
+    window.addEventListener("mouseup", onMouseUp)
 
     return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [onMouseMove, onMouseUp]);
+      window.removeEventListener("mousemove", onMouseMove)
+      window.removeEventListener("mouseup", onMouseUp)
+    }
+  }, [onMouseMove, onMouseUp])
 
   return (
     <>
@@ -63,7 +62,7 @@ function AppContent() {
         <button
           type="button"
           aria-label="Toggle history sidebar"
-          onClick={() => setHistoryOpen((prev) => !prev)}
+          onClick={() => setHistoryOpen(prev => !prev)}
           style={{
             position: "fixed",
             top: "50%",
@@ -138,7 +137,7 @@ function AppContent() {
               path="/history"
               element={
                 <ProtectedRoute>
-                  <History />
+                  <HistoryPage />
                 </ProtectedRoute>
               }
             />
@@ -169,8 +168,7 @@ function App() {
     <BrowserRouter>
       <AppContent />
     </BrowserRouter>
-  );
+  )
 }
 
-export default App;
-
+export default App

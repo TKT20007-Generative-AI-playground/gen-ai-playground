@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
-test('main page has no console errors on load', async ({ page }) => {
+test("main page has no console errors on load", async ({ page }) => {
   const consoleErrors = [];
   const errorResponses = [];
 
-  page.on('console', msg => {
-    if (msg.type() === 'error') {
+  page.on("console", (msg) => {
+    if (msg.type() === "error") {
       consoleErrors.push(msg.text());
     }
   });
@@ -19,7 +19,16 @@ test('main page has no console errors on load', async ({ page }) => {
     }
   });
 
-  await page.goto('http://localhost:5173');
+  page.on('response', response => {
+    if (response.status() >= 400) {
+      errorResponses.push({
+        url: response.url(),
+        status: response.status()
+      });
+    }
+  });
+
+  await page.goto("http://localhost:5173");
   await page.waitForTimeout(1000);
 
   // Ignore the expected unauthenticated /me 401 error
@@ -34,3 +43,4 @@ test('main page has no console errors on load', async ({ page }) => {
 
   expect(unexpectedConsoleErrors).toHaveLength(0);
 });
+

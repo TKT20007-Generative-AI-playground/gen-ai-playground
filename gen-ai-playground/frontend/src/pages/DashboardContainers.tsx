@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import { useState, useEffect, useCallback } from "react"
+import axios from "axios"
 import {
   Table,
   Badge,
@@ -10,7 +10,7 @@ import {
   Stack,
   Alert,
   Select,
-} from '@mantine/core'
+} from "@mantine/core"
 
 interface Container {
   name: string
@@ -28,13 +28,13 @@ export default function DashboardContainers() {
   const [deployLoading, setDeployLoading] = useState(false)
   const [textModelOptions, setTextModelOptions] = useState<{ value: string; label: string }[]>([])
 
-  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
   const getCsrfToken = () =>
     document.cookie
-      .split('; ')
-      .find((c) => c.startsWith('csrf_token='))
-      ?.split('=')[1] ?? ''
+      .split("; ")
+      .find(c => c.startsWith("csrf_token="))
+      ?.split("=")[1] ?? ""
 
   // Fetch available models from backend
   useEffect(() => {
@@ -42,13 +42,13 @@ export default function DashboardContainers() {
       try {
         const res = await axios.get(`${backendUrl}/text/models`, {
           withCredentials: true,
-          headers: { 'X-CSRF-Token': getCsrfToken() },
+          headers: { "X-CSRF-Token": getCsrfToken() },
         })
         const models = (res.data.available_models ?? []).map(
           (m: { value: string; label: string }) => ({
             value: m.value,
             label: m.label,
-          })
+          }),
         )
         setTextModelOptions(models)
       } catch {
@@ -63,13 +63,13 @@ export default function DashboardContainers() {
       setError(null)
       const res = await axios.get(`${backendUrl}/dashboard/containers`, {
         withCredentials: true,
-        headers: { 'X-CSRF-Token': getCsrfToken() },
+        headers: { "X-CSRF-Token": getCsrfToken() },
       })
       setContainers(res.data)
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) return
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
-      setError(detail || (err instanceof Error ? err.message : 'Failed to fetch deployments'))
+      setError(detail || (err instanceof Error ? err.message : "Failed to fetch deployments"))
     } finally {
       setLoading(false)
     }
@@ -85,19 +85,15 @@ export default function DashboardContainers() {
     if (!confirm(`Delete deployment "${deploymentName}"? This cannot be undone.`)) return
     setActionLoading(deploymentName)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/containers/${deploymentName}/stop`,
-        null,
-        {
-          withCredentials: true,
-          headers: { 'X-CSRF-Token': getCsrfToken() },
-        }
-      )
+      await axios.post(`${backendUrl}/dashboard/containers/${deploymentName}/stop`, null, {
+        withCredentials: true,
+        headers: { "X-CSRF-Token": getCsrfToken() },
+      })
       await fetchContainers()
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) return
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
-      setError(detail || (err instanceof Error ? err.message : 'Failed to delete deployment'))
+      setError(detail || (err instanceof Error ? err.message : "Failed to delete deployment"))
     } finally {
       setActionLoading(null)
     }
@@ -114,16 +110,16 @@ export default function DashboardContainers() {
         {
           withCredentials: true,
           headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': getCsrfToken(),
+            "Content-Type": "application/json",
+            "X-CSRF-Token": getCsrfToken(),
           },
-        }
+        },
       )
       await fetchContainers()
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) return
       const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
-      setError(detail || (err instanceof Error ? err.message : 'Failed to deploy model'))
+      setError(detail || (err instanceof Error ? err.message : "Failed to deploy model"))
     } finally {
       setDeployLoading(false)
     }
@@ -131,16 +127,16 @@ export default function DashboardContainers() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'healthy':
-        return 'green'
-      case 'deploying':
-        return 'blue'
-      case 'error':
-        return 'red'
-      case 'unhealthy':
-        return 'orange'
+      case "healthy":
+        return "green"
+      case "deploying":
+        return "blue"
+      case "error":
+        return "red"
+      case "unhealthy":
+        return "orange"
       default:
-        return 'gray'
+        return "gray"
     }
   }
 
@@ -171,11 +167,7 @@ export default function DashboardContainers() {
           onChange={setSelectedModel}
           style={{ minWidth: 220 }}
         />
-        <Button
-          onClick={handleDeploy}
-          disabled={!selectedModel}
-          loading={deployLoading}
-        >
+        <Button onClick={handleDeploy} disabled={!selectedModel} loading={deployLoading}>
           Deploy
         </Button>
       </Group>
@@ -199,14 +191,22 @@ export default function DashboardContainers() {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {containers.map((c) => (
+            {containers.map(c => (
               <Table.Tr key={c.container_id}>
                 <Table.Td>
                   <Text fw={500}>{c.name}</Text>
                 </Table.Td>
                 <Table.Td>
-                  <Text size="sm" c="dimmed" style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {c.image || '—'}
+                  <Text
+                    size="sm"
+                    c="dimmed"
+                    style={{
+                      maxWidth: 300,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {c.image || "—"}
                   </Text>
                 </Table.Td>
                 <Table.Td>
