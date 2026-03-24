@@ -1,12 +1,12 @@
 import { useLocation, useNavigate } from "react-router-dom"
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import LoginModal from './Login';
-import { Group, Divider, Text, Button, Drawer } from "@mantine/core";
-import History from "./History";
+import { Group, Divider, Text, Button } from "@mantine/core";
 import { getTargetTab, saveCurrentTab, getDashboardTab, type PlaygroundTab, PLAYGROUND_TABS } from '../constants/tabs';
 
-export default function Header() {
+
+export default function Header() {  
   const { isLoggedIn, isAdmin, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -29,10 +29,6 @@ export default function Header() {
   }
 
   const [loginOpened, setLoginOpened] = useState(false);
-  const [historyOpened, setHistoryOpened] = useState(false);
-  const [drawerWidth, setDrawerWidth] = useState(420);
-  const [resizing, setResizing] = useState(false);
-
   const [redirectTo, setRedirectTo] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,33 +41,15 @@ export default function Header() {
     }
   }, [location])
 
-  const onMouseMove = useCallback((e: MouseEvent) => {
-  if (!resizing) return;
-
-  const newWidth = e.clientX;
-
-  if (newWidth > 250 && newWidth < 800) {
-    setDrawerWidth(newWidth);
-  }
-  }, [resizing]);
-
-  const onMouseUp = useCallback(() => {
-    if (resizing) setResizing(false);
-  }, [resizing]);
-
-  useEffect(() => {
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [onMouseMove, onMouseUp]);
 
   return (
     <>
-      <Group justify="space-between" p="md" bg="linear-gradient(135deg, #000F65, #0b1328)" style={{ position: "sticky", top: 0, zIndex: 100 }}>
+      <Group 
+        justify="space-between"   
+        p="md" 
+        bg="linear-gradient(135deg, #000F65, #0b1328)" 
+        style={{ position: "sticky", top: 0, zIndex: 100 }}
+        >
         <Group gap="md">
           {isAdmin && (
             <Button variant="white" color="dark" onClick={handleDashboardClick} style={{ flexShrink: 0 }}>
@@ -80,11 +58,9 @@ export default function Header() {
           )}
           <Text fw={500} c="white" style={{ flexShrink: 0 }}>Generative AI Playground</Text>
           {isLoggedIn && (
-            <Button
+            <Button 
               variant="white"
               color="dark"
-              onClick={() => setHistoryOpened(true)}
-              style={{ flexShrink: 0 }}
             >
               History
             </Button>
@@ -103,44 +79,6 @@ export default function Header() {
         <LoginModal opened={loginOpened} onClose={() => { setLoginOpened(false); setRedirectTo(null); }} redirectTo={redirectTo} />
       </Group>
       <Divider />
-
-      <Drawer
-        opened={historyOpened}
-        onClose={() => setHistoryOpened(false)}
-        title="History"
-        position="left"
-        size={drawerWidth}
-        padding="md"
-        overlayProps={{
-          blur: 0,
-          opacity: 0,
-          style: { backgroundColor: "transparent" }
-      }}
-        styles={{
-        root: { overflow: "hidden", position: "relative", transition: resizing ? "none" : "width 0.2s ease" }
-     }}
-      >
-      <div style={{ overflow: "hidden", position: "relative", width: "100%", height: "100%" }}>
-       <History />
-
-      <div
-        onMouseDown={(e) => {
-          e.preventDefault();
-          setResizing(true);
-      }}
-        style={{
-          position: "absolute",
-          top: 0,
-          right: 0,
-          width: 6,
-          height: "100%",
-          cursor: "ew-resize",
-          zIndex: 9999,
-          backgroundColor: "gray",
-      }}
-       />
-       </div>
-      </Drawer>
     </>
   );
 }

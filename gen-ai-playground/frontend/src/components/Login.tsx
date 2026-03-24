@@ -41,11 +41,9 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
 
       login(res.data.token, res.data.username, res.data.is_admin || false);
       onClose();
-
       if (redirectTo) {
-        navigate(redirectTo)
+        navigate(redirectTo);
       }
-      
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail;
       alert(detail || 'Login failed');
@@ -72,7 +70,7 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
             {...form.getInputProps('password')}
           />
 
-          <Button className="btn-primary" type="submit" fullWidth>
+          <Button type="submit" fullWidth>
             Login
           </Button>
 
@@ -91,4 +89,3 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
     </Modal>
   )
 }
-
