@@ -2,9 +2,19 @@ import axios from "axios"
 import { useAuth } from "../context/AuthContext"
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
 
-import { Alert, Button, MultiSelect, Paper, Text, ScrollArea, TextInput } from "@mantine/core"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
+import {
+  Alert,
+  Button,
+  MultiSelect,
+  Paper,
+  Text,
+  ScrollArea,
+  TextInput,
+  Select,
+  Group,
+} from "@mantine/core"
 
 type ModelOption = {
   value: string
@@ -21,7 +31,7 @@ type Message = {
   pendingStartTime?: number
 }
 
-type ModelStatus = "live" | "starting" | "offline" | "unknown"
+type ModelStatus = "live" | "starting" | "offline" | "cold" | "unknown"
 
 const makeMessageId = () => {
   // Prefer crypto.randomUUID when available; fall back for older browsers.
@@ -61,22 +71,26 @@ function parseModelReply(rawReply: string): {
 const modelStatusPriority: Record<ModelStatus, number> = {
   live: 0,
   starting: 1,
-  unknown: 2,
-  offline: 3,
+  cold: 2,
+  unknown: 3,
+  offline: 4,
 }
 
-// Build dropdown data with colored status dots; disable non-live models
-function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string, ModelStatus>) {
+// Build dropdown data with colored status dots; only disable offline models
+function buildDropdownData(
+  modelOptions: ModelOption[],
+  statuses: Record<string, ModelStatus>
+) {
   return modelOptions
     .map(m => {
       const st = statuses[m.value]
-      const isLive = st === "live"
-      const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
+      const isSelectable = st !== "offline" && st !== "unknown"  // Allow live, starting, cold
+      const emoji = st === "live" ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : st === "cold" ? "\u{1F535}" : "\u26AA"
 
       return {
         value: m.value,
         label: `${emoji} ${m.label}`,
-        disabled: !isLive,
+        disabled: !isSelectable,
       }
     })
     .sort((a, b) => {
@@ -112,10 +126,38 @@ function ChatPanel({
   statusMessage,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [offlineStartTime, setOfflineStartTime] = useState<number | null>(null)
+  const [offlineDuration, setOfflineDuration] = useState<number>(0)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, isLoading])
+
+  // Track how long the model has been offline
+  useEffect(() => {
+    if (modelStatus === "offline") {
+      // Model just went offline
+      if (offlineStartTime === null) {
+        setOfflineStartTime(Date.now())
+      }
+    } else {
+      // Model is back online or in another state
+      setOfflineStartTime(null)
+      setOfflineDuration(0)
+    }
+  }, [modelStatus, offlineStartTime])
+
+  // Update offline duration every second
+  useEffect(() => {
+    if (offlineStartTime === null) return
+
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - offlineStartTime) / 1000)
+      setOfflineDuration(elapsed)
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [offlineStartTime])
 
   return (
     <div
@@ -134,7 +176,7 @@ function ChatPanel({
 
       {modelStatus && modelStatus !== "live" && (
         <Alert
-          color={modelStatus === "starting" ? "yellow" : "gray"}
+          color={modelStatus === "starting" ? "yellow" : modelStatus === "cold" ? "blue" : "gray"}
           variant="light"
           mb={8}
           p="xs"
@@ -144,7 +186,11 @@ function ChatPanel({
             ? statusMessage
             : modelStatus === "starting"
               ? "This model is starting up. It usually takes about 2 minutes."
-              : "This model is not deployed. Ask an admin to deploy it from the dashboard."}
+              : modelStatus === "cold"
+                ? "This model is cold. Generating text will start it automatically (~2-5 min)."
+                : offlineDuration < 30
+                  ? "This model is offline. It might be pulling the image. Please wait for 30 seconds..."
+                  : "This model has been offline for a while. Try deploying it again."}
         </Alert>
       )}
 
@@ -247,6 +293,10 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
 
   const sidebarOpen = opened
+  // Deployment state
+  const [deployModel, setDeployModel] = useState<string | null>(null)
+  const [deployLoading, setDeployLoading] = useState(false)
+  const [deployMsg, setDeployMsg] = useState<string | null>(null)
 
   // Keep a ref so async loops always see the latest messages.
   const messagesByModelRef = useRef<Record<string, Message[]>>({})
@@ -302,7 +352,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   useEffect(() => {
     if (!isLoggedIn) return
     fetchStatuses()
-    const id = setInterval(fetchStatuses, 30000)
+    const id = setInterval(fetchStatuses, 10000)
     return () => clearInterval(id)
   }, [fetchStatuses, isLoggedIn])
 
@@ -416,6 +466,35 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     }
   }
 
+  const handleDeploy = async () => {
+    if (!deployModel) return
+    setDeployLoading(true)
+    setDeployMsg(null)
+    try {
+      const token = localStorage.getItem("token")
+      await axios.post(
+        `${backendUrl}/text/deploy`,
+        { model_path: deployModel },
+        { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } }
+      )
+      setDeployMsg("Model deployed successfully! It takes a few seconds for it to appear in model status")
+      setDeployModel(null)
+    } catch (error: unknown) {
+      const errorMsg = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Failed to deploy model."
+      setDeployMsg(errorMsg)
+    } finally {
+      setDeployLoading(false)
+    }
+  }
+
+  // Auto-dismiss success message after 4 seconds
+  useEffect(() => {
+    if (deployMsg === "Model deployed successfully! It takes a few seconds for it to appear in model status") {
+      const timer = setTimeout(() => setDeployMsg(null), 4000)
+      return () => clearTimeout(timer)
+    }
+  }, [deployMsg])
+
   if (!isLoggedIn) {
     return (
       <div
@@ -435,6 +514,27 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const isBreakout = selectedModels.length > 2
   const dropdownData = buildDropdownData(modelOptions, modelStatuses)
 
+  // Count models by status
+  const statusCounts = Object.values(modelStatuses).reduce(
+    (acc, status) => {
+      acc[status] = (acc[status] || 0) + 1
+      return acc
+    },
+    {} as Record<ModelStatus, number>
+  )
+
+  const statusSummary = [
+    statusCounts.live ? `🟢 ${statusCounts.live} ready` : null,
+    statusCounts.starting ? `🟡 ${statusCounts.starting} starting` : null,
+    statusCounts.cold ? `🔵 ${statusCounts.cold} cold` : null,
+    statusCounts.offline ? `⚪ ${statusCounts.offline} offline` : null,
+    statusCounts.unknown ? `⚪ ${statusCounts.unknown} unknown` : null,
+  ]
+    .filter(Boolean)
+    .join(" | ")
+
+  const showStartingMsg = Boolean(statusCounts.starting || statusCounts.cold)
+
   return (
     <div
       style={{
@@ -448,6 +548,49 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         gap: "16px",
       }}
     >
+      {statusSummary && (
+        <Alert color="blue" variant="light" mb={8} p="xs" styles={{ message: { fontSize: 13 } }}>
+          Model status: {statusSummary}
+        </Alert>
+      )}
+      {showStartingMsg && (
+        <Alert color="yellow" variant="light" mb={8} p="xs" styles={{ message: { fontSize: 13 } }}>
+          {statusCounts.starting && statusCounts.cold
+            ? `${statusCounts.starting} model(s) are still starting up (usually ~2 min). ${statusCounts.cold} model(s) are cold and will start on first use (~2-5 min).`
+            : statusCounts.starting
+              ? "Some of the models are still starting up. It usually takes about 2 minutes."
+              : "Some of the models are cold to save costs and will start on first use (~2-5 min)."}
+        </Alert>
+      )}
+
+      {/* Deploy model dropdown and button */}
+      <Group align="end" gap="sm">
+        <Select
+          label="Deploy a model"
+          placeholder="Select model"
+          data={modelOptions}
+          value={deployModel}
+          onChange={setDeployModel}
+          disabled={deployLoading}
+          searchable
+          clearable
+          style={{ minWidth: 220 }}
+        />
+        <Button
+          onClick={handleDeploy}
+          disabled={!deployModel || deployLoading}
+          loading={deployLoading}
+        >
+          Deploy
+        </Button>
+      </Group>
+
+      {deployMsg && (
+        <Alert color={deployMsg === "Model deployed successfully! It takes a few seconds for it to appear in model status" ? "green" : "red"} mb={16} withCloseButton onClose={() => setDeployMsg(null)}>
+          {deployMsg}
+        </Alert>
+      )}
+
       <Text c="dimmed" size="sm" mb={6}>
         Select up to {MAX_MODELS} models for text generation.
       </Text>
@@ -541,11 +684,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
               onKeyDown={handleKeyDown}
               disabled={isAnyLoading}
             />
-            <Button
-              onClick={generateText}
-              disabled={!prompt.trim() || isAnyLoading}
-              loading={isAnyLoading}
-            >
+            <Button onClick={generateText} disabled={!prompt.trim() || isAnyLoading || selectedModels.some((m) => modelStatuses[m] === "starting")} loading={isAnyLoading}>
               Send
             </Button>
           </div>

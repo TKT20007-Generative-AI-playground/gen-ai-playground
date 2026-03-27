@@ -59,7 +59,7 @@ def get_available_compute(current_user: UserInfo = Depends(get_current_user)):
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_model(
     request: DeployModelRequest,
-    current_user: UserInfo = Depends(get_admin_user),
+    current_user: UserInfo = Depends(get_current_user),
     _: None = Depends(validate_csrf_token),
 ):
     """
@@ -225,23 +225,31 @@ def get_model_statuses(
     current_user: UserInfo = Depends(get_current_user),
 ):
     """
-    Return the live/starting/offline status for each known model.
-    Used by the frontend to show green/yellow indicators in the model selector.
+    Return the live/starting/offline/cold status for each known model.
+    Used by the frontend to show green/yellow/blue/gray indicators in the model selector.
+    
+    Status meanings:
+    - live: Healthy and ready to serve
+    - starting: Deployment exists but not yet healthy (initializing)
+    - cold: Deployment paused/idle (will auto-start on first request)
+    - offline: Deployment doesn't exist or unreachable
     """
     try:
         client = verda_service._get_client()
         deployments = client.containers.get_deployments()
-    except Exception:
-        # If we can't reach Verda, everything is offline
+    except Exception as e:
+        print(f"Error fetching deployments: {e}")
         return {name: "offline" for name in get_template_map().values()}
 
-    # Build a lookup: deployment_name (lower) -> status string
+    # Build a lookup: deployment_name (lower) -> status_str
     dep_statuses: dict[str, str] = {}
     for d in deployments:
         try:
             status = client.containers.get_deployment_status(d.name)
-            dep_statuses[d.name.lower()] = status.value
-        except Exception:
+            status_str = status.value
+            dep_statuses[d.name.lower()] = status_str
+        except Exception as e:
+            print(f"Error getting status for {d.name}: {e}")
             dep_statuses[d.name.lower()] = "unknown"
 
     result: dict[str, str] = {}
@@ -251,15 +259,28 @@ def get_model_statuses(
             continue
         dep_name_expected = _deployment_name_from_filename(template_name)
         matched_status = "offline"
+        
         for dep_name, st in dep_statuses.items():
             if dep_name_expected == dep_name:
+                # Map Verda status to our UI status
                 if st == "healthy":
-                    matched_status = "live"
+                    # Check replica count to distinguish "live" (1+) from "cold" (0)
+                    replica_count = verda_service.get_deployment_replica_count(dep_name)
+                    if replica_count > 0:
+                        matched_status = "live"
+                    else:
+                        matched_status = "cold"
+                elif st in ("initializing", "pending", "scaling"):
+                    matched_status = "starting"
+                elif st in ("paused", "pausing"):
+                    matched_status = "cold"
                 elif st == "unknown":
                     matched_status = "offline"
                 else:
-                    matched_status = "starting"
+                    # Any other status = offline
+                    matched_status = "offline"
                 break
+        
         result[display_name] = matched_status
 
     return result
