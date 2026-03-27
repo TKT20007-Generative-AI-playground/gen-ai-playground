@@ -7,7 +7,7 @@ import { getTargetTab, saveCurrentTab, getDashboardTab, type PlaygroundTab, PLAY
 
 
 export default function Header() {
-  const { isLoggedIn, isAdmin, logout } = useAuth()
+  const { isLoggedIn, isAdmin, username, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -69,7 +69,12 @@ export default function Header() {
         </Group>
 
         {isLoggedIn ? (
+          <Group gap="md">
+          <Text fw={500} c="white">
+            {username}
+          </Text>
           <Button variant="white" color="dark" onClick={logout} style={{ flexShrink: 0 }}>Logout</Button>
+          </Group>
         ) : (
           <Button variant="white" color="dark" onClick={() => setLoginOpened(true)} style={{ flexShrink: 0 }}>Login</Button>
         )}
