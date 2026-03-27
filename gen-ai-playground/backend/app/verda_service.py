@@ -191,10 +191,13 @@ class VerdaService:
             cfg = self._parse_and_validate_template(template_name)
             compute_name, gpu_count = self._resolve_gpu(cfg, all_resources)
             
-            supports_thinking = (
-                cfg.sglang is not None
-                and cfg.sglang.reasoning_parser is not None
-            ) if hasattr(cfg, 'sglang') else False
+            supports_thinking = False
+            if cfg.model_mode in {"thinking", "hybrid"}:
+                supports_thinking = True
+            elif cfg.sglang is not None and cfg.sglang.reasoning_parser is not None:
+                supports_thinking = True
+            elif cfg.vllm is not None and cfg.vllm.reasoning_parser is not None:
+                supports_thinking = True
 
             results.append({
                 "value": display_name,
@@ -203,6 +206,7 @@ class VerdaService:
                 "tp": gpu_count,
                 "availability": compute_name,
                 "supports_thinking": supports_thinking,
+                "model_mode": cfg.model_mode,
             })
         return results
       
@@ -741,10 +745,25 @@ class VerdaService:
             "top_p": top_p,
         }
         if supports_thinking:
-            thinking_kwargs = {"enable_thinking": enable_thinking}
+            # Different runtimes/models expect either enable_thinking or thinking.
+            thinking_kwargs = {
+                "enable_thinking": enable_thinking,
+                "thinking": enable_thinking,
+            }
             if enable_thinking and thinking_budget is not None:
                 thinking_kwargs["thinking_budget"] = thinking_budget
+                # vLLM expects this sampling parameter name for reasoning budget control.
+                chat_data["thinking_token_budget"] = thinking_budget
+
+            # Keep direct fields for SGLang compatibility.
             chat_data["chat_template_kwargs"] = thinking_kwargs
+
+            # Also pass through OpenAI-style extra_body for runtimes that read overrides there.
+            chat_data["extra_body"] = {
+                "chat_template_kwargs": thinking_kwargs,
+            }
+            if enable_thinking and thinking_budget is not None:
+                chat_data["extra_body"]["thinking_token_budget"] = thinking_budget
 
         response = deployment.run_sync(
             chat_data,
@@ -753,19 +772,41 @@ class VerdaService:
 
         result = response.output()
 
-        # Extract assistant message from OpenAI-compatible response
+        # Extract assistant message + reasoning from OpenAI-compatible response.
         assistant_message = ""
+        reasoning_message: str | None = None
         if isinstance(result, dict) and "choices" in result:
             if result["choices"]:
                 message = result["choices"][0].get("message", {})
                 assistant_message = message.get("content") or ""
-                # If model returned reasoning content (eg Nemotron)
-                reasoning = message.get("reasoning_content")
-                if reasoning and not assistant_message:
-                    assistant_message = reasoning
+
+                # Prefer structured reasoning fields from runtime responses.
+                reasoning = message.get("reasoning")
+                if not reasoning:
+                    reasoning = message.get("reasoning_content")
+                if isinstance(reasoning, str) and reasoning.strip():
+                    reasoning_message = reasoning.strip()
+
+                # Fallback for runtimes that inline reasoning into content.
+                if isinstance(assistant_message, str) and "<think>" in assistant_message and "</think>" in assistant_message:
+                    start = assistant_message.find("<think>")
+                    end = assistant_message.find("</think>", start + len("<think>"))
+                    if start != -1 and end != -1:
+                        inline_reasoning = assistant_message[start + len("<think>"):end].strip()
+                        assistant_message = (
+                            assistant_message[:start] +
+                            assistant_message[end + len("</think>"):]
+                        ).strip()
+                        if inline_reasoning and not reasoning_message:
+                            reasoning_message = inline_reasoning
+
+                # Some models may return only reasoning when no final content is generated.
+                if not assistant_message and reasoning_message:
+                    assistant_message = reasoning_message
 
         return {
             "reply": assistant_message,
+            "reasoning": reasoning_message,
             "model": model_path,
             "usage": result.get("usage", {}) if isinstance(result, dict) else {},
             "raw_response": result,

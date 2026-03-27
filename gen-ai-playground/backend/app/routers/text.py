@@ -449,7 +449,12 @@ def chat_with_model(
     if template_name:
         cfg = get_template_configs().get(template_name)
         if cfg is not None:
-            supports_thinking = cfg.sglang is not None and cfg.sglang.reasoning_parser is not None
+            if cfg.model_mode in {"thinking", "hybrid"}:
+                supports_thinking = True
+            elif cfg.sglang is not None and cfg.sglang.reasoning_parser is not None:
+                supports_thinking = True
+            elif cfg.vllm is not None and cfg.vllm.reasoning_parser is not None:
+                supports_thinking = True
 
     # Chat
     try:
@@ -482,6 +487,7 @@ def chat_with_model(
 
         return ChatResponse(
             reply=result["reply"],
+            reasoning=result.get("reasoning"),
             model=result["model"],
             usage=result.get("usage", {}),
         )

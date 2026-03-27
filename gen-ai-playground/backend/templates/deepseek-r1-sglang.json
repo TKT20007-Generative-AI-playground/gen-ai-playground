@@ -1,9 +1,11 @@
 {
   "engine": "sglang",
   "model": "deepseek-ai/DeepSeek-R1-0528",
+  "name": "DeepSeek R1 · SGLang · FP8",
   "explanation": "DeepSeek R1 reinforcement learning model with FP8 quantization for efficient memory usage. Optimized for complex reasoning tasks with the DeepSeek-R1 parser.",
   "short_explanation": "DeepSeek R1 with FP8 and reasoning parser",
   "gpu_types": ["h100", "h200", "b200"],
+  "model_mode": "thinking",
   "model_loader_extra_config": {
     "enable_multithread_load": true,
     "num_threads": 64

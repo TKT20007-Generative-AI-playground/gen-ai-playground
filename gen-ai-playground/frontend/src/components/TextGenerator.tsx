@@ -19,13 +19,20 @@ type ModelOption = {
   value: string
   label: string
   supportsThinking: boolean
+  modelMode?: "thinking" | "hybrid" | "instruct" | null
 }
 
 type Message = {
   id: string
   role: "user" | "assistant"
   content: string
+  reasoning?: string | null
   modelLabel?: string
+}
+
+type ChatApiResponse = {
+  reply: string
+  reasoning?: string | null
 }
 
 type ModelStatus = "live" | "starting" | "offline" | "unknown"
@@ -99,7 +106,7 @@ type ChatPanelProps = {
   isBusy: boolean
   modelStatus: ModelStatus
   statusMessage: string | null
-  supportsThinking: boolean
+  thinkingMode?: "thinking" | "hybrid" | "instruct" | null
   enableThinking: boolean
   onToggleThinking: (enabled: boolean) => void
 }
@@ -112,7 +119,7 @@ function ChatPanel({
   isBusy,
   modelStatus,
   statusMessage,
-  supportsThinking,
+  thinkingMode,
   enableThinking,
   onToggleThinking,
 }: ChatPanelProps) {
@@ -163,7 +170,11 @@ function ChatPanel({
         <Button size="xs" color="orange" onClick={onClearMessages} disabled={isBusy}>
           Clear
         </Button>
-        {supportsThinking && (
+        {thinkingMode === "thinking" ? (
+          <Text size="xs" c="dimmed">
+            Thinking only
+          </Text>
+        ) : thinkingMode === "hybrid" ? (
           <Switch
             label="Thinking"
             size="xs"
@@ -171,7 +182,7 @@ function ChatPanel({
             onChange={(e) => onToggleThinking(e.currentTarget.checked)}
             disabled={isBusy}
           />
-        )}
+        ) : null}
       </div>
 
       <ScrollArea
@@ -214,6 +225,25 @@ function ChatPanel({
                 >
                   {message.content}
                 </Text>
+                {message.role === "assistant" && message.reasoning && (
+                  <details style={{ marginTop: "8px" }}>
+                    <summary style={{ cursor: "pointer", color: "#666", fontSize: "12px" }}>
+                      Show reasoning
+                    </summary>
+                    <Text
+                      size="xs"
+                      c="dimmed"
+                      mt={6}
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                        overflowWrap: "break-word",
+                      }}
+                    >
+                      {message.reasoning}
+                    </Text>
+                  </details>
+                )}
               </Paper>
             ))}
             {isLoading && (
@@ -277,10 +307,11 @@ export default function TextGenerator() {
           headers: getAuthHeaders(),
         })
         const models: ModelOption[] = (res.data.available_models ?? []).map(
-          (m: { value: string; label: string; supports_thinking?: boolean }) => ({
+          (m: { value: string; label: string; supports_thinking?: boolean; model_mode?: "thinking" | "hybrid" | "instruct" | null }) => ({
             value: m.value,
             label: m.label,
             supportsThinking: m.supports_thinking ?? false,
+            modelMode: m.model_mode ?? null,
           })
         )
         setModelOptions(models)
@@ -311,6 +342,15 @@ export default function TextGenerator() {
   }, [fetchStatuses, isLoggedIn])
 
   const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
+  const getModelOption = (value: string) => modelOptions.find((m) => m.value === value)
+  const getThinkingMode = (value: string) => getModelOption(value)?.modelMode ?? null
+  const isThinkingEnabled = (value: string) => {
+    const mode = getThinkingMode(value)
+    if (mode === "thinking") return true
+    if (mode === "instruct") return false
+    if (mode === "hybrid") return enableThinkingByModel[value] ?? false
+    return false
+  }
   const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
 
   /**
@@ -333,20 +373,22 @@ export default function TextGenerator() {
           max_tokens: maxTokens,
           temperature: 0.7,
           top_p: 0.9,
-          enable_thinking: enableThinkingByModel[modelValue] ?? false,
-          ...(enableThinkingByModel[modelValue] ? { thinking_budget: thinkingBudget } : {}),
+          enable_thinking: isThinkingEnabled(modelValue),
+          ...(isThinkingEnabled(modelValue) ? { thinking_budget: thinkingBudget } : {}),
         },
         { headers: getAuthHeaders() }
       )
 
-      const result = response.data
+      const result = response.data as ChatApiResponse
       const parsed = parseModelReply(result.reply)
-      if (parsed.thinking) console.log("Thinking:", parsed.thinking)
+      const reasoning = result.reasoning ?? parsed.thinking
+      if (reasoning) console.log("Thinking:", reasoning)
       const label = getModelLabel(modelValue)
       const withReply = messagesWithUser.concat({
         id: makeMessageId(),
         role: "assistant",
         content: parsed.actualReply,
+        reasoning,
         modelLabel: label,
       })
       setMessagesForModel(modelValue, withReply)
@@ -445,14 +487,14 @@ export default function TextGenerator() {
               setMaxTokens(next)
               setThinkingBudget((prev) => Math.min(prev, Math.max(1, next - 1)))
             }}
-            min={selectedModels.some((m) => enableThinkingByModel[m]) ? 2 : 1}
+            min={selectedModels.some((m) => isThinkingEnabled(m)) ? 2 : 1}
             max={32768}
             step={64}
             clampBehavior="strict"
             style={{ width: 180 }}
             disabled={isAnyLoading}
           />
-          {selectedModels.some((m) => enableThinkingByModel[m]) && (
+          {selectedModels.some((m) => isThinkingEnabled(m)) && (
             <NumberInput
               label="Thinking Budget"
               value={thinkingBudget}
@@ -502,7 +544,7 @@ export default function TextGenerator() {
                       isBusy={isAnyLoading}
                       modelStatus={modelStatuses[modelValue] ?? "unknown"}
                       statusMessage={statusMsgs[modelValue] ?? null}
-                      supportsThinking={modelOptions.find((m) => m.value === modelValue)?.supportsThinking ?? false}
+                      thinkingMode={getThinkingMode(modelValue)}
                       enableThinking={enableThinkingByModel[modelValue] ?? false}
                       onToggleThinking={(enabled) => {
                         setEnableThinkingByModel((prev) => ({ ...prev, [modelValue]: enabled }))
@@ -541,7 +583,7 @@ export default function TextGenerator() {
                   isBusy={isAnyLoading}
                   modelStatus={modelStatuses[modelValue] ?? "unknown"}
                   statusMessage={statusMsgs[modelValue] ?? null}
-                  supportsThinking={modelOptions.find((m) => m.value === modelValue)?.supportsThinking ?? false}
+                  thinkingMode={getThinkingMode(modelValue)}
                   enableThinking={enableThinkingByModel[modelValue] ?? false}
                   onToggleThinking={(enabled) => {
                     setEnableThinkingByModel((prev) => ({ ...prev, [modelValue]: enabled }))

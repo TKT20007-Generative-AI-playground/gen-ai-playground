@@ -59,6 +59,7 @@ class VLLMConfig(BaseModel):
     swap_space: Optional[int] = Field(default=None, ge=1)
     max_num_batched_tokens: Optional[int] = Field(default=None, ge=1)
     scheduling_policy: Optional[str] = None
+    reasoning_parser: Optional[str] = None
     
     
 
@@ -71,6 +72,8 @@ class TemplateConfig(BaseModel):
     # Common Fields (All Engines)
     engine: Literal["vllm", "sglang", "custom"]
     model: str
+    name: Optional[str] = None
+    model_mode: Optional[Literal["thinking", "hybrid", "instruct"]] = None
     trust_remote_code: Optional[bool] = None
     quantization: Optional[str] = None
     gpu_types: List[str] = Field(default_factory=list)

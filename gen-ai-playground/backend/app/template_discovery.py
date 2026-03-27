@@ -4,8 +4,9 @@ Auto-discover templates from the backend/templates/ directory.
 Scans *.json files, validates them through TemplateConfig, and builds
 a mapping of {template_filename: display_name}.
 
-Display names are derived from filenames: strip .json, capitalize first letter.
-Deployment names use the same stem in lowercase.
+Display names prefer the template "name" field when present; otherwise
+they fall back to filename-derived names. Deployment names use the
+same stem in lowercase.
 """
 import json
 from pathlib import Path
@@ -44,7 +45,8 @@ def discover_templates() -> tuple[dict[str, str], dict[str, TemplateConfig]]:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             cfg = TemplateConfig(**data)
-            names[path.name] = _display_name_from_filename(path.name)
+            display_name = cfg.name.strip() if cfg.name and cfg.name.strip() else _display_name_from_filename(path.name)
+            names[path.name] = display_name
             configs[path.name] = cfg
         except Exception:
             continue

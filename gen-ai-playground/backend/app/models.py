@@ -148,6 +148,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     """Response model for chat completions"""
     reply: str
+    reasoning: Optional[str] = None
     model: str
     usage: Dict[str, Any] = {}
 

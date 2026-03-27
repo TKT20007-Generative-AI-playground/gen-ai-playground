@@ -1,9 +1,11 @@
 {
   "engine": "sglang",
   "model": "meta-llama/Llama-3.1-8B-Instruct",
+  "name": "Llama 3.1 8B · SGLang · Single GPU",
   "explanation": "Llama 3.1 8B on single GPU with optimized memory settings. Uses 85% static memory fraction and 8K context length for efficient inference.",
   "short_explanation": "Llama 8B single GPU optimized",
   "gpu_types": ["h100", "h200", "b200", "a100", "l40s", "v100"],
+  "model_mode": "instruct",
   "sglang": {
     "tp": 1,
     "mem_fraction_static": 0.85,
