@@ -220,3 +220,9 @@ class HistoryResponseText(BaseModel):
     total: int
     page: int
     total_pages: int
+    
+class ConversationCreateRequest(BaseModel):
+    """Request model for creating a new conversation"""
+    title: Optional[str] = None
+    participants: Optional[List[str]] = None
+    initial_messages:Optional[list[dict]] = []

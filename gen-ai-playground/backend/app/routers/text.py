@@ -6,15 +6,18 @@ generate text completions, chat with the model, and clean up.
 """
 import math
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
+from flask import request
 from pymongo.database import Database
 from datetime import datetime, timezone
 from typing import Optional
 import time
+from bson import ObjectId
+import asyncio
 
 
 from app.database import get_database
-from app.dependencies import get_current_user, get_admin_user, validate_csrf_token
+from app.dependencies import get_current_user, get_current_user_ws, get_admin_user, validate_csrf_token
 from app.models import (
     HistoryResponseText,
     TextGenerateRequest,
@@ -25,15 +28,19 @@ from app.models import (
     DeploymentStatusResponse,
     ConnectDeploymentRequest,
     UserInfo,
+    ConversationCreateRequest,
 )
 from app.verda_service import verda_service
 from app.template_discovery import get_template_map, _deployment_name_from_filename
 from verda.containers import ContainerDeploymentStatus
+from app.connection_manager import ConnectionManager
+
 
 def _sanitize_slug(model_path: str) -> str:
     """Convert a model path to a deployment-name-compatible slug."""
     return model_path.split("/")[-1].lower().replace(".", "-")
 
+manager = ConnectionManager()
 
 router = APIRouter(
     prefix="/text",
@@ -631,4 +638,207 @@ def history(
     except Exception as e:
         print(f"Error getting history: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting history: {e}")
+    
+    
+@router.post("/conversations")
+async def create_conversation(
+    conversation: ConversationCreateRequest,
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user_ws),
+):
+    initial_messages = conversation.initial_messages or []
+    
+    username = cur_user.username
+    conversation = {
+        "title": conversation.title or "Untitled Conversation",
+        "participants": list(set(conversation.participants or []) | {username}),
+        "messages":initial_messages,
+        "created_at": datetime.utcnow(),
+    }
+    
+    participants = list(set(conversation.participants + [cur_user.username]))
 
+    conversation = {
+        "title": conversation.title or "New conversation",
+        "participants": participants,
+        "messages": [],
+        "created_by": cur_user.username,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
+
+    result = db.conversations.insert_one(conversation)
+
+    return {
+        "conversation_id": str(result.inserted_id),
+        "participants": participants,
+        "title": conversation["title"],
+        "created_at": conversation["created_at"],
+    }
+    
+    
+@router.websocket("/ws/conversations/{conversation_id}")
+async def conversation_ws(
+    websocket: WebSocket,
+    conversation_id: str,
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user_ws),
+):
+    username = cur_user.username
+    
+    conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    
+    if not conversation:
+        await websocket.close(code=1008)
+        return
+
+    if username not in conversation["participants"]:
+        await websocket.close(code=1008)
+        return
+    
+    await manager.connect(conversation_id, username, websocket)
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+
+            content = data.get("content")
+            model_key = data.get("model")
+
+            if not content:
+                continue
+
+          
+            # save user message to db
+           
+            user_message = {
+                "sender": username,
+                "role": "user",
+                "content": content,
+                "timestamp": datetime.utcnow(),
+            }
+
+            db.conversations.update_one(
+                {"_id": ObjectId(conversation_id)},
+                {"$push": {"messages": user_message}},
+            )
+
+         
+            # Broadcast user message to other participants
+            
+            await manager.broadcast(
+                conversation_id,
+                {
+                    "type": "message",
+                    **user_message,
+                },
+            )
+
+            # generate       
+            asyncio.create_task(
+                handle_llm_reply(
+                    conversation_id,
+                    model_key,
+                    db,
+                    cur_user,
+                )
+            )
+
+    except WebSocketDisconnect:
+        manager.disconnect(conversation_id, username)
+
+        await manager.broadcast(
+            conversation_id,
+            {
+                "type": "user_left",
+                "user": username,
+            },
+        )
+        
+async def handle_llm_reply(
+    conversation_id: str,
+    model_key: str,
+    db: Database,
+    user: UserInfo
+):
+    try:
+        # Fetch conversation
+        conversation = db.conversations.find_one(
+            {"_id": conversation_id}
+        )
+
+        if not conversation:
+            return
+
+        messages = conversation.get("messages", [])
+
+        await manager.broadcast(
+            conversation_id,
+            {
+                "type": "assistant_typing",
+            },
+        )
+        assistant_text = ""
+
+        async for chunk in llm_stream(
+            model=model_key,
+            messages=messages,
+            user=user.username,
+        ):
+            assistant_text += chunk
+
+            await manager.broadcast(
+                conversation_id,
+                {
+                    "type": "assistant_stream",
+                    "delta": chunk,
+                },
+            )
+
+        #save assistant message
+        assistant_message = {
+            "role": "assistant",
+            "content": assistant_text,
+        }
+
+        db.conversations.update_one(
+            {"_id": conversation_id},
+            {"$push": {"messages": assistant_message}},
+        )
+
+        #final message event
+        await manager.broadcast(
+            conversation_id,
+            {
+                "type": "assistant_done",
+                "message": assistant_message,
+            },
+        )
+
+    except Exception as e:
+        await manager.broadcast(
+            conversation_id,
+            {
+                "type": "error",
+                "message": str(e),
+            },
+        )
+        
+async def llm_stream(model: str, messages: list, user: str):
+
+    # fake streaming 
+    text = "Hello! This is a streamed response."
+
+    for token in text.split():
+        await asyncio.sleep(0.05)
+        yield token + " "
+
+
+
+    
+    
+    
+    
+    
+    
+    
