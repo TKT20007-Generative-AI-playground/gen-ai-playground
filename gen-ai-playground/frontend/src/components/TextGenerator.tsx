@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "re
 import { Alert, Button, MultiSelect, Paper, Text, ScrollArea, TextInput } from "@mantine/core"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
+import { ShareConversationModal } from "./SharedConversationsModal"
 
 type ModelOption = {
   value: string
@@ -100,6 +101,7 @@ type ChatPanelProps = {
   isBusy: boolean
   modelStatus: ModelStatus
   statusMessage: string | null
+  onShare: () => void
 }
 
 function ChatPanel({
@@ -110,6 +112,7 @@ function ChatPanel({
   isBusy,
   modelStatus,
   statusMessage,
+  onShare,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -159,6 +162,9 @@ function ChatPanel({
           Clear
         </Button>
       </div>
+      <Button size="xs" variant="light" onClick={onShare}>
+        Share conversation
+      </Button>
 
       <ScrollArea
         style={{
@@ -245,6 +251,9 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const [messagesByModel, setMessagesByModel] = useState<Record<string, Message[]>>({})
   const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
+
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareTargetModel, setShareTargetModel] = useState<string | null>(null)
 
   const sidebarOpen = opened
 
@@ -337,7 +346,6 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         },
         { headers: getAuthHeaders(), withCredentials: true },
       )
-
       const result = response.data
       const parsed = parseModelReply(result.reply)
       if (parsed.thinking) console.log("Thinking:", parsed.thinking)
@@ -345,13 +353,13 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
         message.id === pendingMessageId
           ? {
-              ...message,
-              content: parsed.actualReply,
-              modelLabel: label,
-              generationTimeMs: result.generation_time_ms ?? undefined,
-              isPending: false,
-              pendingStartTime: undefined,
-            }
+            ...message,
+            content: parsed.actualReply,
+            modelLabel: label,
+            generationTimeMs: result.generation_time_ms ?? undefined,
+            isPending: false,
+            pendingStartTime: undefined,
+          }
           : message,
       )
       setMessagesForModel(modelValue, replaced)
@@ -362,11 +370,11 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
         message.id === pendingMessageId
           ? {
-              ...message,
-              content: "Failed to generate a response.",
-              isPending: false,
-              pendingStartTime: undefined,
-            }
+            ...message,
+            content: "Failed to generate a response.",
+            isPending: false,
+            pendingStartTime: undefined,
+          }
           : message,
       )
       setMessagesForModel(modelValue, replaced)
@@ -435,6 +443,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const isBreakout = selectedModels.length > 2
   const dropdownData = buildDropdownData(modelOptions, modelStatuses)
 
+
   return (
     <div
       style={{
@@ -497,6 +506,10 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                   isBusy={isAnyLoading}
                   modelStatus={modelStatuses[modelValue] ?? "unknown"}
                   statusMessage={statusMsgs[modelValue] ?? null}
+                  onShare={() => {
+                    setShareTargetModel(modelValue)
+                    setShareModalOpen(true)
+                  }}
                 />
               ))}
             </div>
@@ -526,6 +539,10 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                   isBusy={isAnyLoading}
                   modelStatus={modelStatuses[modelValue] ?? "unknown"}
                   statusMessage={statusMsgs[modelValue] ?? null}
+                  onShare={() => {
+                    setShareTargetModel(modelValue)
+                    setShareModalOpen(true)
+                  }}
                 />
               ))}
             </div>
@@ -544,13 +561,22 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
             <Button
               onClick={generateText}
               disabled={!prompt.trim() || isAnyLoading}
-              loading={isAnyLoading}
+            loading={isAnyLoading}
             >
-              Send
-            </Button>
-          </div>
-        </>
-      )}
-    </div>
+            Send
+          </Button>
+        </div>
+    </>
+  )
+}
+<ShareConversationModal
+  opened={shareModalOpen}
+  onClose={() => setShareModalOpen(false)}
+  currentMessages={shareTargetModel ? (messagesByModel[shareTargetModel] ?? []) : []}
+  modelValue={shareTargetModel ?? ""}
+  backendUrl={backendUrl}
+/>
+    </div >
+  
   )
 }

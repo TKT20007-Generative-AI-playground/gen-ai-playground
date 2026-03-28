@@ -5,9 +5,7 @@ Provides endpoints to deploy an LLM on Verda, check deployment status,
 generate text completions, chat with the model, and clean up.
 """
 import math
-
 from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
-from flask import request
 from pymongo.database import Database
 from datetime import datetime, timezone
 from typing import Optional
@@ -644,38 +642,29 @@ def history(
 async def create_conversation(
     conversation: ConversationCreateRequest,
     db=Depends(get_database),
-    cur_user: UserInfo = Depends(get_current_user_ws),
+    cur_user: UserInfo = Depends(get_current_user),
 ):
-    initial_messages = conversation.initial_messages or []
-    
     username = cur_user.username
-    conversation = {
-        "title": conversation.title or "Untitled Conversation",
-        "participants": list(set(conversation.participants or []) | {username}),
-        "messages":initial_messages,
-        "created_at": datetime.utcnow(),
-    }
-    
-    participants = list(set(conversation.participants + [cur_user.username]))
+    participants = list(set(conversation.participants or []) | {username})
+    initial_messages = conversation.initial_messages or []
 
-    conversation = {
-        "title": conversation.title or "New conversation",
+    doc = {
+        "title": conversation.title or "Untitled Conversation",
         "participants": participants,
-        "messages": [],
-        "created_by": cur_user.username,
+        "messages": initial_messages,
+        "created_by": username,
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
     }
 
-    result = db.conversations.insert_one(conversation)
+    result = db.conversations.insert_one(doc)
 
     return {
         "conversation_id": str(result.inserted_id),
         "participants": participants,
-        "title": conversation["title"],
-        "created_at": conversation["created_at"],
+        "title": doc["title"],
+        "created_at": doc["created_at"],
     }
-    
     
 @router.websocket("/ws/conversations/{conversation_id}")
 async def conversation_ws(
