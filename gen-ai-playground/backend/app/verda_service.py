@@ -710,7 +710,6 @@ class VerdaService:
         temperature: float = 0.7,
         top_p: float = 0.9,
         enable_thinking: bool = False,
-        thinking_budget: int | None = None,
         supports_thinking: bool = False,
         deployment_name: str = "",
         model_path: str = "",
@@ -743,6 +742,7 @@ class VerdaService:
             "max_tokens": max_tokens,
             "temperature": temperature,
             "top_p": top_p,
+            "separate_reasoning": True,
         }
         if supports_thinking:
             # Different runtimes/models expect either enable_thinking or thinking.
@@ -750,10 +750,6 @@ class VerdaService:
                 "enable_thinking": enable_thinking,
                 "thinking": enable_thinking,
             }
-            if enable_thinking and thinking_budget is not None:
-                thinking_kwargs["thinking_budget"] = thinking_budget
-                # vLLM expects this sampling parameter name for reasoning budget control.
-                chat_data["thinking_token_budget"] = thinking_budget
 
             # Keep direct fields for SGLang compatibility.
             chat_data["chat_template_kwargs"] = thinking_kwargs
@@ -761,9 +757,8 @@ class VerdaService:
             # Also pass through OpenAI-style extra_body for runtimes that read overrides there.
             chat_data["extra_body"] = {
                 "chat_template_kwargs": thinking_kwargs,
+                "separate_reasoning": True,
             }
-            if enable_thinking and thinking_budget is not None:
-                chat_data["extra_body"]["thinking_token_budget"] = thinking_budget
 
         response = deployment.run_sync(
             chat_data,
@@ -800,9 +795,9 @@ class VerdaService:
                         if inline_reasoning and not reasoning_message:
                             reasoning_message = inline_reasoning
 
-                # Some models may return only reasoning when no final content is generated.
-                if not assistant_message and reasoning_message:
-                    assistant_message = reasoning_message
+                # Keep reasoning separate from final answer.
+                # If the model returns only reasoning and no final content,
+                # reply remains empty and reasoning is exposed via `reasoning`.
 
         return {
             "reply": assistant_message,

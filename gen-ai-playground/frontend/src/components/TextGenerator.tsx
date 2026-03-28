@@ -271,7 +271,6 @@ export default function TextGenerator() {
   const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
   const [maxTokens, setMaxTokens] = useState<number>(256)
-  const [thinkingBudget, setThinkingBudget] = useState<number>(1024)
   const [enableThinkingByModel, setEnableThinkingByModel] = useState<Record<string, boolean>>({})
 
   // Keep a ref so async loops always see the latest messages.
@@ -374,7 +373,6 @@ export default function TextGenerator() {
           temperature: 0.7,
           top_p: 0.9,
           enable_thinking: isThinkingEnabled(modelValue),
-          ...(isThinkingEnabled(modelValue) ? { thinking_budget: thinkingBudget } : {}),
         },
         { headers: getAuthHeaders() }
       )
@@ -485,7 +483,6 @@ export default function TextGenerator() {
             onChange={(val) => {
               const next = typeof val === "number" ? val : 256
               setMaxTokens(next)
-              setThinkingBudget((prev) => Math.min(prev, Math.max(1, next - 1)))
             }}
             min={selectedModels.some((m) => isThinkingEnabled(m)) ? 2 : 1}
             max={32768}
@@ -494,19 +491,6 @@ export default function TextGenerator() {
             style={{ width: 180 }}
             disabled={isAnyLoading}
           />
-          {selectedModels.some((m) => isThinkingEnabled(m)) && (
-            <NumberInput
-              label="Thinking Budget"
-              value={thinkingBudget}
-              onChange={(val) => setThinkingBudget(typeof val === "number" ? Math.min(val, maxTokens - 1) : Math.max(1, Math.floor(maxTokens * 0.8)))}
-              min={1}
-              max={maxTokens - 1}
-              step={64}
-              clampBehavior="strict"
-              style={{ width: 180 }}
-              disabled={isAnyLoading}
-            />
-          )}
         </Group>
       )}
 
@@ -551,7 +535,6 @@ export default function TextGenerator() {
                         if (enabled) {
                           const effectiveMax = Math.max(maxTokens, 2)
                           setMaxTokens(effectiveMax)
-                          setThinkingBudget(Math.max(1, Math.floor(effectiveMax * 0.8)))
                         }
                       }}
                     />
@@ -590,7 +573,6 @@ export default function TextGenerator() {
                     if (enabled) {
                       const effectiveMax = Math.max(maxTokens, 2)
                       setMaxTokens(effectiveMax)
-                      setThinkingBudget(Math.max(1, Math.floor(effectiveMax * 0.8)))
                     }
                   }}
                 />

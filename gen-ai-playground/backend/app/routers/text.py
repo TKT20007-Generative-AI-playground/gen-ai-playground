@@ -464,7 +464,6 @@ def chat_with_model(
             temperature=request.temperature,
             top_p=request.top_p,
             enable_thinking=request.enable_thinking,
-            thinking_budget=request.thinking_budget,
             supports_thinking=supports_thinking,
             deployment_name=deployment_name,
             model_path=model_path,
