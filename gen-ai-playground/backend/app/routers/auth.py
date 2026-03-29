@@ -57,7 +57,7 @@ def _set_refresh_cookie(response: Response, token: str, max_age: timedelta) -> N
         value=token,
         httponly=True,
         secure=settings.IS_PROD,
-        samesite="none" if settings.IS_PROD else "lax",
+        samesite="lax",
         max_age=int(max_age.total_seconds()),
         path="/refresh",
     )
@@ -69,7 +69,7 @@ def _set_csrf_cookie(response: Response, token: str, max_age: timedelta) -> None
         value=token,
         httponly=False,   # must be readable by frontend JS
         secure=settings.IS_PROD,
-        samesite="none" if settings.IS_PROD else "lax",
+        samesite="lax",
         max_age=int(max_age.total_seconds()),
     )
 
