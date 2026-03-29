@@ -34,6 +34,8 @@ __pycache__/
 *$py.class
 backend/.env
 
+.env
+
 # Node / Playwright
 node_modules/
 test-results/
