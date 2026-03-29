@@ -6,7 +6,7 @@ services:
     ports:
       - "0.0.0.0:8000:8000"
     environment:
-      - ALLOWED_ORIGINS=http://localhost:5173,http://${LOCAL_IP}:5173
+      - ALLOWED_ORIGINS=http://localhost:5173${LOCAL_IP:+,http://${LOCAL_IP}:5173}
       - MONGO_DB_URL=mongodb://mongodb:27017
       - JWT_SECRET_KEY=dev-secret-key-for-local-development
       - JWT_REFRESH_SECRET_KEY=dev-refresh-secret-key-for-local-development
@@ -40,7 +40,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.dev
     environment:
-      - VITE_API_URL=http://${LOCAL_IP}:8000
+      - VITE_API_URL=http://${LOCAL_IP:-localhost}:8000
     volumes:
       - ./frontend:/app          
       - /app/node_modules        
