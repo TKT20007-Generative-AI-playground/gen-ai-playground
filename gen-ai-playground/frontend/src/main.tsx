@@ -14,6 +14,13 @@ const theme = createTheme({
     fontFamily: "'Inter', sans-serif",
     fontWeight: "700",
   },
+  components: {
+    Select: {
+      styles: {
+        input: { fontSize: 16 },
+      },
+    },
+  },
 })
 
 createRoot(document.getElementById("root")!).render(

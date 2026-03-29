@@ -11,6 +11,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
 import HistorySidebar from "./components/HistorySidebar";
 import { useState, useCallback, useEffect } from "react";
+import { useMediaQuery } from "@mantine/hooks";
 import { useAuth } from "./context/AuthContext";
 import HistoryPage from "./pages/HistoryPage"
 import SharedChat from "./components/SharedChat"
@@ -27,6 +28,7 @@ function AppContent() {
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [resizing, setResizing] = useState(false);
   const auth = useAuth();
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   const startResize = () => setResizing(true);
 
@@ -60,7 +62,7 @@ function AppContent() {
       {!isDashboardRoute && <Header />}
 
       {/* Sidebar toggle button */}
-      {auth.isLoggedIn && !isDashboardRoute && (
+      {auth.isLoggedIn && !isMobile && (
         <button
           type="button"
           aria-label="Toggle history sidebar"
@@ -83,8 +85,8 @@ function AppContent() {
         </button>
       )}
 
-      <div style={{ display: "flex", minHeight: "100vh", height: "100%" }}>
-        {auth.isLoggedIn && isHistoryOpen && (
+      <div style={{ display: "flex", minHeight: "100dvh", height: "100%" }}>
+        {auth.isLoggedIn && historyOpen && !isMobile && (
           <div
             style={{
               width: sidebarWidth,

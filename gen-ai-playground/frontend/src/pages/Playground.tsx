@@ -46,6 +46,7 @@ export default function Playground({ historyOpen }: { historyOpen: boolean }) {
             if (value) navigate(`/playground/${value}`)
           }}
           data-testid="playground-select"
+          searchable
         />
       </Group>
 
