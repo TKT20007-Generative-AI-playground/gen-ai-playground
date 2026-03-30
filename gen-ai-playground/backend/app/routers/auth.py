@@ -5,7 +5,7 @@ Security Model:
 - Access token is returned in the response body and kept in-memory on the frontend
 - Refresh token is stored in an HTTPOnly cookie (path-scoped to /refresh)
 - CSRF token is a non-HTTPOnly cookie used for double-submit protection
-- Cookie settings: samesite="strict", secure=IS_PROD
+- Cookie settings: in prod: samesite="none", secure=IS_PROD
 """
 from fastapi import APIRouter, HTTPException, Depends, Response, Request
 from pymongo import ReturnDocument
@@ -57,7 +57,7 @@ def _set_refresh_cookie(response: Response, token: str, max_age: timedelta) -> N
         value=token,
         httponly=True,
         secure=settings.IS_PROD,
-        samesite="strict",
+        samesite="lax",
         max_age=int(max_age.total_seconds()),
         path="/refresh",
     )
@@ -69,7 +69,7 @@ def _set_csrf_cookie(response: Response, token: str, max_age: timedelta) -> None
         value=token,
         httponly=False,   # must be readable by frontend JS
         secure=settings.IS_PROD,
-        samesite="strict",
+        samesite="lax",
         max_age=int(max_age.total_seconds()),
     )
 
@@ -279,14 +279,14 @@ def logout(
     response.delete_cookie(
         key="refresh_token",
         httponly=True,
-        samesite="strict",
+        samesite="none" if settings.IS_PROD else "lax",
         secure=settings.IS_PROD,
         path="/refresh",
     )
     response.delete_cookie(
         key="csrf_token",
         httponly=False,
-        samesite="strict",
+        samesite="none" if settings.IS_PROD else "lax",
         secure=settings.IS_PROD,
     )
     return {"message": "Logged out successfully"}
