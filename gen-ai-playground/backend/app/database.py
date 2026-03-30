@@ -17,6 +17,7 @@ class DatabaseManager:
         self.db: Optional[Database] = None
         self._connect()
         self._seed_admin()
+        self._seed_invitation_code()
         self._create_indexes()
     
     def _connect(self):
@@ -69,6 +70,32 @@ class DatabaseManager:
             "created_at": datetime.utcnow()
         })
         print(f"Admin user '{settings.ADMIN_USERNAME}' created from environment.")
+
+    def _seed_invitation_code(self):
+        """Create invitation code from env var if not already present"""
+        if self.db is None:
+            return
+        if not settings.INVITATION_CODE:
+            print("INVITATION_CODE not set, skipping invitation seed.")
+            return
+
+        existing = self.db.invitation_codes.find_one({"code": settings.INVITATION_CODE})
+        if existing:
+            print(f"Invitation code '{settings.INVITATION_CODE}' already exists.")
+            return
+
+        now = datetime.utcnow()
+        self.db.invitation_codes.insert_one({
+            "code": settings.INVITATION_CODE,
+            "created_at": now,
+            "expires_at": datetime(2099, 1, 1),
+            "max_uses": 1000000,
+            "uses_count": 0,
+            "is_active": True,
+            "used_by": [],
+            "created_by": "system_startup"
+        })
+        print(f"Invitation code '{settings.INVITATION_CODE}' created from environment.")
     
     def _create_indexes(self):
         """Create database indexes for optimal query performance"""
