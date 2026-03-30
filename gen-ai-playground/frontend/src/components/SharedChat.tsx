@@ -16,6 +16,7 @@ type Message = {
     generationTimeMs?: number
     isPending?: boolean
     pendingStartTime?: number
+    title?: string
 }
 const getCsrfToken = (): string => {
     const value = `; ${document.cookie}`
@@ -47,6 +48,7 @@ export default function SharedChat() {
     const modelLabel: string = state?.modelLabel ?? modelValue
     const conversationId: string = state?.conversationId ?? paramId ?? ""
     const initialMessages: Message[] = state?.initialMessages ?? []
+    const [chatTitle, setChatTitle] = useState(state?.title ?? "")
 
     const [prompt, setPrompt] = useState("")
     const [isTyping, setIsTyping] = useState(false)
@@ -112,6 +114,7 @@ export default function SharedChat() {
                     `${backendUrl}/text/conversation-history/${conversationId}`,
                     { headers: getAuthHeaders(), withCredentials: true }
                 )
+                setChatTitle(res.data.title ?? "")
                 const historical: Message[] = (res.data.messages ?? []).map((m: any) => ({
                     id: makeMessageId(),
                     role: m.role,
@@ -278,7 +281,7 @@ export default function SharedChat() {
                     Shared Chat
                 </Text>
                 <Badge variant="light" color="blue" size="md">
-                    {modelLabel}
+                    {chatTitle.split(" – ")[1] ?? modelLabel}
                 </Badge>
             </div>
 
