@@ -1,23 +1,23 @@
 from fastapi import WebSocket
 from typing import Dict
+import json
 
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: Dict[str, WebSocket] = {}
+        self.active_connections: Dict[str, Dict[str, WebSocket]] = {}
 
-    async def connect(self, websocket: WebSocket, client_id: str):
-        await websocket.accept()
-        self.active_connections[client_id] = websocket
+    async def connect(self, conversation_id: str, username: str, websocket: WebSocket):
+        if conversation_id not in self.active_connections:
+            self.active_connections[conversation_id] = {}
+        self.active_connections[conversation_id][username] = websocket
 
-    def disconnect(self, client_id: str):
-        if client_id in self.active_connections:
-            del self.active_connections[client_id]
+    def disconnect(self, conversation_id: str, username: str):
+        if conversation_id in self.active_connections:
+            self.active_connections[conversation_id].pop(username, None)
+            if not self.active_connections[conversation_id]:
+                del self.active_connections[conversation_id]
 
-    async def send_message(self, message: str, client_id: str):
-        if client_id in self.active_connections:
-            websocket = self.active_connections[client_id]
-            await websocket.send_text(message)
-
-    async def broadcast(self, message: str):
-        for connection in self.active_connections.values():
-            await connection.send_text(message)
+    async def broadcast(self, conversation_id: str, message: dict):
+        connections = self.active_connections.get(conversation_id, {})
+        for websocket in connections.values():
+            await websocket.send_json(message)

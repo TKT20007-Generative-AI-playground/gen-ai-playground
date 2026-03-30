@@ -5,6 +5,7 @@ Provides endpoints to deploy an LLM on Verda, check deployment status,
 generate text completions, chat with the model, and clean up.
 """
 import math
+import secrets
 from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
 from pymongo.database import Database
 from datetime import datetime, timezone
@@ -15,7 +16,7 @@ import asyncio
 
 
 from app.database import get_database
-from app.dependencies import get_current_user, get_current_user_ws, get_admin_user, validate_csrf_token
+from app.dependencies import get_current_user, verify_token, get_admin_user, validate_csrf_token
 from app.models import (
     HistoryResponseText,
     TextGenerateRequest,
@@ -653,6 +654,7 @@ async def create_conversation(
         "participants": participants,
         "messages": initial_messages,
         "created_by": username,
+        "invite_code": secrets.token_hex(8),
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
     }
@@ -663,20 +665,89 @@ async def create_conversation(
         "conversation_id": str(result.inserted_id),
         "participants": participants,
         "title": doc["title"],
+        "invite_code": doc["invite_code"],
         "created_at": doc["created_at"],
     }
-    
-@router.websocket("/ws/conversations/{conversation_id}")
-async def conversation_ws(
-    websocket: WebSocket,
+
+
+@router.post("/conversations/{conversation_id}/join")
+def join_conversation(
+    conversation_id: str,
+    body: dict,
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if cur_user.username not in conversation["participants"]:
+        if body.get("invite_code") != conversation.get("invite_code"):
+            raise HTTPException(status_code=403, detail="Invalid invite code")
+
+    db.conversations.update_one(
+        {"_id": ObjectId(conversation_id)},
+        {"$addToSet": {"participants": cur_user.username}},
+    )
+    return {"ok": True}
+
+
+@router.get("/conversations/{conversation_id}/check-participant")
+def check_participant(
     conversation_id: str,
     db=Depends(get_database),
-    cur_user: UserInfo = Depends(get_current_user_ws),
+    cur_user: UserInfo = Depends(get_current_user),
 ):
-    username = cur_user.username
-    
     conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if cur_user.username not in conversation["participants"]:
+        raise HTTPException(status_code=403, detail="Not a participant")
+    return {"ok": True}
+
+
+@router.get("/conversation-history/{conversation_id}")
+def conversation_history(
+    conversation_id: str,
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if cur_user.username not in conversation["participants"]:
+        raise HTTPException(status_code=403, detail="Not a participant of this conversation")
+
+    return {
+        "messages": conversation.get("messages", []),
+        "title": conversation.get("title", "Untitled Conversation"),
+    }
     
+
+@router.websocket("/ws/conversations/{conversation_id}")
+async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends(get_database)):
+    await websocket.accept()
+
+    try:
+        auth_data = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
+    except asyncio.TimeoutError:
+        await websocket.close(code=1008)
+        return
+
+    if auth_data.get("type") != "auth":
+        await websocket.close(code=1008)
+        return
+
+    user = verify_token(auth_data.get("token", ""), db)
+    if not user:
+        await websocket.close(code=1008)
+        return
+
+
+    username = user.username
+
+    conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
     if not conversation:
         await websocket.close(code=1008)
         return
@@ -684,7 +755,8 @@ async def conversation_ws(
     if username not in conversation["participants"]:
         await websocket.close(code=1008)
         return
-    
+
+    await websocket.send_json({"type": "auth_ok"})
     await manager.connect(conversation_id, username, websocket)
 
     try:
@@ -704,7 +776,7 @@ async def conversation_ws(
                 "sender": username,
                 "role": "user",
                 "content": content,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.utcnow().isoformat(),
             }
 
             db.conversations.update_one(
@@ -729,7 +801,7 @@ async def conversation_ws(
                     conversation_id,
                     model_key,
                     db,
-                    cur_user,
+                    user,
                 )
             )
 
@@ -753,7 +825,7 @@ async def handle_llm_reply(
     try:
         # Fetch conversation
         conversation = db.conversations.find_one(
-            {"_id": conversation_id}
+        {"_id": ObjectId(conversation_id)}  
         )
 
         if not conversation:
@@ -791,7 +863,7 @@ async def handle_llm_reply(
         }
 
         db.conversations.update_one(
-            {"_id": conversation_id},
+            {"_id": ObjectId(conversation_id)},
             {"$push": {"messages": assistant_message}},
         )
 

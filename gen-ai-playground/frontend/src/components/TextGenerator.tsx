@@ -2,10 +2,11 @@ import axios from "axios"
 import { useAuth } from "../context/AuthContext"
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
 
-import { Alert, Button, MultiSelect, Paper, Text, ScrollArea, TextInput } from "@mantine/core"
+import { Alert, Button, MultiSelect, Paper, Text, ScrollArea, TextInput, Modal } from "@mantine/core"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { ShareConversationModal } from "./SharedConversationsModal"
+import { useNavigate } from "react-router-dom"
 
 type ModelOption = {
   value: string
@@ -272,6 +273,23 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
   const [statusMsgs, setStatusMsgs] = useState<Record<string, string | null>>({})
 
+  const [joinModalOpen, setJoinModalOpen] = useState(false)
+  const [joinId, setJoinId] = useState("")
+  const navigate = useNavigate()
+
+  const handleJoin = () => {
+    const input = joinId.trim()
+    if (!input) return
+    const id = input.split("/").pop() ?? input
+
+    setJoinModalOpen(false)
+    setJoinId("")
+    navigate(`/chat/conversations/${id}`, {
+      state: { conversationId: id, modelValue: "", modelLabel: "Assistant" }
+    })
+  }
+
+
   // Fetch available models from backend
   useEffect(() => {
     if (!isLoggedIn) return
@@ -287,6 +305,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
             label: m.label,
           }),
         )
+        models.push({ value: "fakeModel", label: "fakeModel" })
         setModelOptions(models)
       } catch {
         // silent
@@ -302,7 +321,8 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         headers: getAuthHeaders(),
         withCredentials: true,
       })
-      setModelStatuses(res.data)
+
+      setModelStatuses({ ...res.data, fakeModel: "live" })
     } catch {
       // silent
     }
@@ -472,6 +492,27 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         clearable
         disabled={isAnyLoading}
       />
+      <Button variant="light" onClick={() => setJoinModalOpen(true)}>
+        Join conversation
+      </Button>
+
+      <Modal
+        opened={joinModalOpen}
+        onClose={() => setJoinModalOpen(false)}
+        title="Join conversation"
+        size="sm"
+      >
+        <TextInput
+          label="Coversation Link"
+          placeholder="Paste conversation link here..."
+          value={joinId}
+          onChange={e => setJoinId(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") handleJoin() }}
+        />
+        <Button fullWidth mt="md" onClick={handleJoin} disabled={!joinId.trim()}>
+          Join
+        </Button>
+      </Modal>
 
       {selectedModels.length > 0 && (
         <>
@@ -561,22 +602,22 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
             <Button
               onClick={generateText}
               disabled={!prompt.trim() || isAnyLoading}
-            loading={isAnyLoading}
+              loading={isAnyLoading}
             >
-            Send
-          </Button>
-        </div>
-    </>
-  )
-}
-<ShareConversationModal
-  opened={shareModalOpen}
-  onClose={() => setShareModalOpen(false)}
-  currentMessages={shareTargetModel ? (messagesByModel[shareTargetModel] ?? []) : []}
-  modelValue={shareTargetModel ?? ""}
-  backendUrl={backendUrl}
-/>
+              Send
+            </Button>
+          </div>
+        </>
+      )
+      }
+      <ShareConversationModal
+        opened={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        currentMessages={shareTargetModel ? (messagesByModel[shareTargetModel] ?? []) : []}
+        modelValue={shareTargetModel ?? ""}
+        backendUrl={backendUrl}
+      />
     </div >
-  
+
   )
 }

@@ -65,68 +65,18 @@ def get_current_user(
             detail=f"Authentication failed: {str(e)}"
         )
 
-async def get_current_user_ws(
-    websocket: WebSocket,
-    db: Database = Depends(get_database)
-) -> UserInfo:
-    """
-    WebSocket version of get_current_user.
-    """
-
-    token = None
-
-    auth_header = websocket.headers.get("authorization")
-
-    if auth_header and auth_header.startswith("Bearer "):
-        token = auth_header.replace("Bearer ", "")
-
-    if not token:
-        token = websocket.query_params.get("token")
-
-    if not token:
-        await websocket.close(code=1008)
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    try:   
-        # Decode JWT
-        payload = jwt.decode(
-            token,
-            settings.JWT_SECRET_KEY,
-            algorithms=["HS256"],
-        )
-
+def verify_token(token: str, db) -> UserInfo | None:
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
         username = payload.get("username")
-
         if not username:
-            await websocket.close(code=1008)
-            raise HTTPException(status_code=401, detail="Invalid token")
-
-        # Verify DB user
+            return None
         user = db.users.find_one({"username": username})
-
         if not user:
-            await websocket.close(code=1008)
-            raise HTTPException(status_code=401, detail="User not found")
-
-        return UserInfo(
-            username=username,
-            is_admin=user.get("is_admin", False),
-        )
-
-    except jwt.ExpiredSignatureError:
-        await websocket.close(code=1008)
-        raise HTTPException(status_code=401, detail="Token has expired")
-
-    except jwt.InvalidTokenError:
-        await websocket.close(code=1008)
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-    except Exception as e:
-        await websocket.close(code=1008)
-        raise HTTPException(
-            status_code=401,
-            detail=f"Authentication failed: {str(e)}",
-        )
+            return None
+        return UserInfo(username=username, is_admin=user.get("is_admin", False))
+    except Exception:
+        return None
 
 def validate_csrf_token(
     csrf_cookie: str = Cookie(None, alias="csrf_token"),
