@@ -50,6 +50,8 @@ export default function SharedChat() {
     const initialMessages: Message[] = state?.initialMessages ?? []
     const [chatTitle, setChatTitle] = useState(state?.title ?? "")
 
+    const currentModelRef = useRef<string>(state?.modelValue ?? "")
+
     const [prompt, setPrompt] = useState("")
     const [isTyping, setIsTyping] = useState(false)
     const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -115,6 +117,7 @@ export default function SharedChat() {
                     { headers: getAuthHeaders(), withCredentials: true }
                 )
                 setChatTitle(res.data.title ?? "")
+                currentModelRef.current = res.data.model ?? state?.modelValue ?? ""
                 const historical: Message[] = (res.data.messages ?? []).map((m: any) => ({
                     id: makeMessageId(),
                     role: m.role,
@@ -234,10 +237,9 @@ export default function SharedChat() {
 
         const userMsg: Message = { id: makeMessageId(), role: "user", content: text }
         updateMessages([...messagesRef.current, userMsg])
-
         wsRef.current.send(JSON.stringify({
             content: text,
-            model: modelValue,
+            model: currentModelRef.current,
         }))
     }
 

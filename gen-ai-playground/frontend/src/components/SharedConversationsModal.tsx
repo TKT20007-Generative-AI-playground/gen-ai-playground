@@ -63,6 +63,7 @@ export function ShareConversationModal({
                         role: m.role,
                         content: m.content,
                     })),
+                    model_key: modelValue,
                 },
                 {
                     headers: {

@@ -648,12 +648,16 @@ async def create_conversation(
     username = cur_user.username
     participants = list(set(conversation.participants or []) | {username})
     initial_messages = conversation.initial_messages or []
+    model_key = conversation.model_key or "default"
+    
+    print(f"Creating conversation titled '{conversation.title}' with participants: {participants} and initial messages: {initial_messages}, model_key: {model_key} ")
 
     doc = {
         "title": conversation.title or "Untitled Conversation",
         "participants": participants,
         "messages": initial_messages,
         "created_by": username,
+        "model": model_key,
         "invite_code": secrets.token_hex(8),
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
@@ -665,6 +669,7 @@ async def create_conversation(
         "conversation_id": str(result.inserted_id),
         "participants": participants,
         "title": doc["title"],
+        "model": model_key,
         "invite_code": doc["invite_code"],
         "created_at": doc["created_at"],
     }
@@ -722,6 +727,7 @@ def conversation_history(
     return {
         "messages": conversation.get("messages", []),
         "title": conversation.get("title", "Untitled Conversation"),
+        "model": conversation.get("model", "default"),
     }
     
 
@@ -819,80 +825,91 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
 async def handle_llm_reply(
     conversation_id: str,
     model_key: str,
-    db: Database,
-    user: UserInfo
+    db: Database = Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
 ):
-    try:
-        # Fetch conversation
-        conversation = db.conversations.find_one(
-        {"_id": ObjectId(conversation_id)}  
-        )
 
+    try:
+        conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
         if not conversation:
             return
 
-        messages = conversation.get("messages", [])
+        messages = [
+            {"role": m["role"], "content": m["content"]}
+            for m in conversation.get("messages", [])
+        ]
 
-        await manager.broadcast(
-            conversation_id,
-            {
-                "type": "assistant_typing",
-            },
-        )
-        assistant_text = ""
+        template_name = _resolve_template_name(model_key)
+        expected_dep = _deployment_name_from_filename(template_name) if template_name else None
 
-        async for chunk in llm_stream(
-            model=model_key,
-            messages=messages,
-            user=user.username,
-        ):
-            assistant_text += chunk
+        try:
+            deployments = verda_service.list_deployments()
+        except Exception as e:
+            await manager.broadcast(conversation_id, {"type": "error", "message": "Could not reach deployment service."})
+            return
 
-            await manager.broadcast(
-                conversation_id,
-                {
-                    "type": "assistant_stream",
-                    "delta": chunk,
-                },
+        existing = None
+        for d in deployments:
+            if expected_dep and d.get("name", "").lower() == expected_dep:
+                existing = d
+                break
+
+        if not existing:
+            await manager.broadcast(conversation_id, {"type": "error", "message": f"Model {model_key} is not deployed."})
+            return
+
+        deployment_name = existing["name"]
+
+        try:
+            client = verda_service._get_client()
+            dep_status = client.containers.get_deployment_status(deployment_name)
+            status_str = dep_status.value if hasattr(dep_status, "value") else str(dep_status)
+            if status_str != "healthy":
+                await manager.broadcast(conversation_id, {"type": "error", "message": f"Model not healthy: {status_str}"})
+                return
+        except Exception as e:
+            await manager.broadcast(conversation_id, {"type": "error", "message": f"Failed to check deployment: {str(e)}"})
+            return
+
+        await manager.broadcast(conversation_id, {"type": "assistant_typing"})
+
+        # chat
+        try:
+            model_path = choose_text_model_path(model_key)
+            result = await asyncio.to_thread(
+                verda_service.chat,
+                messages=messages,
+                max_tokens=256,
+                temperature=0.7,
+                top_p=0.9,
+                deployment_name=deployment_name,
+                model_path=model_path,
             )
+            assistant_text = result["reply"]
+        except Exception as e:
+            await manager.broadcast(conversation_id, {"type": "error", "message": str(e)})
+            return
 
-        #save assistant message
-        assistant_message = {
-            "role": "assistant",
-            "content": assistant_text,
-        }
-
+        
+        assistant_message = {"role": "assistant", "content": assistant_text}
         db.conversations.update_one(
             {"_id": ObjectId(conversation_id)},
             {"$push": {"messages": assistant_message}},
         )
 
-        #final message event
-        await manager.broadcast(
-            conversation_id,
-            {
-                "type": "assistant_done",
-                "message": assistant_message,
-            },
-        )
+        await manager.broadcast(conversation_id, {"type": "assistant_done", "message": assistant_message})
 
     except Exception as e:
-        await manager.broadcast(
-            conversation_id,
-            {
-                "type": "error",
-                "message": str(e),
-            },
-        )
+        await manager.broadcast(conversation_id, {"type": "error", "message": str(e)})
         
-async def llm_stream(model: str, messages: list, user: str):
+# async def llm_stream(model: str, messages: list, user: str):
 
-    # fake streaming 
-    text = "Hello! This is a streamed response."
+#     # fake streaming 
+#     text = "Hello! This is a streamed response."
 
-    for token in text.split():
-        await asyncio.sleep(0.05)
-        yield token + " "
+#     for token in text.split():
+#         await asyncio.sleep(0.05)
+#         yield token + " "
 
 
 

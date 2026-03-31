@@ -225,4 +225,5 @@ class ConversationCreateRequest(BaseModel):
     """Request model for creating a new conversation"""
     title: Optional[str] = None
     participants: Optional[List[str]] = None
+    model_key: Optional[str] = None
     initial_messages:Optional[list[dict]] = []
