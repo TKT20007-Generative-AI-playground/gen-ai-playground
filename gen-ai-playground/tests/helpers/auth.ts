@@ -16,20 +16,28 @@ export type TestUser = {
   password: string;
 };
 
-export function createTestUser(prefix = "pw"): TestUser {
-  const unique = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+function toAlphanumeric(value: string): string {
+  return value.replace(/[^a-zA-Z0-9]/g, "");
+}
 
+function createUsername(prefix: string): string {
+  const safePrefix = toAlphanumeric(prefix) || "pw";
+  const timestampPart = Date.now().toString(36);
+  const randomPart = Math.random().toString(36).slice(2, 10);
+  return `${safePrefix}${timestampPart}${randomPart}`;
+}
+
+export function createTestUser(prefix = "pw"): TestUser {
   return {
-    username: `${prefix}_${unique}`,
+    username: createUsername(prefix),
     password: 'ValidPass1234!',
   };
 }
 
-export function createValidRegisterUser(prefix = "pw_register"): TestUser {
-  const unique = `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+export function createValidRegisterUser(prefix = "pwregister"): TestUser {
 
   return {
-    username: `${prefix}_${unique}`,
+    username: createUsername(prefix),
     password: "ValidPass1!",
   };
 }
@@ -60,7 +68,7 @@ export async function registerViaAPI(
 
 export async function createAndRegisterUser(
   request: APIRequestContext,
-  prefix = "pw_login",
+  prefix = "pwlogin",
 ): Promise<TestUser> {
   const user = createTestUser(prefix);
   return registerViaAPI(request, user);

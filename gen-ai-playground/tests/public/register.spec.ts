@@ -102,14 +102,14 @@ test.describe("Register", () => {
     await expect(page).toHaveURL(/\/register$/);
   });
 
-  test('shows "Server unreachable" on network failure', async ({ page }) => {
+  test('shows "Registration failed" on network failure', async ({ page }) => {
     await gotoRegisterPage(page);
-    const user = createValidRegisterUser("pw_register_netfail");
+    const user = createValidRegisterUser("networkfailure");
     await page.route("**/register", async (route) => {
       await route.abort();
     });
     await fillRegisterForm(page, user, INVITATION_CODE);
     await submitRegister(page);
-    await expect(page.getByText("Server unreachable")).toBeVisible();
+    await expect(page.getByText("Registration failed")).toBeVisible();
   });
 });
