@@ -2,6 +2,8 @@
 
 We did Start Stop Continue for our retro.
 
+<img width="1230" height="331" alt="image" src="https://github.com/user-attachments/assets/0472e00d-d339-42d1-aa52-9441d3725e4d" />
+
 # Start
 - Start paying attention to AI slop imports, meaning sometimes AI makes completely unnecessary changes that just moves for example dependencies in to a different order
 - Start making branches public from the get go, push the branch visible to others when you start working on it.
