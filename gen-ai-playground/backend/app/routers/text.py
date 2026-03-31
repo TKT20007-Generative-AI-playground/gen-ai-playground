@@ -904,16 +904,16 @@ async def handle_llm_reply(
     except Exception as e:
         await manager.broadcast(conversation_id, {"type": "error", "message": str(e)})
         
-# async def llm_stream(model: str, messages: list, user: str):
 
-#     # fake streaming 
-#     text = "Hello! This is a streamed response."
-
-#     for token in text.split():
-#         await asyncio.sleep(0.05)
-#         yield token + " "
-
-
+@router.get("/all-conversations")
+def all_conversations(
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    conversations = list(db.conversations.find({"participants": cur_user.username}))
+    for c in conversations:
+        c["_id"] = str(c["_id"])
+    return {"conversations": conversations}
 
     
     

@@ -35,3 +35,18 @@ export interface TextRecord {
   }
   generation_time_ms?: number
 }
+
+export interface ConversationMessage {
+  role: string
+  content: string
+  sender: string 
+}
+
+export interface ConversationRecord {
+    _id: string
+    title: string
+    participants: string[]
+    model: string
+    messages: ConversationMessage[]
+    timestamp: string
+}
