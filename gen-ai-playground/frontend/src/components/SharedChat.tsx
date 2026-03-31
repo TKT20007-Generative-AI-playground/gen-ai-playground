@@ -1,6 +1,6 @@
 import { useAuth } from "../context/AuthContext"
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react"
-import { Alert, Badge, Button, Paper, ScrollArea, Text, TextInput } from "@mantine/core"
+import { Alert, Badge, Button, Checkbox, Paper, ScrollArea, Text, TextInput } from "@mantine/core"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { useLocation, useParams, useSearchParams } from "react-router-dom"
@@ -51,6 +51,7 @@ export default function SharedChat() {
     const [chatTitle, setChatTitle] = useState(state?.title ?? "")
 
     const currentModelRef = useRef<string>(state?.modelValue ?? "")
+    const [noAI, setNoAI] = useState(false);
 
     const [prompt, setPrompt] = useState("")
     const [isTyping, setIsTyping] = useState(false)
@@ -98,7 +99,7 @@ export default function SharedChat() {
             `${backendUrl}/text/conversations/${conversationId}/check-participant`,
             { headers: getAuthHeaders(), withCredentials: true }
         ).then(() => {
-            setJoined(true) 
+            setJoined(true)
         }).catch(() => {
             const code = searchParams.get("invite") ?? state?.invCode
             if (code) handleJoin(code)
@@ -240,6 +241,7 @@ export default function SharedChat() {
         wsRef.current.send(JSON.stringify({
             content: text,
             model: currentModelRef.current,
+            noAI: noAI, // if true, backend will not involve the AI and just broadcast the message to other participants
         }))
     }
 
@@ -366,13 +368,19 @@ export default function SharedChat() {
             </ScrollArea>
 
             {/* Input */}
-            <div style={{ display: "flex", gap: "10px" }}>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                 <TextInput
                     style={{ flex: 1, minWidth: 0 }}
                     placeholder="Type a message..."
                     value={prompt}
                     onChange={e => setPrompt(e.target.value)}
                     onKeyDown={handleKeyDown}
+                    disabled={isTyping}
+                />
+                <Checkbox
+                    label="Don't involve AI"
+                    checked={noAI}
+                    onChange={e => setNoAI(e.currentTarget.checked)}
                     disabled={isTyping}
                 />
                 <Button onClick={sendMessage} disabled={!prompt.trim() || isTyping} loading={isTyping}>

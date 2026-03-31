@@ -771,6 +771,7 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
 
             content = data.get("content")
             model_key = data.get("model")
+            no_ai = data.get("noAI", False)
 
             if not content:
                 continue
@@ -801,15 +802,16 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
                 },
             )
 
-            # generate       
-            asyncio.create_task(
-                handle_llm_reply(
-                    conversation_id,
-                    model_key,
-                    db,
-                    user,
+            # generate
+            if not no_ai:
+                asyncio.create_task(
+                    handle_llm_reply(
+                        conversation_id,
+                        model_key,
+                        db,
+                        user,
+                    )
                 )
-            )
 
     except WebSocketDisconnect:
         manager.disconnect(conversation_id, username)
