@@ -1,78 +1,104 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom"
-import { Group, Button, Text, Divider } from "@mantine/core"
+import { Group, Button, Text, Divider, Burger, Drawer, Stack } from "@mantine/core"
 import { useAuth } from "../context/AuthContext"
 import { getTargetTab, type DashboardTab, saveDashboardTab } from "../constants/tabs"
+import { useState } from "react"
+import { useMediaQuery } from "@mantine/hooks"
 
 export default function DashboardLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { logout } = useAuth()
 
-  // Save current dashboard tab and navigate to playground
+  const [opened, setOpened] = useState(false)
+
+  // Mantine v7: tämä korvaa MediaQueryn
+  const isMobile = useMediaQuery("(max-width: 768px)")
+
   const handlePlaygroundClick = () => {
-    // Determine current dashboard tab from location
     const path = location.pathname
     let currentTab: DashboardTab = 'containers'
-    if (path === '/dashboard/invitations') {
-      currentTab = 'invitations'
-    } else if (path === '/dashboard/users') {
-      currentTab = 'users'
-    }
+    if (path === '/dashboard/invitations') currentTab = 'invitations'
+    if (path === '/dashboard/users') currentTab = 'users'
+
     saveDashboardTab(currentTab)
-    
-    // Navigate to the last used playground tab, defaulting to ImageGenerator
     const targetTab = getTargetTab()
     navigate(`/playground/${targetTab}`)
   }
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa" }}>
-      {/* Top Bar - Same style as main Header */}
       <Group justify="space-between" p="md" bg="linear-gradient(135deg, #000F65, #0b1328)" style={{ position: "sticky", top: 0, zIndex: 100 }}>
+        
         <Group gap="md">
-          <Button variant="white" color="dark" onClick={handlePlaygroundClick} style={{ flexShrink: 0 }}>
+          <Button variant="white" color="dark" onClick={handlePlaygroundClick}>
             ← Playground
           </Button>
-          <Text fw={500} c="white" style={{ flexShrink: 0 }}>Generative AI Playground</Text>
-          <Button
-            component={Link}
-            to="/dashboard/containers"
-            variant={location.pathname.includes("/dashboard/containers") ? "filled" : "white"}
-            color={location.pathname.includes("/dashboard/containers") ? "blue" : "dark"}
-            style={{ flexShrink: 0 }}
-          >
-            Containers
-          </Button>
-          <Button
-            component={Link}
-            to="/dashboard/invitations"
-            variant={location.pathname.includes("/dashboard/invitations") ? "filled" : "white"}
-            color={location.pathname.includes("/dashboard/invitations") ? "blue" : "dark"}
-            style={{ flexShrink: 0 }}
-          >
-            Invitations
-          </Button>
-          <Button
-            component={Link}
-            to="/dashboard/users"
-            variant={location.pathname.includes("/dashboard/users") ? "filled" : "white"}
-            color={location.pathname.includes("/dashboard/users") ? "blue" : "dark"}
-            style={{ flexShrink: 0 }}
-          >
-            Users
-          </Button>
+
+          <Text fw={500} c="white">Generative AI Playground</Text>
+
+          {/* DESKTOP NAVIGATION */}
+          {!isMobile && (
+            <Group gap="md">
+              <Button
+                component={Link}
+                to="/dashboard/containers"
+                variant={location.pathname.includes("/dashboard/containers") ? "filled" : "white"}
+                color={location.pathname.includes("/dashboard/containers") ? "blue" : "dark"}
+              >
+                Containers
+              </Button>
+
+              <Button
+                component={Link}
+                to="/dashboard/invitations"
+                variant={location.pathname.includes("/dashboard/invitations") ? "filled" : "white"}
+                color={location.pathname.includes("/dashboard/invitations") ? "blue" : "dark"}
+              >
+                Invitations
+              </Button>
+
+              <Button
+                component={Link}
+                to="/dashboard/users"
+                variant={location.pathname.includes("/dashboard/users") ? "filled" : "white"}
+                color={location.pathname.includes("/dashboard/users") ? "blue" : "dark"}
+              >
+                Users
+              </Button>
+            </Group>
+          )}
+
+          {/* MOBILE BURGER */}
+          {isMobile && (
+            <Burger opened={opened} onClick={() => setOpened(true)} color="white" />
+          )}
         </Group>
 
-        <Button variant="white" color="dark" onClick={logout} style={{ flexShrink: 0 }}>Logout</Button>
+        <Button variant="white" color="dark" onClick={logout}>Logout</Button>
       </Group>
+
       <Divider />
 
-      {/* Dashboard Title */}
+      {/* MOBILE DRAWER MENU */}
+      <Drawer opened={opened} onClose={() => setOpened(false)} padding="md" title="Menu">
+        <Stack>
+          <Button component={Link} to="/dashboard/containers" onClick={() => setOpened(false)}>
+            Containers
+          </Button>
+          <Button component={Link} to="/dashboard/invitations" onClick={() => setOpened(false)}>
+            Invitations
+          </Button>
+          <Button component={Link} to="/dashboard/users" onClick={() => setOpened(false)}>
+            Users
+          </Button>
+        </Stack>
+      </Drawer>
+
       <div style={{ padding: "16px 20px 0" }}>
         <Text size="xl" fw={500}>Dashboard</Text>
       </div>
 
-      {/* Content Area */}
       <div style={{ padding: "20px" }}>
         <Outlet />
       </div>
