@@ -27,6 +27,14 @@ def _display_name_from_filename(filename: str) -> str:
     return stem[0].upper() + stem[1:]
 
 
+def _display_name_from_template(filename: str, data: dict) -> str:
+    """Prefer explicit template display_name, then fallback to filename-derived name."""
+    display_name = data.get("display_name")
+    if isinstance(display_name, str) and display_name.strip():
+        return display_name.strip()
+    return _display_name_from_filename(filename)
+
+
 def _deployment_name_from_filename(filename: str) -> str:
     """'deepseek-7b-sglang.json' -> 'deepseek-7b-sglang'"""
     return filename.removesuffix(".json").lower()
@@ -52,7 +60,7 @@ def discover_templates(include_audio: bool = False) -> dict[str, str]:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             TemplateConfig(**data)
-            result[path.name] = _display_name_from_filename(path.name)
+            result[path.name] = _display_name_from_template(path.name, data)
         except Exception:
             continue
 

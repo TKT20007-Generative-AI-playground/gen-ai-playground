@@ -1,0 +1,12 @@
+{
+  "engine": "custom",
+  "display_name": "Whisper Small",
+  "model": "small",
+  "explanation": "Deploy Faster-Whisper custom container pinned to Whisper Small for faster, lower-cost transcription.",
+  "short_explanation": "Whisper Faster-Whisper small custom container",
+  "gpu_types": ["b200", "h100", "h200", "a100", "l40s"],
+  "custom": {
+    "image": "honjen/whisper-service:v1"
+  },
+  "port": 9000
+}

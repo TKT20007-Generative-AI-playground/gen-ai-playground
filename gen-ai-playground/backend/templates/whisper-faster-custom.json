@@ -1,5 +1,6 @@
 {
   "engine": "custom",
+  "display_name": "Whisper Large v3 Turbo",
   "model": "openai/whisper-large-v3-turbo",
   "explanation": "Deploy a custom Faster-Whisper HTTP service container for transcription.",
   "short_explanation": "Whisper Faster-Whisper custom container",

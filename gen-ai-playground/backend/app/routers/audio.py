@@ -30,8 +30,18 @@ def _audio_deployment_names() -> set[str]:
     }
 
 
-def _resolve_audio_endpoint(require_healthy: bool = True) -> tuple[str, str]:
+def _resolve_audio_endpoint(model_path: str | None = None, require_healthy: bool = True) -> tuple[str, str]:
     expected_names = _audio_deployment_names()
+    if model_path:
+        template_name = _resolve_audio_template_name(model_path)
+        if not template_name:
+            supported = list(get_audio_template_map().values())
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported audio model: {model_path}. Supported models: {supported}",
+            )
+        expected_names = {_deployment_name_from_filename(template_name)}
+
     deployments = verda_service.list_deployments()
 
     if not deployments or (len(deployments) == 1 and deployments[0].get("error")):
@@ -42,9 +52,13 @@ def _resolve_audio_endpoint(require_healthy: bool = True) -> tuple[str, str]:
 
     candidates = [d for d in deployments if d.get("name", "").lower() in expected_names]
     if not candidates:
+        requested_model_msg = f" for model '{model_path}'" if model_path else ""
         raise HTTPException(
             status_code=503,
-            detail="No deployed audio container found. Deploy a Whisper model from dashboard first.",
+            detail=(
+                f"No deployed audio container found{requested_model_msg}. "
+                "Deploy a Whisper model from dashboard first."
+            ),
         )
 
     for deployment in candidates:
@@ -62,9 +76,13 @@ def _resolve_audio_endpoint(require_healthy: bool = True) -> tuple[str, str]:
         return deployment_name, endpoint_url
 
     if require_healthy:
+        requested_model_msg = f" for model '{model_path}'" if model_path else ""
         raise HTTPException(
             status_code=503,
-            detail="Audio deployment exists but is not healthy yet. Please wait and try again.",
+            detail=(
+                f"Audio deployment exists{requested_model_msg} but is not healthy yet. "
+                "Please wait and try again."
+            ),
         )
 
     raise HTTPException(
@@ -149,6 +167,46 @@ def list_available_audio_models(_current_user: UserInfo = Depends(get_current_us
     return {"available_models": available_models}
 
 
+@router.get("/model-statuses")
+def get_audio_model_statuses(_current_user: UserInfo = Depends(get_current_user)) -> dict[str, str]:
+    """Return live/starting/offline status for each known audio model."""
+    template_map = get_audio_template_map()
+    statuses: dict[str, str] = {display_name: "offline" for display_name in template_map.values()}
+
+    try:
+        deployments = verda_service.list_deployments()
+    except RuntimeError:
+        return statuses
+
+    template_deployment_map = {
+        _deployment_name_from_filename(template_name): display_name
+        for template_name, display_name in template_map.items()
+    }
+
+    for deployment in deployments:
+        deployment_name = deployment.get("name")
+        if not deployment_name:
+            continue
+
+        display_name = template_deployment_map.get(deployment_name.lower())
+        if not display_name:
+            continue
+
+        try:
+            deployment_status = verda_service.get_deployment_status(deployment_name)
+            status_str = deployment_status.get("status")
+            if status_str == "healthy":
+                statuses[display_name] = "live"
+            elif status_str in {"error", "unknown", "no_deployment"}:
+                statuses[display_name] = "offline"
+            else:
+                statuses[display_name] = "starting"
+        except RuntimeError:
+            statuses[display_name] = "offline"
+
+    return statuses
+
+
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_audio_model(
     request: DeployModelRequest,
@@ -178,9 +236,9 @@ def deploy_audio_model(
 
 
 @router.get("/health")
-async def audio_health() -> dict[str, Any]:
-    """Health check against the active deployed Verda audio container."""
-    deployment_name, endpoint_url = _resolve_audio_endpoint(require_healthy=False)
+async def audio_health(model_path: str | None = None) -> dict[str, Any]:
+    """Health check against the selected (or first available) deployed audio container."""
+    deployment_name, endpoint_url = _resolve_audio_endpoint(model_path=model_path, require_healthy=False)
     deployment_status = verda_service.get_deployment_status(deployment_name)
 
     if deployment_status.get("status") != "healthy":
@@ -213,6 +271,7 @@ async def audio_health() -> dict[str, Any]:
 @router.post("/transcribe")
 async def transcribe_audio(
     file: UploadFile = File(...),
+    model_path: str | None = Form(None),
     language: str | None = Form(None),
     task: str = Form("transcribe"),
     beam_size: int = Form(5),
@@ -220,13 +279,16 @@ async def transcribe_audio(
     current_user: UserInfo = Depends(get_current_user),
     _: None = Depends(validate_csrf_token),
 ) -> dict[str, Any]:
-    """Proxy file transcription to the active deployed Verda audio container."""
+    """Proxy file transcription to a selected deployed Verda audio container."""
     if task not in {"transcribe", "translate"}:
         raise HTTPException(status_code=400, detail="task must be either 'transcribe' or 'translate'")
 
-    deployment_name, endpoint_url = _resolve_audio_endpoint(require_healthy=True)
+    deployment_name, endpoint_url = _resolve_audio_endpoint(model_path=model_path, require_healthy=True)
 
-    print(f"Audio transcription requested by user: {current_user.username} (deployment: {deployment_name})")
+    print(
+        "Audio transcription requested by user: "
+        f"{current_user.username} (deployment: {deployment_name}, model_path: {model_path})"
+    )
     file_bytes = await file.read()
 
     files = {

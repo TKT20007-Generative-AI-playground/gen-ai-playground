@@ -355,6 +355,21 @@ class VerdaService:
                     type=EnvVarType.SECRET,
                 ),
             )
+        elif cfg.engine == "custom":
+            custom_plain_env: dict[str, str] = {}
+            if cfg.model:
+                custom_plain_env["WHISPER_MODEL"] = cfg.model
+            if cfg.custom and cfg.custom.env:
+                custom_plain_env.update(cfg.custom.env)
+
+            for env_name, env_value in custom_plain_env.items():
+                env_vars.append(
+                    EnvVar(
+                        name=env_name,
+                        value_or_reference_to_secret=str(env_value),
+                        type=EnvVarType.PLAIN,
+                    )
+                )
 
         entrypoint_overrides = EntrypointOverridesSettings(
             enabled=cfg.engine != "custom",

@@ -1,5 +1,5 @@
 
-from typing import List, Optional, Literal
+from typing import Dict, List, Optional, Literal
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -65,6 +65,7 @@ class VLLMConfig(BaseModel):
 
 class CustomConfig(BaseModel):
     image: Optional[str] = None
+    env: Optional[Dict[str, str]] = None
 
 
 class TemplateConfig(BaseModel):
