@@ -16,6 +16,11 @@ TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 _SKIP_TEMPLATES = {"custom-engine.json"} # not tested/validated, and not needed in the dropdowns
 
 
+def _is_audio_template(filename: str) -> bool:
+    """Audio templates are currently identified by whisper-* naming."""
+    return filename.startswith("whisper-")
+
+
 def _display_name_from_filename(filename: str) -> str:
     """'deepseek-7b-sglang.json' -> 'Deepseek-7b-sglang'"""
     stem = filename.removesuffix(".json")
@@ -27,10 +32,13 @@ def _deployment_name_from_filename(filename: str) -> str:
     return filename.removesuffix(".json").lower()
 
 
-def discover_templates() -> dict[str, str]:
+def discover_templates(include_audio: bool = False) -> dict[str, str]:
     """
     Scan TEMPLATES_DIR for *.json, validate each, return {filename: display_name}.
     Skips files in _SKIP_TEMPLATES and invalid templates.
+
+    Args:
+        include_audio: If False, exclude audio/whisper templates.
     """
     result: dict[str, str] = {}
     if not TEMPLATES_DIR.is_dir():
@@ -38,6 +46,8 @@ def discover_templates() -> dict[str, str]:
 
     for path in sorted(TEMPLATES_DIR.glob("*.json")):
         if path.name in _SKIP_TEMPLATES:
+            continue
+        if not include_audio and _is_audio_template(path.name):
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -50,6 +60,7 @@ def discover_templates() -> dict[str, str]:
 
 
 _cache: dict[str, str] | None = None
+_audio_cache: dict[str, str] | None = None
 
 
 def get_template_map() -> dict[str, str]:
@@ -60,8 +71,19 @@ def get_template_map() -> dict[str, str]:
     return _cache
 
 
+def get_audio_template_map() -> dict[str, str]:
+    """Return cached audio {template_filename: display_name} mapping."""
+    global _audio_cache
+    if _audio_cache is None:
+        all_templates = discover_templates(include_audio=True)
+        _audio_cache = {k: v for k, v in all_templates.items() if _is_audio_template(k)}
+    return _audio_cache
+
+
 def refresh() -> dict[str, str]:
     """Re-scan the templates directory and update the cache."""
-    global _cache
+    global _cache, _audio_cache
     _cache = discover_templates()
+    all_templates = discover_templates(include_audio=True)
+    _audio_cache = {k: v for k, v in all_templates.items() if _is_audio_template(k)}
     return _cache

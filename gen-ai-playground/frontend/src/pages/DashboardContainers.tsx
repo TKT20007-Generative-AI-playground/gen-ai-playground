@@ -19,14 +19,21 @@ interface Container {
   container_id: string
 }
 
+interface DeployOption {
+  id: string
+  modelPath: string
+  label: string
+  kind: "text" | "audio"
+}
+
 export default function DashboardContainers() {
   const [containers, setContainers] = useState<Container[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [selectedModel, setSelectedModel] = useState<string | null>(null)
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
   const [deployLoading, setDeployLoading] = useState(false)
-  const [textModelOptions, setTextModelOptions] = useState<{ value: string; label: string }[]>([])
+  const [deployOptions, setDeployOptions] = useState<DeployOption[]>([])
 
   const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
@@ -39,21 +46,46 @@ export default function DashboardContainers() {
   // Fetch available models from backend
   useEffect(() => {
     const fetchModels = async () => {
+      const headers = { "X-CSRF-Token": getCsrfToken() }
+      const options: DeployOption[] = []
+
       try {
-        const res = await axios.get(`${backendUrl}/text/models`, {
+        const textRes = await axios.get(`${backendUrl}/text/models`, {
           withCredentials: true,
-          headers: { "X-CSRF-Token": getCsrfToken() },
+          headers,
         })
-        const models = (res.data.available_models ?? []).map(
-          (m: { value: string; label: string }) => ({
-            value: m.value,
-            label: m.label,
-          }),
-        )
-        setTextModelOptions(models)
+        const textModels = (textRes.data.available_models ?? []) as Array<{ value: string; label: string }>
+        for (const model of textModels) {
+          options.push({
+            id: `text::${model.value}`,
+            modelPath: model.value,
+            label: `Text: ${model.label}`,
+            kind: "text",
+          })
+        }
       } catch {
         // silent
       }
+
+      try {
+        const audioRes = await axios.get(`${backendUrl}/audio/models`, {
+          withCredentials: true,
+          headers,
+        })
+        const audioModels = (audioRes.data.available_models ?? []) as Array<{ value: string; label: string }>
+        for (const model of audioModels) {
+          options.push({
+            id: `audio::${model.value}`,
+            modelPath: model.value,
+            label: `Audio: ${model.label}`,
+            kind: "audio",
+          })
+        }
+      } catch {
+        // silent
+      }
+
+      setDeployOptions(options)
     }
     fetchModels()
   }, [backendUrl])
@@ -100,13 +132,17 @@ export default function DashboardContainers() {
   }
 
   const handleDeploy = async () => {
-    if (!selectedModel) return
+    if (!selectedModelId) return
+    const selectedOption = deployOptions.find(option => option.id === selectedModelId)
+    if (!selectedOption) return
+
     setDeployLoading(true)
     setError(null)
     try {
+      const deployPath = selectedOption.kind === "audio" ? "/audio/deploy" : "/text/deploy"
       await axios.post(
-        `${backendUrl}/text/deploy`,
-        { model_path: selectedModel },
+        `${backendUrl}${deployPath}`,
+        { model_path: selectedOption.modelPath },
         {
           withCredentials: true,
           headers: {
@@ -162,12 +198,12 @@ export default function DashboardContainers() {
         <Select
           label="Deploy a model"
           placeholder="Select model"
-          data={textModelOptions}
-          value={selectedModel}
-          onChange={setSelectedModel}
+          data={deployOptions.map(option => ({ value: option.id, label: option.label }))}
+          value={selectedModelId}
+          onChange={setSelectedModelId}
           style={{ minWidth: 220 }}
         />
-        <Button onClick={handleDeploy} disabled={!selectedModel} loading={deployLoading}>
+        <Button onClick={handleDeploy} disabled={!selectedModelId} loading={deployLoading}>
           Deploy
         </Button>
       </Group>

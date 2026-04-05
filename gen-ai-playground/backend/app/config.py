@@ -52,6 +52,4 @@ class Settings:
         "FLUX2_KLEIN_4B": "https://inference.datacrunch.io/flux2-klein-4b/generate"
     }
 
-
-
 settings = Settings()

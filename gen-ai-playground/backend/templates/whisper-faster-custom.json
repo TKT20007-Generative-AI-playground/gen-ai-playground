@@ -1,0 +1,11 @@
+{
+  "engine": "custom",
+  "model": "openai/whisper-large-v3-turbo",
+  "explanation": "Deploy a custom Faster-Whisper HTTP service container for transcription.",
+  "short_explanation": "Whisper Faster-Whisper custom container",
+  "gpu_types": ["b200", "h100", "h200", "a100", "l40s"],
+  "custom": {
+    "image": "honjen/whisper-service:v1"
+  },
+  "port": 9000
+}
