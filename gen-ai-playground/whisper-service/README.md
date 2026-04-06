@@ -28,9 +28,13 @@ docker build -t whisper-service:local ./whisper-service
 
 docker run --rm -p 9000:9000 \
   -e WHISPER_MODEL=openai/whisper-large-v3-turbo \
-  -e WHISPER_DEVICE=cpu \
+  -e WHISPER_DEVICE=cuda \
+  -e WHISPER_COMPUTE_TYPE=float16 \
   whisper-service:local
 ```
+
+The image installs NVIDIA CUDA runtime libraries (`nvidia-cublas-cu12`,
+`nvidia-cudnn-cu12`) so GPU transcription can load `libcublas.so.12`.
 
 ## Test with curl
 
@@ -47,6 +51,7 @@ Example response:
   "text": "hello world",
   "language": "en",
   "duration": 4.2,
+  "transcription_time_ms": 1530,
   "segments": [
     {"start": 0.0, "end": 1.2, "text": "hello"},
     {"start": 1.2, "end": 2.0, "text": " world"}
@@ -69,9 +74,23 @@ Use:
 ```bash
 docker run --rm -p 9000:9000 \
   -e WHISPER_MODEL=openai/whisper-large-v3-turbo \
-  -e WHISPER_DEVICE=cpu \
+  -e WHISPER_DEVICE=cuda \
+  -e WHISPER_COMPUTE_TYPE=float16 \
   whisper-service:local
 ```
+
+If you see an error like:
+
+`Library libcublas.so.12 is not found or cannot be loaded`
+
+rebuild and publish a fresh image tag, then redeploy template:
+
+```bash
+docker build -t honjen/whisper-service:v5 ./whisper-service
+docker push honjen/whisper-service:v5
+```
+
+The backend whisper templates are pinned to `honjen/whisper-service:v5`.
 
 Then verify:
 

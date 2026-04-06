@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -125,6 +126,7 @@ async def transcribe_audio(
                 tmp.write(chunk)
 
         model = _get_model()
+        transcription_start = time.perf_counter()
         segments, info = model.transcribe(
             temp_path,
             language=language,
@@ -144,12 +146,14 @@ async def transcribe_audio(
                 }
             )
             full_text_parts.append(seg.text)
+        transcription_time_ms = int((time.perf_counter() - transcription_start) * 1000)
 
         return {
             "text": "".join(full_text_parts).strip(),
             "language": getattr(info, "language", None),
             "duration": getattr(info, "duration", None),
             "segments": output_segments,
+            "transcription_time_ms": transcription_time_ms,
             "configured_model": settings.model_size,
             "model": _normalize_model_name(settings.model_size),
             "resolved_model": _resolve_model_name(settings.model_size),

@@ -15,6 +15,7 @@ type TranscriptionResponse = {
   text: string
   language?: string
   duration?: number
+  transcription_time_ms?: number
   model?: string
   resolved_model?: string
   segments?: TranscriptionSegment[]
@@ -609,9 +610,13 @@ export default function Transcribe() {
                             Audio duration: {formatDurationMs(modelResult.data.duration * 1000, { compactMinutes: true })}
                           </Text>
                         ) : null}
-                        {typeof modelResult.elapsedMs === "number" ? (
+                        {(typeof modelResult.data.transcription_time_ms === "number" ||
+                          typeof modelResult.elapsedMs === "number") ? (
                           <Text size="sm" c="dimmed">
-                            Transcription time: {formatDurationMs(modelResult.elapsedMs, { compactMinutes: true })}
+                            Transcription time: {formatDurationMs(
+                              modelResult.data.transcription_time_ms ?? modelResult.elapsedMs ?? 0,
+                              { compactMinutes: true },
+                            )}
                           </Text>
                         ) : null}
                         {modelResult.data.segments?.length ? (

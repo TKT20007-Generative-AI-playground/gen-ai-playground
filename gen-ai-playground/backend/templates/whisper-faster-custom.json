@@ -6,7 +6,11 @@
   "short_explanation": "Whisper Faster-Whisper custom container",
   "gpu_types": ["b200", "h100", "h200", "a100", "l40s"],
   "custom": {
-    "image": "honjen/whisper-service:v1"
+    "image": "honjen/whisper-service:v5",
+    "env": {
+      "WHISPER_DEVICE": "cuda",
+      "WHISPER_COMPUTE_TYPE": "float16"
+    }
   },
   "port": 9000
 }
