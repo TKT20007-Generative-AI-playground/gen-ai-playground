@@ -1,6 +1,7 @@
 """Audio transcription routes."""
 
-from typing import Any
+import os
+from typing import Any, BinaryIO
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -8,12 +9,14 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from app.config import settings
 from app.dependencies import get_admin_user, get_current_user, validate_csrf_token
 from app.models import DeployModelRequest, DeploymentStatusResponse, UserInfo
-from app.template_discovery import get_audio_template_map, _deployment_name_from_filename
+from app.template_discovery import _deployment_name_from_filename, get_audio_template_map
 from app.verda_service import verda_service
 
 
 router = APIRouter(prefix="/audio", tags=["audio"])
 WHISPER_TIMEOUT_SECONDS = 300.0
+MAX_AUDIO_UPLOAD_MB = settings.MAX_AUDIO_UPLOAD_MB
+MAX_AUDIO_UPLOAD_BYTES = MAX_AUDIO_UPLOAD_MB * 1024 * 1024
 
 
 def _inference_headers() -> dict[str, str]:
@@ -61,33 +64,40 @@ def _resolve_audio_endpoint(model_path: str | None = None, require_healthy: bool
             ),
         )
 
+    fallback_candidate: tuple[str, str] | None = None
+
     for deployment in candidates:
         deployment_name = deployment.get("name")
         endpoint_url = str(deployment.get("endpoint_url", "")).rstrip("/")
         if not deployment_name or not endpoint_url:
             continue
 
-        if require_healthy:
+        status_str = None
+        try:
             status_payload = verda_service.get_deployment_status(deployment_name)
             status_str = status_payload.get("status")
-            if status_str != "healthy":
-                continue
+        except RuntimeError:
+            status_str = None
 
-        return deployment_name, endpoint_url
+        if status_str == "healthy":
+            return deployment_name, endpoint_url
 
-    if require_healthy:
-        requested_model_msg = f" for model '{model_path}'" if model_path else ""
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                f"Audio deployment exists{requested_model_msg} but is not healthy yet. "
-                "Please wait and try again."
-            ),
-        )
+        if fallback_candidate is None:
+            fallback_candidate = (deployment_name, endpoint_url)
 
+        if require_healthy:
+            continue
+
+    if not require_healthy and fallback_candidate:
+        return fallback_candidate
+
+    requested_model_msg = f" for model '{model_path}'" if model_path else ""
     raise HTTPException(
         status_code=503,
-        detail="Audio deployment found but endpoint is unavailable.",
+        detail=(
+            f"Audio deployment exists{requested_model_msg} but is not healthy yet. "
+            "Please wait and try again."
+        ),
     )
 
 
@@ -127,12 +137,23 @@ async def _post_with_fallback_paths(
     base_url: str,
     paths: list[str],
     data: dict[str, str],
-    files: dict[str, tuple[str, bytes, str]],
+    file_obj: BinaryIO,
+    file_name: str,
+    file_content_type: str,
 ) -> dict[str, Any]:
     tried: list[str] = []
     headers = _inference_headers()
     async with httpx.AsyncClient(timeout=WHISPER_TIMEOUT_SECONDS) as client:
         for path in paths:
+            file_obj.seek(0, os.SEEK_SET)
+            files = {
+                "file": (
+                    file_name,
+                    file_obj,
+                    file_content_type,
+                )
+            }
+
             url = _whisper_url(base_url, path)
             tried.append(url)
             response = await client.post(url, data=data, files=files, headers=headers)
@@ -158,6 +179,20 @@ def _resolve_audio_template_name(model: str) -> str | None:
         if display_name == model:
             return template_name
     return None
+
+
+def _validate_upload_size(file: UploadFile) -> None:
+    file_obj = file.file
+    current_pos = file_obj.tell()
+    file_obj.seek(0, os.SEEK_END)
+    size_bytes = file_obj.tell()
+    file_obj.seek(current_pos, os.SEEK_SET)
+
+    if size_bytes > MAX_AUDIO_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Max size is {MAX_AUDIO_UPLOAD_MB} MB",
+        )
 
 
 @router.get("/models")
@@ -236,10 +271,26 @@ def deploy_audio_model(
 
 
 @router.get("/health")
-async def audio_health(model_path: str | None = None) -> dict[str, Any]:
+async def audio_health(
+    model_path: str | None = None,
+    _current_user: UserInfo = Depends(get_current_user),
+) -> dict[str, Any]:
     """Health check against the selected (or first available) deployed audio container."""
     deployment_name, endpoint_url = _resolve_audio_endpoint(model_path=model_path, require_healthy=False)
-    deployment_status = verda_service.get_deployment_status(deployment_name)
+    try:
+        deployment_status = verda_service.get_deployment_status(deployment_name)
+    except RuntimeError:
+        return {
+            "status": "ok",
+            "deployment": {
+                "name": deployment_name,
+                "status": "unknown",
+            },
+            "whisper": {
+                "status": "unavailable",
+                "detail": "Unable to fetch deployment status from Verda.",
+            },
+        }
 
     if deployment_status.get("status") != "healthy":
         return {
@@ -289,15 +340,8 @@ async def transcribe_audio(
         "Audio transcription requested by user: "
         f"{current_user.username} (deployment: {deployment_name}, model_path: {model_path})"
     )
-    file_bytes = await file.read()
+    _validate_upload_size(file)
 
-    files = {
-        "file": (
-            file.filename or "audio.bin",
-            file_bytes,
-            file.content_type or "application/octet-stream",
-        )
-    }
     form_data: dict[str, str] = {
         "task": task,
         "beam_size": str(beam_size),
@@ -311,7 +355,9 @@ async def transcribe_audio(
             endpoint_url,
             ["transcribe", "predict", ""],
             form_data,
-            files,
+            file.file,
+            file.filename or "audio.bin",
+            file.content_type or "application/octet-stream",
         )
     except httpx.HTTPStatusError as exc:
         try:

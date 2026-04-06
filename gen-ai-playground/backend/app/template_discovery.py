@@ -40,6 +40,18 @@ def _deployment_name_from_filename(filename: str) -> str:
     return filename.removesuffix(".json").lower()
 
 
+def _raise_duplicate_display_names(duplicates: list[tuple[str, str, str]]) -> None:
+    """Raise a clear error when duplicate template display names are detected."""
+    if not duplicates:
+        return
+
+    details = "; ".join(
+        f"'{display_name}' used by {first_file} and {second_file}"
+        for display_name, first_file, second_file in duplicates
+    )
+    raise ValueError(f"Duplicate template display_name values found: {details}")
+
+
 def discover_templates(include_audio: bool = False) -> dict[str, str]:
     """
     Scan TEMPLATES_DIR for *.json, validate each, return {filename: display_name}.
@@ -49,6 +61,8 @@ def discover_templates(include_audio: bool = False) -> dict[str, str]:
         include_audio: If False, exclude audio/whisper templates.
     """
     result: dict[str, str] = {}
+    seen_display_names: dict[str, str] = {}
+    duplicate_display_names: list[tuple[str, str, str]] = []
     if not TEMPLATES_DIR.is_dir():
         return result
 
@@ -60,9 +74,55 @@ def discover_templates(include_audio: bool = False) -> dict[str, str]:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             TemplateConfig(**data)
-            result[path.name] = _display_name_from_template(path.name, data)
-        except Exception:
+            display_name = _display_name_from_template(path.name, data)
+            normalized_display_name = display_name.strip().lower()
+            existing_file = seen_display_names.get(normalized_display_name)
+            if existing_file:
+                duplicate_display_names.append((display_name, existing_file, path.name))
+                continue
+            seen_display_names[normalized_display_name] = path.name
+            result[path.name] = display_name
+        except Exception as exc:
+            print(f"Skipping invalid template '{path.name}': {exc}")
             continue
+
+    _raise_duplicate_display_names(duplicate_display_names)
+
+    return result
+
+
+def discover_audio_templates() -> dict[str, str]:
+    """
+    Scan TEMPLATES_DIR for audio *.json templates only, return {filename: display_name}.
+    Skips files in _SKIP_TEMPLATES and invalid templates.
+    """
+    result: dict[str, str] = {}
+    seen_display_names: dict[str, str] = {}
+    duplicate_display_names: list[tuple[str, str, str]] = []
+    if not TEMPLATES_DIR.is_dir():
+        return result
+
+    for path in sorted(TEMPLATES_DIR.glob("*.json")):
+        if path.name in _SKIP_TEMPLATES:
+            continue
+        if not _is_audio_template(path.name):
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            TemplateConfig(**data)
+            display_name = _display_name_from_template(path.name, data)
+            normalized_display_name = display_name.strip().lower()
+            existing_file = seen_display_names.get(normalized_display_name)
+            if existing_file:
+                duplicate_display_names.append((display_name, existing_file, path.name))
+                continue
+            seen_display_names[normalized_display_name] = path.name
+            result[path.name] = display_name
+        except Exception as exc:
+            print(f"Skipping invalid template '{path.name}': {exc}")
+            continue
+
+    _raise_duplicate_display_names(duplicate_display_names)
 
     return result
 
@@ -83,8 +143,7 @@ def get_audio_template_map() -> dict[str, str]:
     """Return cached audio {template_filename: display_name} mapping."""
     global _audio_cache
     if _audio_cache is None:
-        all_templates = discover_templates(include_audio=True)
-        _audio_cache = {k: v for k, v in all_templates.items() if _is_audio_template(k)}
+        _audio_cache = discover_audio_templates()
     return _audio_cache
 
 
@@ -92,6 +151,5 @@ def refresh() -> dict[str, str]:
     """Re-scan the templates directory and update the cache."""
     global _cache, _audio_cache
     _cache = discover_templates()
-    all_templates = discover_templates(include_audio=True)
-    _audio_cache = {k: v for k, v in all_templates.items() if _is_audio_template(k)}
+    _audio_cache = discover_audio_templates()
     return _cache

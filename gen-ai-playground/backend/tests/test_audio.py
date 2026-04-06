@@ -1,0 +1,242 @@
+"""Tests for /audio/* endpoints."""
+
+import asyncio
+import io
+from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, Mock, patch
+
+import bcrypt
+import jwt
+import mongomock
+import pytest
+from fastapi.testclient import TestClient
+
+from app.config import settings
+from server import app
+
+
+@pytest.fixture
+def mock_db():
+    """Create a mock MongoDB database for testing."""
+    client = mongomock.MongoClient()
+    return client["gen_ai_playground"]
+
+
+@pytest.fixture
+def test_user_data():
+    return {
+        "username": "audio-user",
+        "password": "SecurePassword123!",
+    }
+
+
+@pytest.fixture
+def registered_user(mock_db, test_user_data):
+    hashed_password = bcrypt.hashpw(
+        test_user_data["password"].encode("utf-8"),
+        bcrypt.gensalt(),
+    )
+    mock_db.users.insert_one(
+        {
+            "username": test_user_data["username"],
+            "password": hashed_password,
+            "is_admin": True,
+            "created_at": datetime.utcnow(),
+        }
+    )
+    return test_user_data
+
+
+@pytest.fixture
+def auth_token(test_user_data):
+    payload = {
+        "username": test_user_data["username"],
+        "is_admin": True,
+        "exp": datetime.utcnow() + timedelta(hours=24),
+        "type": "access",
+    }
+    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
+
+
+@pytest.fixture
+def auth_headers(auth_token):
+    return {"Authorization": f"Bearer {auth_token}"}
+
+
+@pytest.fixture
+def client(mock_db):
+    with patch("app.database.db_manager.db", mock_db):
+        with patch("app.database.get_database", return_value=mock_db):
+            yield TestClient(app)
+
+
+class TestAudioHealthAuth:
+    def test_health_requires_authentication(self, client):
+        response = client.get("/audio/health")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Not authenticated"
+
+
+class TestAudioEndpointSelection:
+    @patch("app.routers.audio.get_audio_template_map")
+    @patch("app.routers.audio._get_with_fallback_paths", new_callable=AsyncMock)
+    @patch("app.routers.audio.verda_service")
+    def test_health_prefers_healthy_deployment(
+        self,
+        mock_verda_service,
+        mock_whisper_health,
+        mock_template_map,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_template_map.return_value = {
+            "whisper-a.json": "Whisper A",
+            "whisper-b.json": "Whisper B",
+        }
+
+        mock_verda_service.list_deployments.return_value = [
+            {"name": "whisper-a", "endpoint_url": "https://a.example"},
+            {"name": "whisper-b", "endpoint_url": "https://b.example"},
+        ]
+
+        def _status_for_name(name: str):
+            if name == "whisper-a":
+                return {"name": name, "status": "deploying"}
+            return {"name": name, "status": "healthy"}
+
+        mock_verda_service.get_deployment_status.side_effect = _status_for_name
+        mock_whisper_health.return_value = {"status": "ok"}
+
+        response = client.get("/audio/health", headers=auth_headers)
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["deployment"]["name"] == "whisper-b"
+        assert payload["deployment"]["status"] == "healthy"
+        mock_whisper_health.assert_awaited_once_with("https://b.example", ["health", ""])
+
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._get_with_fallback_paths", new_callable=AsyncMock)
+    @patch("app.routers.audio.verda_service")
+    def test_health_returns_degraded_payload_when_status_lookup_fails(
+        self,
+        mock_verda_service,
+        mock_whisper_health,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_verda_service.get_deployment_status.side_effect = RuntimeError("verda status failed")
+
+        response = client.get("/audio/health", headers=auth_headers)
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "ok"
+        assert payload["deployment"]["name"] == "whisper-a"
+        assert payload["deployment"]["status"] == "unknown"
+        assert payload["whisper"]["status"] == "unavailable"
+        assert "Unable to fetch deployment status" in payload["whisper"]["detail"]
+        mock_whisper_health.assert_not_awaited()
+
+
+class TestAudioUploadValidation:
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_MB", 1)
+    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_BYTES", 1024)
+    def test_transcribe_rejects_oversized_upload(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
+            data={"task": "transcribe"},
+            files={"file": ("audio.wav", b"x" * 2048, "audio/wav")},
+        )
+
+        assert response.status_code == 413
+        assert "File too large" in response.json()["detail"]
+        mock_proxy_call.assert_not_awaited()
+
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_MB", 1)
+    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_BYTES", 1024)
+    def test_transcribe_accepts_upload_at_exact_size_limit(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_proxy_call.return_value = {"text": "ok"}
+
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
+            data={"task": "transcribe"},
+            files={"file": ("audio.wav", b"x" * 1024, "audio/wav")},
+        )
+
+        assert response.status_code == 200
+        assert response.json() == {"text": "ok"}
+        mock_proxy_call.assert_awaited_once()
+
+
+class TestAudioFallbackUpload:
+    def test_post_with_fallback_paths_rewinds_file_between_attempts(self, monkeypatch):
+        from app.routers import audio as audio_router
+
+        captured_payloads: list[bytes] = []
+
+        response_not_found = Mock()
+        response_not_found.status_code = 404
+        response_not_found.raise_for_status = Mock()
+
+        response_ok = Mock()
+        response_ok.status_code = 200
+        response_ok.raise_for_status = Mock()
+        response_ok.json = Mock(return_value={"text": "ok"})
+
+        class DummyAsyncClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, _url, data=None, files=None, headers=None):
+                _ = data, headers
+                captured_payloads.append(files["file"][1].read())
+                if len(captured_payloads) == 1:
+                    return response_not_found
+                return response_ok
+
+        monkeypatch.setattr(audio_router.httpx, "AsyncClient", DummyAsyncClient)
+
+        file_obj = io.BytesIO(b"abc123")
+        result = asyncio.run(
+            audio_router._post_with_fallback_paths(
+                base_url="https://a.example",
+                paths=["transcribe", "predict"],
+                data={"task": "transcribe"},
+                file_obj=file_obj,
+                file_name="audio.wav",
+                file_content_type="audio/wav",
+            )
+        )
+
+        assert result == {"text": "ok"}
+        assert captured_payloads == [b"abc123", b"abc123"]

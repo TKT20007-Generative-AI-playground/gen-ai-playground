@@ -1,4 +1,5 @@
 
+import re
 from typing import Dict, List, Optional, Literal
 from pydantic import BaseModel, Field, model_validator
 
@@ -67,11 +68,28 @@ class CustomConfig(BaseModel):
     image: Optional[str] = None
     env: Optional[Dict[str, str]] = None
 
+    @model_validator(mode="after")
+    def validate_env_keys(self):
+        if not self.env:
+            return self
+
+        env_name_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+        for env_name in self.env.keys():
+            if not env_name_pattern.match(env_name):
+                raise ValueError(
+                    f"custom.env contains invalid key '{env_name}'. "
+                    "Env var names must match [A-Za-z_][A-Za-z0-9_]*"
+                )
+        return self
+
 
 class TemplateConfig(BaseModel):
     # Common Fields (All Engines)
     engine: Literal["vllm", "sglang", "custom"]
     model: str
+    display_name: Optional[str] = None
+    explanation: Optional[str] = None
+    short_explanation: Optional[str] = None
     trust_remote_code: Optional[bool] = None
     quantization: Optional[str] = None
     gpu_types: List[str] = Field(default_factory=list)
@@ -97,6 +115,17 @@ class TemplateConfig(BaseModel):
             raise ValueError("vllm engine requires vllm config")
         if self.engine == "custom" and not self.custom:
             raise ValueError("custom engine requires custom config")
+        if self.engine == "custom" and self.custom and not self.custom.image:
+            raise ValueError("custom engine requires custom.image")
+        if self.engine == "custom" and self.custom and self.custom.image:
+            image = self.custom.image
+            if "@sha256:" not in image:
+                last_segment = image.rsplit("/", 1)[-1]
+                if ":" not in last_segment:
+                    raise ValueError("custom.image must include a non-latest tag or digest")
+                tag = last_segment.rsplit(":", 1)[-1].lower()
+                if tag == "latest":
+                    raise ValueError("custom.image tag ':latest' is not allowed")
         return self
 
 

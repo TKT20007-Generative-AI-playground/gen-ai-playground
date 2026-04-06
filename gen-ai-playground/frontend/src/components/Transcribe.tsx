@@ -419,7 +419,7 @@ export default function Transcribe() {
       }}
     >
       <Text c="dimmed" size="sm" mb={6}>
-        Select up to {MAX_AUDIO_MODELS} models for side-by-side transcription.
+        Select up to {MAX_AUDIO_MODELS} models for transcription.
       </Text>
 
       <MultiSelect

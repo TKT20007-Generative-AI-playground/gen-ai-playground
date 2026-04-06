@@ -103,17 +103,26 @@ async def transcribe_audio(
     if task not in {"transcribe", "translate"}:
         raise HTTPException(status_code=400, detail="task must be either 'transcribe' or 'translate'")
 
-    content = await file.read()
     max_bytes = settings.max_upload_mb * 1024 * 1024
-    if len(content) > max_bytes:
-        raise HTTPException(status_code=413, detail=f"File too large. Max size is {settings.max_upload_mb} MB")
 
     suffix = os.path.splitext(file.filename or "audio.bin")[1]
+    temp_path: str | None = None
 
     try:
+        bytes_written = 0
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(content)
             temp_path = tmp.name
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                bytes_written += len(chunk)
+                if bytes_written > max_bytes:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File too large. Max size is {settings.max_upload_mb} MB",
+                    )
+                tmp.write(chunk)
 
         model = _get_model()
         segments, info = model.transcribe(
@@ -150,5 +159,6 @@ async def transcribe_audio(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}") from exc
     finally:
-        if "temp_path" in locals() and os.path.exists(temp_path):
+        await file.close()
+        if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
