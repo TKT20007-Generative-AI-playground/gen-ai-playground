@@ -75,8 +75,12 @@ export function ShareConversationModal({
             )
             setConversationId(res.data.conversation_id)
             setInviteCode(res.data.invite_code)
-        } catch (e: any) {
-            setError(e.response?.data?.detail ?? e.message)
+        } catch (e: unknown) {
+            if (axios.isAxiosError<{ detail?: string }>(e)) {
+                setError(e.response?.data?.detail ?? e.message)
+            } else {
+                setError("Failed to create shared conversation")
+            }
         } finally {
             setLoading(false)
         }

@@ -18,6 +18,12 @@ type Message = {
     pendingStartTime?: number
     title?: string
 }
+
+type ConversationHistoryMessage = {
+    role: "user" | "assistant"
+    content: string
+    sender?: string
+}
 const getCsrfToken = (): string => {
     const value = `; ${document.cookie}`
     const parts = value.split(`; csrf_token=`)
@@ -46,6 +52,7 @@ export default function SharedChat() {
     const [searchParams] = useSearchParams()
     const modelValue: string = state?.modelValue ?? ""
     const modelLabel: string = state?.modelLabel ?? modelValue
+    const stateInviteCode: string = state?.invCode ?? ""
     const conversationId: string = state?.conversationId ?? paramId ?? ""
     const initialMessages: Message[] = state?.initialMessages ?? []
     const [chatTitle, setChatTitle] = useState(state?.title ?? "")
@@ -101,10 +108,10 @@ export default function SharedChat() {
         ).then(() => {
             setJoined(true)
         }).catch(() => {
-            const code = searchParams.get("invite") ?? state?.invCode
+            const code = searchParams.get("invite") ?? stateInviteCode
             if (code) handleJoin(code)
         })
-    }, [conversationId])
+    }, [backendUrl, conversationId, handleJoin, searchParams, stateInviteCode])
 
     // WebSocket conn
     useEffect(() => {
@@ -118,13 +125,13 @@ export default function SharedChat() {
                     { headers: getAuthHeaders(), withCredentials: true }
                 )
                 setChatTitle(res.data.title ?? "")
-                currentModelRef.current = res.data.model ?? state?.modelValue ?? ""
-                const historical: Message[] = (res.data.messages ?? []).map((m: any) => ({
+                currentModelRef.current = res.data.model ?? modelValue
+                const historical: Message[] = ((res.data.messages ?? []) as ConversationHistoryMessage[]).map((m) => ({
                     id: makeMessageId(),
                     role: m.role,
                     content: m.content,
                     sender: m.sender,
-                    modelLabel: m.role === "assistant" ? modelLabel : undefined,
+                    modelLabel: m.role === "assistant" ? (currentModelRef.current || modelLabel) : undefined,
                 }))
                 updateMessages(historical)
             } catch {
@@ -165,7 +172,7 @@ export default function SharedChat() {
                         id: pendingId,
                         role: "assistant",
                         content: "",
-                        modelLabel,
+                        modelLabel: currentModelRef.current || modelLabel,
                         isPending: true,
                         pendingStartTime: Date.now(),
                     }
@@ -209,7 +216,7 @@ export default function SharedChat() {
         connect()
 
         return () => ws?.close()
-    }, [conversationId, backendUrl, modelLabel, joined, updateMessages])
+    }, [conversationId, backendUrl, modelLabel, joined, updateMessages, getAccessToken, modelValue])
 
     if (!joined) {
         return (
@@ -340,7 +347,9 @@ export default function SharedChat() {
                                 }}
                             >
                                 <Text fw={700} size="xs">
-                                    {message.role === "user" ? message.sender : (message.modelLabel ?? modelLabel)}
+                                    {message.role === "user"
+                                        ? (message.sender ?? "You")
+                                        : (message.modelLabel ?? currentModelRef.current ?? modelLabel)}
                                 </Text>
                                 {message.role === "assistant" && message.generationTimeMs != null && (
                                     <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>

@@ -175,7 +175,7 @@ export default function History() {
     [backendUrl],
   )
 
-  const getImagesLength = async () => {
+  const getImagesLength = useCallback(async () => {
     try {
       const res = await axios.get(`${backendUrl}/images/history-length`, {
         headers: getAuthHeaders(),
@@ -185,9 +185,9 @@ export default function History() {
     } catch {
       return 0
     }
-  }
+  }, [backendUrl])
 
-  const getTextLength = async () => {
+  const getTextLength = useCallback(async () => {
     try {
       const res = await axios.get(`${backendUrl}/text/chat-messages-length`, {
         headers: getAuthHeaders(),
@@ -197,9 +197,9 @@ export default function History() {
     } catch {
       return 0
     }
-  }
+  }, [backendUrl])
 
-  const getConversationLength = async () => {
+  const getConversationLength = useCallback(async () => {
     try {
       const res = await axios.get(`${backendUrl}/text/conversations-length`, {
         headers: getAuthHeaders(),
@@ -209,7 +209,7 @@ export default function History() {
     } catch {
       return 0
     }
-  }
+  }, [backendUrl])
 
   useEffect(() => {
     const run = async () => {
@@ -263,7 +263,9 @@ export default function History() {
     }
 
     run()
-  }, [activeTab, dateRange, currentPage, fetchImagesHistory, fetchTextHistory, fetchConversationHistory])
+  }, [activeTab, dateRange, currentPage,
+    fetchImagesHistory, fetchTextHistory, fetchConversationHistory,
+    getImagesLength, getTextLength, getConversationLength])
 
   const handleDateChange = (range: [Date | null, Date | null]) => {
     setDateRange(range)
