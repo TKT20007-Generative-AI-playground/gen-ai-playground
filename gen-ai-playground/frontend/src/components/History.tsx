@@ -61,6 +61,13 @@ export default function History() {
   const [activeTab, setActiveTab] = useState<Tab>("images")
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null])
 
+  const [totalItems, setTotalItems] = useState<Record<Tab, number>>({
+    images: 0,
+    text: 0,
+    conversations: 0,
+  })
+
+
   const [pages, setPages] = useState<Record<Tab, number>>({
     images: 1,
     text: 1,
@@ -98,7 +105,7 @@ export default function History() {
       try {
         const his = await axios.get(
           `${backendUrl}/text/all-conversations`,
-          { headers: getAuthHeaders(), withCredentials: true }
+          { headers: getAuthHeaders(), withCredentials: true, params }
         )
 
         console.log("history", his)
@@ -168,9 +175,57 @@ export default function History() {
     [backendUrl],
   )
 
+  const getImagesLength = async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/images/history-length`, {
+        headers: getAuthHeaders(),
+        withCredentials: true,
+      })
+      return res.data.length ?? 0
+    } catch {
+      return 0
+    }
+  }
+
+  const getTextLength = async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/text/chat-messages-length`, {
+        headers: getAuthHeaders(),
+        withCredentials: true,
+      })
+      return res.data.length ?? 0
+    } catch {
+      return 0
+    }
+  }
+
+  const getConversationLength = async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/text/conversations-length`, {
+        headers: getAuthHeaders(),
+        withCredentials: true,
+      })
+      return res.data.length ?? 0
+    } catch {
+      return 0
+    }
+  }
+
   useEffect(() => {
     const run = async () => {
       setLoading(true)
+
+      const [imagesLength, textLength, conversationLength] = await Promise.all([
+        getImagesLength(),
+        getTextLength(),
+        getConversationLength(),
+      ])
+
+      setTotalItems({
+        images: imagesLength,
+        text: textLength,
+        conversations: conversationLength,
+      })
 
       try {
         if (activeTab === "images") {
@@ -181,6 +236,7 @@ export default function History() {
             ...prev,
             images: data.totalPages,
           }))
+
         } else if (activeTab === "text") {
           const data = await fetchTextHistory(dateRange, currentPage)
 
@@ -189,6 +245,7 @@ export default function History() {
             ...prev,
             text: data.totalPages,
           }))
+        
         } else if (activeTab === "conversations") {
           const data = await fetchConversationHistory(dateRange, currentPage)
 
@@ -218,7 +275,6 @@ export default function History() {
   }
 
   const columns = isMobile ? 2 : isTablet ? 3 : 4
-  const totalImages = imageHistory.reduce((acc, g) => acc + g.images.length, 0)
 
   return (
     <Box
@@ -254,7 +310,7 @@ export default function History() {
           <Tabs.List>
             <HoverTab value="images" leftSection={<ImageIcon />}>
               Images
-              {totalImages > 0 && (
+              {totalItems.images > 0 && (
                 <Badge
                   ml={8}
                   size="xs"
@@ -268,14 +324,14 @@ export default function History() {
                     height: 18,
                   }}
                 >
-                  {totalImages}
+                  {totalItems.images}
                 </Badge>
               )}
             </HoverTab>
 
             <HoverTab value="text" leftSection={<TextIcon />}>
               Text
-              {textHistory.length > 0 && (
+              {totalItems.text > 0 && (
                 <Badge
                   ml={8}
                   size="xs"
@@ -289,13 +345,13 @@ export default function History() {
                     height: 18,
                   }}
                 >
-                  {textHistory.length}
+                  {totalItems.text}
                 </Badge>
               )}
             </HoverTab>
             <HoverTab value="conversations" leftSection={<TextIcon />}>
               Conversations
-              {conversationHistory.length > 0 && (
+              {totalItems.conversations > 0 && (
                 <Badge
                   ml={8}
                   size="xs"
@@ -309,7 +365,7 @@ export default function History() {
                     height: 18,
                   }}
                 >
-                  {conversationHistory.length}
+                  {totalItems.conversations}
                 </Badge>
               )}
             </HoverTab>

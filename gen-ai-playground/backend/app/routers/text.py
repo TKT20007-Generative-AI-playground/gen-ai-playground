@@ -909,16 +909,59 @@ async def handle_llm_reply(
 def all_conversations(
     db=Depends(get_database),
     cur_user: UserInfo = Depends(get_current_user),
+    from_date: Optional[int] = Query(None, alias="from"),
+    to_date: Optional[int] = Query(None, alias="to"),
+    page: int = Query(1, alias="page", ge=1),
 ):
-    conversations = list(db.conversations.find({"participants": cur_user.username}))
+    page_size = 10
+
+    query = {"participants": cur_user.username}
+
+    if from_date or to_date:
+        date_filter = {}
+        if from_date:
+            date_filter["$gte"] = datetime.fromtimestamp(from_date / 1000, tz=timezone.utc)
+        if to_date:
+            date_filter["$lte"] = datetime.fromtimestamp(to_date / 1000, tz=timezone.utc)
+        query["created_at"] = date_filter
+
+    total = db.conversations.count_documents(query)
+
+    if total == 0:
+        return {"conversations": [], "total": 0, "page": page, "total_pages": 0}
+
+    total_pages = math.ceil(total / page_size)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+
+    conversations = list(
+        db.conversations.find(query)
+        .sort("created_at", -1)
+        .skip(start)
+        .limit(page_size)
+    )
     for c in conversations:
         c["_id"] = str(c["_id"])
-    return {"conversations": conversations}
+    return {
+        "conversations": conversations,
+        "total": total,
+        "page": page,
+        "total_pages": total_pages,
+    }
 
-    
-    
-    
-    
-    
-    
-    
+
+@router.get("/conversations-length")
+def conversations_length(
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    length = db.conversations.count_documents({"participants": cur_user.username})
+    return {"length": length}
+
+@router.get("/chat-messages-length")
+def chat_messages_length(
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    length = db.text_generations.count_documents({"username": cur_user.username})
+    return {"length": length}
