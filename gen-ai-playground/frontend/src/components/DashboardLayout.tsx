@@ -31,9 +31,11 @@ export default function DashboardLayout() {
       <Group justify="space-between" p="md" bg="linear-gradient(135deg, #000F65, #0b1328)" style={{ position: "sticky", top: 0, zIndex: 100 }}>
         
         <Group gap="md">
-          <Button variant="white" color="dark" onClick={handlePlaygroundClick}>
-            ← Playground
-          </Button>
+          {!isMobile && (
+            <Button variant="white" color="dark" onClick={handlePlaygroundClick}>
+              ← Playground
+            </Button>
+          )}
 
           <Text fw={500} c="white">Generative AI Playground</Text>
 
@@ -69,28 +71,50 @@ export default function DashboardLayout() {
             </Group>
           )}
 
-          {/* MOBILE BURGER */}
-          {isMobile && (
-            <Burger opened={opened} onClick={() => setOpened(true)} color="white" />
-          )}
         </Group>
 
-        <Button variant="white" color="dark" onClick={logout}>Logout</Button>
+        {!isMobile && (
+          <Button variant="white" color="dark" onClick={logout}>Logout</Button>
+        )}
+
+        {isMobile && (
+          <Burger
+            opened={opened}
+            onClick={() => setOpened(prev => !prev)}
+            color="white"
+            aria-label="Toggle menu"
+          />
+        )}
       </Group>
 
       <Divider />
 
       {/* MOBILE DRAWER MENU */}
-      <Drawer opened={opened} onClose={() => setOpened(false)} padding="md" title="Menu">
-        <Stack>
-          <Button component={Link} to="/dashboard/containers" onClick={() => setOpened(false)}>
+      <Drawer
+        opened={opened}
+        onClose={() => setOpened(false)}
+        title="Menu"
+        size="xs"
+        position="right"
+        styles={{
+          content: { backgroundColor: "white", border: "1px solid black" }
+        }}
+      >
+        <Stack gap="sm">
+          <Button variant="default" fullWidth component={Link} to="/dashboard/containers" onClick={() => setOpened(false)}>
             Containers
           </Button>
-          <Button component={Link} to="/dashboard/invitations" onClick={() => setOpened(false)}>
+          <Button variant="default" fullWidth component={Link} to="/dashboard/invitations" onClick={() => setOpened(false)}>
             Invitations
           </Button>
-          <Button component={Link} to="/dashboard/users" onClick={() => setOpened(false)}>
+          <Button variant="default" fullWidth component={Link} to="/dashboard/users" onClick={() => setOpened(false)}>
             Users
+          </Button>
+          <Button variant="default" fullWidth onClick={handlePlaygroundClick}>
+            Playground
+          </Button>
+          <Button variant="default" fullWidth onClick={() => { logout(); setOpened(false) }}>
+            Logout
           </Button>
         </Stack>
       </Drawer>

@@ -205,6 +205,8 @@ export default function DashboardContainers() {
           value={selectedModelId}
           onChange={setSelectedModelId}
           style={{ minWidth: 220 }}
+          searchable
+          clearable
         />
         <Button onClick={handleDeploy} disabled={!selectedModelId} loading={deployLoading}>
           Deploy

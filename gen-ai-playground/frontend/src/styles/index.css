@@ -4,6 +4,16 @@ body {
   min-height: 100dvh;
 }
 
+/* Prevent iOS Safari from auto-zooming when focusing form fields.
+   iOS zooms in whenever an input's font-size is below 16px. */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
