@@ -4,6 +4,7 @@ import { Alert, Button, FileInput, Group, MultiSelect, Text, Textarea } from "@m
 
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
+import { formatAudioModelName } from "./history-ui/audioHistoryUtils"
 
 type TranscriptionSegment = {
   start: number
@@ -17,7 +18,6 @@ type TranscriptionResponse = {
   duration?: number
   transcription_time_ms?: number
   model?: string
-  resolved_model?: string
   segments?: TranscriptionSegment[]
 }
 
@@ -73,6 +73,13 @@ const getCsrfToken = (): string => {
   const parts = value.split(`; csrf_token=`)
   if (parts.length === 2) return parts.pop()!.split(";").shift()!
   return ""
+}
+
+const makeTranscriptionRunId = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
 
 export default function Transcribe() {
@@ -254,6 +261,9 @@ export default function Transcribe() {
       ),
     )
 
+    let succeededCount = 0
+    const runId = makeTranscriptionRunId()
+
     await Promise.all(
       modelsToRun.map(async modelValue => {
         const startedAt = Date.now()
@@ -261,6 +271,8 @@ export default function Transcribe() {
         formData.append("file", targetFile)
         formData.append("task", "transcribe")
         formData.append("model_path", modelValue)
+        formData.append("source", source)
+        formData.append("run_id", runId)
 
         try {
           const response = await axios.post<TranscriptionResponse>(`${backendUrl}/audio/transcribe`, formData, {
@@ -281,6 +293,7 @@ export default function Transcribe() {
               error: null,
             },
           }))
+          succeededCount += 1
         } catch (err: unknown) {
           setResultsByModel(prev => ({
             ...prev,
@@ -295,6 +308,10 @@ export default function Transcribe() {
         }
       }),
     )
+
+    if (succeededCount > 0) {
+      window.dispatchEvent(new Event("history-update"))
+    }
 
     setIsLoading(false)
     setActiveTranscribeSource(null)
@@ -600,10 +617,7 @@ export default function Transcribe() {
                           Language: {modelResult.data.language ?? "unknown"}
                         </Text>
                         <Text size="sm" c="dimmed">
-                          Model: {modelResult.data.model ?? "unknown"}
-                          {modelResult.data.resolved_model
-                            ? ` (resolved: ${modelResult.data.resolved_model})`
-                            : ""}
+                          Model: {formatAudioModelName(modelResult.data.model ?? "unknown")}
                         </Text>
                         {typeof modelResult.data.duration === "number" ? (
                           <Text size="sm" c="dimmed">

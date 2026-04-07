@@ -36,7 +36,7 @@ export function getTypeIcon(type: string | null | undefined) {
       return <ImageIcon />
   }
 }
-export function formatDate(ts: string) {
+export function formatDate(ts: string | number | Date) {
   const d = new Date(ts)
   return (
     d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +

@@ -14,7 +14,7 @@ def test_custom_engine_requires_image():
         TemplateConfig.model_validate(
             {
                 "engine": "custom",
-                "model": "openai/whisper-large-v3-turbo",
+                "model": "whisper-large-v3-turbo",
                 "custom": {},
             }
         )
@@ -25,7 +25,7 @@ def test_custom_engine_rejects_latest_image_tag():
         TemplateConfig.model_validate(
             {
                 "engine": "custom",
-                "model": "openai/whisper-large-v3-turbo",
+                "model": "whisper-large-v3-turbo",
                 "custom": {"image": "repo/whisper-service:latest"},
             }
         )
@@ -36,7 +36,7 @@ def test_custom_engine_rejects_invalid_env_key():
         TemplateConfig.model_validate(
             {
                 "engine": "custom",
-                "model": "openai/whisper-large-v3-turbo",
+                "model": "whisper-large-v3-turbo",
                 "custom": {
                     "image": "repo/whisper-service:v1",
                     "env": {
@@ -55,7 +55,7 @@ def test_discovery_fails_on_duplicate_display_names(tmp_path: Path, monkeypatch)
     first = {
         "engine": "custom",
         "display_name": duplicate_name,
-        "model": "openai/whisper-large-v3-turbo",
+        "model": "whisper-large-v3-turbo",
         "gpu_types": ["l40s"],
         "custom": {"image": "repo/whisper:v1"},
         "port": 9000,
@@ -64,7 +64,7 @@ def test_discovery_fails_on_duplicate_display_names(tmp_path: Path, monkeypatch)
     second = {
         "engine": "custom",
         "display_name": duplicate_name,
-        "model": "openai/whisper-large-v3",
+        "model": "whisper-large-v3",
         "gpu_types": ["l40s"],
         "custom": {"image": "repo/whisper:v2"},
         "port": 9000,
@@ -87,7 +87,7 @@ def test_audio_map_keeps_audio_template_when_text_has_same_display_name(tmp_path
     audio = {
         "engine": "custom",
         "display_name": duplicate_name,
-        "model": "openai/whisper-large-v3-turbo",
+        "model": "whisper-large-v3-turbo",
         "gpu_types": ["l40s"],
         "custom": {"image": "repo/whisper:v1"},
         "port": 9000,

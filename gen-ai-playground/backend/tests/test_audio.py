@@ -9,6 +9,7 @@ import bcrypt
 import jwt
 import mongomock
 import pytest
+from pymongo.errors import PyMongoError
 from fastapi.testclient import TestClient
 
 from app.config import settings
@@ -240,3 +241,145 @@ class TestAudioFallbackUpload:
 
         assert result == {"text": "ok"}
         assert captured_payloads == [b"abc123", b"abc123"]
+
+
+class TestAudioHistoryPersistence:
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    def test_transcribe_inserts_history_record(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        mock_db,
+        registered_user,
+        auth_headers,
+    ):
+        mock_proxy_call.return_value = {
+            "text": "hello transcript",
+            "model": "whisper-large-v3-turbo",
+            "language": "en",
+            "transcription_time_ms": 777,
+        }
+
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
+            data={
+                "task": "transcribe",
+                "model_path": "Whisper A",
+                "source": "uploaded",
+                "run_id": "run-123",
+            },
+            files={"file": ("audio.wav", b"abc", "audio/wav")},
+        )
+
+        assert response.status_code == 200
+
+        records = list(mock_db.audio_transcriptions.find({"type": "transcription"}))
+        assert len(records) == 1
+        rec = records[0]
+        assert rec["username"] == "audio-user"
+        assert rec["model"] == "Whisper A"
+        assert rec["transcription_text"] == "hello transcript"
+        assert rec["language"] == "en"
+        assert rec["transcription_time_ms"] == 777
+        assert rec["source"] == "uploaded"
+        assert rec["run_id"] == "run-123"
+        assert rec["input_name"] == "audio.wav"
+        assert "timestamp" in rec
+
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    def test_transcribe_still_returns_on_db_failure(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        mock_db,
+        registered_user,
+        auth_headers,
+    ):
+        mock_proxy_call.return_value = {"text": "ok", "model": "Whisper A"}
+
+        with patch.object(mock_db.audio_transcriptions, "insert_one", side_effect=PyMongoError("db down")):
+            response = client.post(
+                "/audio/transcribe",
+                headers=auth_headers,
+                data={"task": "transcribe", "model_path": "Whisper A"},
+                files={"file": ("audio.wav", b"abc", "audio/wav")},
+            )
+
+        assert response.status_code == 200
+        assert response.json()["text"] == "ok"
+
+
+class TestAudioHistoryEndpoints:
+    def test_audio_history_returns_user_items(self, client, mock_db, registered_user, auth_headers):
+        now = datetime.utcnow()
+        mock_db.audio_transcriptions.insert_many(
+            [
+                {
+                    "type": "transcription",
+                    "transcription_text": "new item",
+                    "model": "whisper-a",
+                    "timestamp": now,
+                    "username": "audio-user",
+                    "transcription_time_ms": 100,
+                },
+                {
+                    "type": "transcription",
+                    "transcription_text": "old item",
+                    "model": "whisper-a",
+                    "timestamp": now - timedelta(minutes=1),
+                    "username": "audio-user",
+                    "transcription_time_ms": 120,
+                },
+                {
+                    "type": "transcription",
+                    "transcription_text": "other user",
+                    "model": "whisper-b",
+                    "timestamp": now,
+                    "username": "someone-else",
+                    "transcription_time_ms": 150,
+                },
+            ]
+        )
+
+        response = client.get("/audio/history", headers=auth_headers)
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total"] == 2
+        assert len(payload["history"]) == 2
+        assert payload["history"][0]["transcription_text"] == "new item"
+        assert payload["history"][1]["transcription_text"] == "old item"
+
+    def test_audio_history_sidebar_returns_sorted_items(self, client, mock_db, registered_user, auth_headers):
+        now = datetime.utcnow()
+        mock_db.audio_transcriptions.insert_many(
+            [
+                {
+                    "type": "transcription",
+                    "transcription_text": "first",
+                    "model": "whisper-a",
+                    "timestamp": now - timedelta(minutes=2),
+                    "username": "audio-user",
+                },
+                {
+                    "type": "transcription",
+                    "transcription_text": "second",
+                    "model": "whisper-a",
+                    "timestamp": now - timedelta(minutes=1),
+                    "username": "audio-user",
+                },
+            ]
+        )
+
+        response = client.get("/audio/history-sidebar", headers=auth_headers)
+
+        assert response.status_code == 200
+        history = response.json()["history"]
+        assert len(history) == 2
+        assert history[0]["transcription_text"] == "second"
+        assert history[1]["transcription_text"] == "first"

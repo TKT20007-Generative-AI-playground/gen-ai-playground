@@ -10,7 +10,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from faster_whisper import WhisperModel
 
 
-DEFAULT_MODEL_NAME = "openai/whisper-large-v3-turbo"
+DEFAULT_MODEL_NAME = "whisper-large-v3-turbo"
 
 # Common placeholder values people leave from copy/paste examples.
 PLACEHOLDER_MODEL_NAMES = {
@@ -86,7 +86,6 @@ def health() -> dict[str, Any]:
         "status": "ok",
         "configured_model": settings.model_size,
         "model": normalized_model,
-        "resolved_model": _resolve_model_name(settings.model_size),
         "device": settings.device,
         "compute_type": settings.compute_type,
         "model_loaded": _state["model"] is not None,
@@ -156,7 +155,6 @@ async def transcribe_audio(
             "transcription_time_ms": transcription_time_ms,
             "configured_model": settings.model_size,
             "model": _normalize_model_name(settings.model_size),
-            "resolved_model": _resolve_model_name(settings.model_size),
         }
     except HTTPException:
         raise

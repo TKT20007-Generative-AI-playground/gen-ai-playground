@@ -35,3 +35,17 @@ export interface TextRecord {
   }
   generation_time_ms?: number
 }
+
+export interface AudioRecord {
+  type: string
+  transcription_text: string
+  model: string
+  timestamp: string
+  username: string
+  run_id?: string
+  input_name?: string
+  language?: string
+  duration?: number
+  transcription_time_ms?: number
+  source?: string
+}

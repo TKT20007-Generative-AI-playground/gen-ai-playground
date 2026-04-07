@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
-import type { ImageRecord, PromptGroup, TextRecord } from "./history-ui/historyInterfaces"
+import type { AudioRecord, ImageRecord, PromptGroup, TextRecord } from "./history-ui/historyInterfaces"
 import DateRangePicker from "./history-ui/DateRangePicker"
 import ImageCard from "./history-ui/ImageCard"
 import TextCard from "./history-ui/TextCard"
+import AudioCard from "./history-ui/AudioCard"
 import EmptyState from "./history-ui/EmptyState"
-import { TextIcon, ImageIcon, DownloadIcon, EditIcon } from "./history-ui/Icons"
+import { TextIcon, ImageIcon, DownloadIcon, EditIcon, AudioIcon } from "./history-ui/Icons"
 import { getTypeColor, getTypeIcon, getTypeLabel, formatDate } from "./history-ui/ImageUtils"
 import { HoverTab } from "./history-ui/HoverTab"
 import {
@@ -38,20 +39,23 @@ export default function History() {
 
   const [imageHistory, setImageHistory] = useState<PromptGroup[]>([])
   const [textHistory, setTextHistory] = useState<TextRecord[]>([])
+  const [audioHistory, setAudioHistory] = useState<AudioRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null)
 
-  type Tab = "images" | "text"
+  type Tab = "images" | "text" | "audio"
   const [activeTab, setActiveTab] = useState<Tab>("images")
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null])
 
   const [pages, setPages] = useState<Record<Tab, number>>({
     images: 1,
     text: 1,
+    audio: 1,
   })
   const [totalPages, setTotalPages] = useState<Record<Tab, number>>({
     images: 1,
     text: 1,
+    audio: 1,
   })
   const currentPage = pages[activeTab]
 
@@ -124,6 +128,27 @@ export default function History() {
     [backendUrl],
   )
 
+  const fetchAudioHistory = useCallback(
+    async (range: [Date | null, Date | null], pageNum: number) => {
+      const headers = {
+        "Content-Type": "application/json",
+      }
+
+      const params = buildParams(range, pageNum)
+
+      const res = await axios.get(`${backendUrl}/audio/history`, {
+        headers,
+        params,
+      })
+
+      return {
+        history: res.data.history || [],
+        totalPages: res.data.total_pages || 1,
+      }
+    },
+    [backendUrl],
+  )
+
   useEffect(() => {
     const run = async () => {
       setLoading(true)
@@ -137,13 +162,21 @@ export default function History() {
             ...prev,
             images: data.totalPages,
           }))
-        } else {
+        } else if (activeTab === "text") {
           const data = await fetchTextHistory(dateRange, currentPage)
 
           setTextHistory(data.history)
           setTotalPages(prev => ({
             ...prev,
             text: data.totalPages,
+          }))
+        } else {
+          const data = await fetchAudioHistory(dateRange, currentPage)
+
+          setAudioHistory(data.history)
+          setTotalPages(prev => ({
+            ...prev,
+            audio: data.totalPages,
           }))
         }
       } catch (err) {
@@ -154,13 +187,14 @@ export default function History() {
     }
 
     run()
-  }, [activeTab, dateRange, currentPage, fetchImagesHistory, fetchTextHistory])
+  }, [activeTab, dateRange, currentPage, fetchImagesHistory, fetchTextHistory, fetchAudioHistory])
 
   const handleDateChange = (range: [Date | null, Date | null]) => {
     setDateRange(range)
     setPages({
       images: 1,
       text: 1,
+      audio: 1,
     })
   }
 
@@ -237,6 +271,27 @@ export default function History() {
                   }}
                 >
                   {textHistory.length}
+                </Badge>
+              )}
+            </HoverTab>
+
+            <HoverTab value="audio" leftSection={<AudioIcon />}>
+              Transcribe
+              {audioHistory.length > 0 && (
+                <Badge
+                  ml={8}
+                  size="xs"
+                  variant="filled"
+                  radius="xl"
+                  style={{
+                    background: "rgba(10, 10, 10, 0.08)",
+                    color: "black",
+                    fontWeight: 600,
+                    minWidth: 22,
+                    height: 18,
+                  }}
+                >
+                  {audioHistory.length}
                 </Badge>
               )}
             </HoverTab>
@@ -329,16 +384,48 @@ export default function History() {
               </Stack>
             </ScrollArea>
           )
-        ) : textHistory.length === 0 ? (
-          <EmptyState label="No text history yet. Start a conversation to see responses here." />
+        ) : activeTab === "text" ? (
+          textHistory.length === 0 ? (
+            <EmptyState label="No text history yet. Start a conversation to see responses here." />
+          ) : (
+            <ScrollArea>
+              <Stack gap={12}>
+                {textHistory.map((item, idx) => (
+                  <Transition key={idx} mounted transition="fade" duration={200}>
+                    {styles => (
+                      <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
+                        <TextCard item={item} />
+                      </div>
+                    )}
+                  </Transition>
+                ))}
+                <Group justify="center" mt="md">
+                  <Pagination
+                    total={totalPages[activeTab]}
+                    value={pages[activeTab]}
+                    onChange={newPage => {
+                      if (newPage == null) return
+                      setPages(prev => ({
+                        ...prev,
+                        [activeTab]: newPage,
+                      }))
+                      window.scrollTo({ top: 0, behavior: "smooth" })
+                    }}
+                  />
+                </Group>
+              </Stack>
+            </ScrollArea>
+          )
+        ) : audioHistory.length === 0 ? (
+          <EmptyState label="No transcription history yet. Run transcription to see outputs here." />
         ) : (
           <ScrollArea>
             <Stack gap={12}>
-              {textHistory.map((item, idx) => (
+              {audioHistory.map((item, idx) => (
                 <Transition key={idx} mounted transition="fade" duration={200}>
                   {styles => (
                     <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
-                      <TextCard item={item} />
+                      <AudioCard item={item} />
                     </div>
                   )}
                 </Transition>

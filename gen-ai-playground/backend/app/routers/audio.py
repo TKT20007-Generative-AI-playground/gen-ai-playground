@@ -1,14 +1,20 @@
 """Audio transcription routes."""
 
+import math
 import os
-from typing import Any, BinaryIO
+import time
+from datetime import datetime, timezone
+from typing import Any, BinaryIO, Optional
 
 import httpx
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from pymongo.database import Database
+from pymongo.errors import PyMongoError
 
 from app.config import settings
+from app.database import get_database
 from app.dependencies import get_admin_user, get_current_user, validate_csrf_token
-from app.models import DeployModelRequest, DeploymentStatusResponse, UserInfo
+from app.models import DeployModelRequest, DeploymentStatusResponse, HistoryResponseAudio, UserInfo
 from app.template_discovery import _deployment_name_from_filename, get_audio_template_map
 from app.verda_service import verda_service
 
@@ -195,6 +201,41 @@ def _validate_upload_size(file: UploadFile) -> None:
         )
 
 
+def _safe_int(value: Any) -> int | None:
+    try:
+        if value is None:
+            return None
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _normalize_whisper_model_identifier(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+
+    if cleaned.lower().startswith("openai/"):
+        return cleaned.split("/", 1)[1]
+
+    return cleaned
+
+
+def _resolve_audio_history_model_label(
+    requested_model: str | None,
+    result_model: Any,
+    deployment_name: str,
+) -> str:
+    for candidate in (requested_model, result_model, deployment_name):
+        normalized = _normalize_whisper_model_identifier(candidate)
+        if normalized:
+            return normalized
+    return "unknown"
+
+
 @router.get("/models")
 def list_available_audio_models(_current_user: UserInfo = Depends(get_current_user)):
     """List audio model templates available for deployment."""
@@ -324,10 +365,13 @@ async def transcribe_audio(
     file: UploadFile = File(...),
     model_path: str | None = Form(None),
     language: str | None = Form(None),
+    source: str | None = Form(None),
+    run_id: str | None = Form(None),
     task: str = Form("transcribe"),
     beam_size: int = Form(5),
     vad_filter: bool = Form(True),
     current_user: UserInfo = Depends(get_current_user),
+    db: Database = Depends(get_database),
     _: None = Depends(validate_csrf_token),
 ) -> dict[str, Any]:
     """Proxy file transcription to a selected deployed Verda audio container."""
@@ -335,6 +379,8 @@ async def transcribe_audio(
         raise HTTPException(status_code=400, detail="task must be either 'transcribe' or 'translate'")
 
     deployment_name, endpoint_url = _resolve_audio_endpoint(model_path=model_path, require_healthy=True)
+    normalized_source = source if source in {"uploaded", "recording"} else source
+    normalized_run_id = (run_id or "").strip()[:128] or None
 
     print(
         "Audio transcription requested by user: "
@@ -350,8 +396,9 @@ async def transcribe_audio(
     if language:
         form_data["language"] = language
 
+    started_at = time.perf_counter()
     try:
-        return await _post_with_fallback_paths(
+        result = await _post_with_fallback_paths(
             endpoint_url,
             ["transcribe", "predict", ""],
             form_data,
@@ -359,6 +406,45 @@ async def transcribe_audio(
             file.filename or "audio.bin",
             file.content_type or "application/octet-stream",
         )
+
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        transcription_time_ms = _safe_int(result.get("transcription_time_ms"))
+        if transcription_time_ms is None:
+            transcription_time_ms = elapsed_ms
+
+        normalized_result_model = _normalize_whisper_model_identifier(result.get("model"))
+        if normalized_result_model:
+            result["model"] = normalized_result_model
+
+        history_model_label = _resolve_audio_history_model_label(
+            requested_model=model_path,
+            result_model=result.get("model"),
+            deployment_name=deployment_name,
+        )
+
+        try:
+            input_name = (file.filename or "").strip() or None
+            if normalized_source == "recording":
+                input_name = None
+
+            history_record = {
+                "type": "transcription",
+                "transcription_text": result.get("text", ""),
+                "model": history_model_label,
+                "timestamp": datetime.utcnow(),
+                "username": current_user.username,
+                "run_id": normalized_run_id,
+                "input_name": input_name,
+                "language": result.get("language"),
+                "duration": result.get("duration"),
+                "transcription_time_ms": transcription_time_ms,
+                "source": normalized_source,
+            }
+            db.audio_transcriptions.insert_one(history_record)
+        except (PyMongoError, TypeError, ValueError) as exc:
+            print(f"Failed to save audio transcription to MongoDB: {exc}")
+
+        return result
     except httpx.HTTPStatusError as exc:
         try:
             payload = exc.response.json()
@@ -368,3 +454,92 @@ async def transcribe_audio(
         raise HTTPException(status_code=exc.response.status_code, detail=detail) from exc
     except httpx.RequestError as exc:
         raise HTTPException(status_code=503, detail=f"Whisper service unavailable: {exc}") from exc
+
+
+@router.get("/history-sidebar")
+def get_audio_history_sidebar(
+    current_user: UserInfo = Depends(get_current_user),
+    db: Database = Depends(get_database),
+) -> dict[str, list[dict[str, Any]]]:
+    records = list(
+        db.audio_transcriptions.find(
+            {"username": current_user.username},
+            {
+                "_id": 0,
+                "type": 1,
+                "transcription_text": 1,
+                "model": 1,
+                "timestamp": 1,
+                "username": 1,
+                "run_id": 1,
+                "input_name": 1,
+                "language": 1,
+                "duration": 1,
+                "transcription_time_ms": 1,
+                "source": 1,
+            },
+        ).sort("timestamp", -1)
+    )
+
+    return {"history": records}
+
+
+@router.get("/history", response_model=HistoryResponseAudio)
+def get_audio_history(
+    current_user: UserInfo = Depends(get_current_user),
+    db: Database = Depends(get_database),
+    from_date: Optional[int] = Query(None, alias="from"),
+    to_date: Optional[int] = Query(None, alias="to"),
+    page: int = Query(1, alias="page", ge=1),
+):
+    page_size = 10
+    query: dict[str, Any] = {"username": current_user.username}
+
+    if from_date or to_date:
+        date_filter: dict[str, datetime] = {}
+        if from_date:
+            date_filter["$gte"] = datetime.fromtimestamp(from_date / 1000, tz=timezone.utc)
+        if to_date:
+            date_filter["$lte"] = datetime.fromtimestamp(to_date / 1000, tz=timezone.utc)
+        query["timestamp"] = date_filter
+
+    total = db.audio_transcriptions.count_documents(query)
+    if total == 0:
+        return HistoryResponseAudio(history=[], total=0, page=page, total_pages=0)
+
+    total_pages = math.ceil(total / page_size)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+
+    try:
+        history = list(
+            db.audio_transcriptions.find(
+                query,
+                {
+                    "_id": 0,
+                    "type": 1,
+                    "transcription_text": 1,
+                    "model": 1,
+                    "timestamp": 1,
+                    "username": 1,
+                    "run_id": 1,
+                    "input_name": 1,
+                    "language": 1,
+                    "duration": 1,
+                    "transcription_time_ms": 1,
+                    "source": 1,
+                },
+            )
+            .sort("timestamp", -1)
+            .skip(start)
+            .limit(page_size)
+        )
+
+        return HistoryResponseAudio(
+            history=history,
+            total=total,
+            page=page,
+            total_pages=total_pages,
+        )
+    except PyMongoError as exc:
+        raise HTTPException(status_code=500, detail=f"Error getting audio history: {exc}") from exc
