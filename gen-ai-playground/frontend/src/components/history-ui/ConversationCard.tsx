@@ -145,6 +145,17 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
           >
             {messages.length} messages
           </Badge>
+          <Button
+            component="a"
+            href={`/chat/conversations/${item._id}`}
+            size="compact-xs"
+            variant="subtle"
+            color="gray"
+            radius="sm"
+            style={{ fontSize: 10, padding: "0 6px", height: 18 }}
+          >
+            Open conversation
+          </Button>
 
           <Group gap={4} align="center">
             <Box c="dimmed" style={{ display: "flex" }}>
