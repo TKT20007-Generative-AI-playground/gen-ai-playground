@@ -39,6 +39,7 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
   const editedUrlRef = useRef<string | null>(null)
   const editControllerRef = useRef<AbortController | null>(null)
   const reeditControllerRef = useRef<AbortController | null>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
 
   const backendUrl = import.meta.env.VITE_API_URL
   const selectedModel = selectedModels[0]
@@ -101,6 +102,12 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
       if (editedUrlRef.current) URL.revokeObjectURL(editedUrlRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    if (editedImageUrl) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [editedImageUrl])
 
   function replaceEditedUrl(next: string | null) {
     setEditedImageUrl(prev => {
@@ -388,6 +395,8 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
           </div>
         </SimpleGrid>
       )}
+      <div ref={bottomRef} />
     </Stack>
+
   )
 }

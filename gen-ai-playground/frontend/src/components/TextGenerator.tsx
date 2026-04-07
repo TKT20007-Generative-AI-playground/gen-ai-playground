@@ -89,6 +89,8 @@ const modelStatusPriority: Record<ModelStatus, number> = {
   offline: 3,
 }
 
+const isMobile = window.matchMedia("(max-width: 768px)").matches
+
 // Build dropdown data with colored status dots; disable non-live models
 function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string, ModelStatus>) {
   return modelOptions
@@ -693,7 +695,6 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                   sidebarOpen && selectedModels.length >= 3
                     ? "repeat(2, 1fr)"
                     : "repeat(auto-fit, minmax(280px, 1fr))",
-
                 transition: "padding-right 0.3s ease",
                 paddingRight: sidebarOpen ? "260px" : "0px",
               }}
@@ -709,19 +710,36 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                   isBusy={isAnyLoading}
                   modelStatus={modelStatuses[modelValue] ?? "unknown"}
                   statusMessage={statusMsgs[modelValue] ?? null}
-                  thinkingMode={getThinkingMode(modelValue)}
-                  enableThinking={enableThinkingByModel[modelValue] ?? false}
-                  onToggleThinking={(enabled) => {
-                    setEnableThinkingByModel(prev => ({ ...prev, [modelValue]: enabled }))
-                    if (enabled) {
-                      const effectiveMax = Math.max(maxTokens, 2)
-                      setMaxTokens(effectiveMax)
-                    }
-                  }}
-                  onShare={() => {
-                    setShareTargetModel(modelValue)
-                    setShareModalOpen(true)
-                  }}
+                />
+              ))}
+            </div>
+          ) : (
+            // 1–2 models: keep the compact layout.
+            <div
+              style={{
+                display: "grid",
+                gap: "20px",
+                gridTemplateColumns: isMobile
+                  ? "1fr"
+                  : selectedModels.length === 1
+                    ? "minmax(320px, 1fr)"
+                    : "repeat(2, minmax(320px, 1fr))",
+                width: "100%",
+                margin: "0 auto",
+                alignItems: "stretch",
+              }}
+            >
+              {selectedModels.map(modelValue => (
+                <ChatPanel
+                  key={modelValue}
+                  modelValue={modelValue}
+                  modelLabel={getModelLabel(modelValue)}
+                  messages={messagesByModel[modelValue] ?? []}
+                  onClearMessages={() => clearMessagesForModel(modelValue)}
+                  isLoading={loadingByModel[modelValue] ?? false}
+                  isBusy={isAnyLoading}
+                  modelStatus={modelStatuses[modelValue] ?? "unknown"}
+                  statusMessage={statusMsgs[modelValue] ?? null}
                 />
               ))}
             </div>

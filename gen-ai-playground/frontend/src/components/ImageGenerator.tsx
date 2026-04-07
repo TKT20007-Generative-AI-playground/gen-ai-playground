@@ -58,6 +58,7 @@ export default function ImageGenerator() {
 
   const imageUrlRef = useRef<string | null>(null)
   const imageUrl2Ref = useRef<string | null>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
   const model1ControllerRef = useRef<AbortController | null>(null)
   const model2ControllerRef = useRef<AbortController | null>(null)
 
@@ -95,6 +96,13 @@ export default function ImageGenerator() {
       if (imageUrl2Ref.current) URL.revokeObjectURL(imageUrl2Ref.current)
     }
   }, [abortActiveRequests])
+
+  useEffect(() => {
+    if (imageUrl || imageUrl2) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
+  }, [imageUrl, imageUrl2])
+
 
   function replaceImageUrl(next: string | null) {
     setImageUrl(prev => {
@@ -414,6 +422,7 @@ export default function ImageGenerator() {
           </SimpleGrid>
         </div>
       )}
+      <div ref={bottomRef} />
     </Stack>
   )
 }
