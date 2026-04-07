@@ -5,12 +5,13 @@ Mocks verda_service so no real Verda/network calls are made.
 """
 import pytest
 from fastapi.testclient import TestClient
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
 import mongomock
 from unittest.mock import patch, MagicMock
 import os
+from bson import ObjectId
 
 from server import app
 from app.dependencies import validate_csrf_token
@@ -593,3 +594,172 @@ class TestTemplateFiles:
                     template_file.read_text(encoding="utf-8"))
             except Exception as e:
                 pytest.fail(f"Invalid template config {template_file.name}: {e}")
+                
+class TestConversations:
+
+    @staticmethod
+    def _auth_headers_for(username: str, is_admin: bool = False) -> dict:
+        payload = {
+            "username": username,
+            "is_admin": is_admin,
+            "exp": datetime.utcnow() + timedelta(hours=24),
+            "type": "access",
+        }
+        token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm="HS256")
+        return {"Authorization": f"Bearer {token}"}
+
+    @staticmethod
+    def _insert_user(mock_db, username: str):
+        hashed_password = bcrypt.hashpw("SecurePassword123!".encode("utf-8"), bcrypt.gensalt())
+        mock_db.users.insert_one({
+            "username": username,
+            "password": hashed_password,
+            "created_at": datetime.utcnow(),
+        })
+
+    def test_create_conversation_applies_defaults_and_includes_creator(
+        self, client, mock_db, registered_user, auth_headers
+    ):
+        response = client.post(
+            "/text/conversations",
+            json={"participants": ["alice", "testuser", "alice"]},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert set(data["participants"]) == {"testuser", "alice"}
+        assert data["title"] == "Untitled Conversation"
+        assert data["model"] == "default"
+
+        saved = mock_db.conversations.find_one({"_id": ObjectId(data["conversation_id"])})
+        assert saved is not None
+        assert saved["created_by"] == "testuser"
+        assert saved["messages"] == []
+
+    def test_join_conversation_rejects_invalid_invite_for_non_participant(
+        self, client, mock_db, registered_user
+    ):
+        self._insert_user(mock_db, "outsider")
+
+        conv_id = mock_db.conversations.insert_one({
+            "title": "Shared",
+            "participants": ["testuser"],
+            "messages": [],
+            "invite_code": "correct-code",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+        }).inserted_id
+
+        response = client.post(
+            f"/text/conversations/{conv_id}/join",
+            json={"invite_code": "wrong-code"},
+            headers=self._auth_headers_for("outsider"),
+        )
+
+        assert response.status_code == 403
+        assert "invalid invite code" in response.json()["detail"].lower()
+
+    def test_join_conversation_adds_participant_with_valid_invite(
+        self, client, mock_db, registered_user
+    ):
+        self._insert_user(mock_db, "outsider")
+
+        conv_id = mock_db.conversations.insert_one({
+            "title": "Shared",
+            "participants": ["testuser"],
+            "messages": [],
+            "invite_code": "correct-code",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+        }).inserted_id
+
+        response = client.post(
+            f"/text/conversations/{conv_id}/join",
+            json={"invite_code": "correct-code"},
+            headers=self._auth_headers_for("outsider"),
+        )
+
+        assert response.status_code == 200
+        assert response.json()["ok"] is True
+
+        updated = mock_db.conversations.find_one({"_id": conv_id})
+        assert "outsider" in updated["participants"]
+
+    def test_conversation_history_forbidden_for_non_participant(
+        self, client, mock_db, registered_user
+    ):
+        self._insert_user(mock_db, "outsider")
+
+        conv_id = mock_db.conversations.insert_one({
+            "title": "Project chat",
+            "participants": ["testuser"],
+            "messages": [{"role": "user", "content": "hello"}],
+            "model": "Deepseek-7b-sglang",
+            "invite_code": "abc123",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+        }).inserted_id
+
+        response = client.get(
+            f"/text/conversation-history/{conv_id}",
+            headers=self._auth_headers_for("outsider"),
+        )
+
+        assert response.status_code == 403
+        assert "not a participant" in response.json()["detail"].lower()
+
+    def test_all_conversations_supports_pagination_and_date_range(
+        self, client, mock_db, registered_user, auth_headers
+    ):
+        now = datetime.now(timezone.utc)
+
+        # 11 recent conversations for testuser and one old conversation.
+        for i in range(11):
+            mock_db.conversations.insert_one({
+                "title": f"Recent {i}",
+                "participants": ["testuser"],
+                "messages": [],
+                "invite_code": f"code-{i}",
+                "created_at": now - timedelta(hours=i),
+                "updated_at": now - timedelta(hours=i),
+            })
+
+        mock_db.conversations.insert_one({
+            "title": "Very old",
+            "participants": ["testuser"],
+            "messages": [],
+            "invite_code": "old-code",
+            "created_at": now - timedelta(days=10),
+            "updated_at": now - timedelta(days=10),
+        })
+
+        # Not visible to testuser.
+        mock_db.conversations.insert_one({
+            "title": "Other user",
+            "participants": ["someone-else"],
+            "messages": [],
+            "invite_code": "other-code",
+            "created_at": now,
+            "updated_at": now,
+        })
+
+        page_2 = client.get("/text/all-conversations?page=2", headers=auth_headers)
+        assert page_2.status_code == 200
+        page_2_data = page_2.json()
+        assert page_2_data["total"] == 12
+        assert page_2_data["total_pages"] == 2
+        assert page_2_data["page"] == 2
+        assert len(page_2_data["conversations"]) == 2
+
+        from_ts = int((now - timedelta(days=2)).timestamp() * 1000)
+        to_ts = int(now.timestamp() * 1000)
+        filtered = client.get(
+            f"/text/all-conversations?from={from_ts}&to={to_ts}&page=1",
+            headers=auth_headers,
+        )
+        assert filtered.status_code == 200
+        filtered_data = filtered.json()
+        assert filtered_data["total"] == 11
+        assert all(conv["title"] != "Very old" for conv in filtered_data["conversations"])
+    
