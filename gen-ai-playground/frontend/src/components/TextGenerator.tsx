@@ -503,7 +503,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         size="sm"
       >
         <TextInput
-          label="Coversation Link"
+          label="Conversation Link"
           placeholder="Paste conversation link here..."
           value={joinId}
           onChange={e => setJoinId(e.target.value)}

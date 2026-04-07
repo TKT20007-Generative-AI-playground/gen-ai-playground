@@ -762,4 +762,38 @@ class TestConversations:
         filtered_data = filtered.json()
         assert filtered_data["total"] == 11
         assert all(conv["title"] != "Very old" for conv in filtered_data["conversations"])
+
+    def test_join_conversation_returns_400_for_invalid_object_id(
+        self, client, registered_user, auth_headers
+    ):
+        response = client.post(
+            "/text/conversations/not-a-valid-objectid/join",
+            json={"invite_code": "x"},
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 400
+        assert "invalid conversation id" in response.json()["detail"].lower()
+
+    def test_check_participant_returns_400_for_invalid_object_id(
+        self, client, registered_user, auth_headers
+    ):
+        response = client.get(
+            "/text/conversations/not-a-valid-objectid/check-participant",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 400
+        assert "invalid conversation id" in response.json()["detail"].lower()
+
+    def test_conversation_history_returns_400_for_invalid_object_id(
+        self, client, registered_user, auth_headers
+    ):
+        response = client.get(
+            "/text/conversation-history/not-a-valid-objectid",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 400
+        assert "invalid conversation id" in response.json()["detail"].lower()
     

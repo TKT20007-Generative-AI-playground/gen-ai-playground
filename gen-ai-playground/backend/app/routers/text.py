@@ -39,6 +39,14 @@ def _sanitize_slug(model_path: str) -> str:
     """Convert a model path to a deployment-name-compatible slug."""
     return model_path.split("/")[-1].lower().replace(".", "-")
 
+
+def _parse_conversation_object_id(conversation_id: str) -> ObjectId:
+    """Parse conversation id and return a client error for malformed ids."""
+    try:
+        return ObjectId(conversation_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid conversation id")
+
 manager = ConnectionManager()
 
 router = APIRouter(
@@ -650,8 +658,6 @@ async def create_conversation(
     initial_messages = conversation.initial_messages or []
     model_key = conversation.model_key or "default"
     
-    print(f"Creating conversation titled '{conversation.title}' with participants: {participants} and initial messages: {initial_messages}, model_key: {model_key} ")
-
     doc = {
         "title": conversation.title or "Untitled Conversation",
         "participants": participants,
@@ -682,7 +688,8 @@ def join_conversation(
     db=Depends(get_database),
     cur_user: UserInfo = Depends(get_current_user),
 ):
-    conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    conversation_oid = _parse_conversation_object_id(conversation_id)
+    conversation = db.conversations.find_one({"_id": conversation_oid})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -691,7 +698,7 @@ def join_conversation(
             raise HTTPException(status_code=403, detail="Invalid invite code")
 
     db.conversations.update_one(
-        {"_id": ObjectId(conversation_id)},
+        {"_id": conversation_oid},
         {"$addToSet": {"participants": cur_user.username}},
     )
     return {"ok": True}
@@ -703,7 +710,8 @@ def check_participant(
     db=Depends(get_database),
     cur_user: UserInfo = Depends(get_current_user),
 ):
-    conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    conversation_oid = _parse_conversation_object_id(conversation_id)
+    conversation = db.conversations.find_one({"_id": conversation_oid})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
     if cur_user.username not in conversation["participants"]:
@@ -717,7 +725,8 @@ def conversation_history(
     db=Depends(get_database),
     cur_user: UserInfo = Depends(get_current_user),
 ):
-    conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    conversation_oid = _parse_conversation_object_id(conversation_id)
+    conversation = db.conversations.find_one({"_id": conversation_oid})
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
@@ -734,6 +743,12 @@ def conversation_history(
 @router.websocket("/ws/conversations/{conversation_id}")
 async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends(get_database)):
     await websocket.accept()
+
+    try:
+        conversation_oid = _parse_conversation_object_id(conversation_id)
+    except HTTPException:
+        await websocket.close(code=1008, reason="Invalid conversation id")
+        return
 
     try:
         auth_data = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
@@ -753,7 +768,7 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
 
     username = user.username
 
-    conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
+    conversation = db.conversations.find_one({"_id": conversation_oid})
     if not conversation:
         await websocket.close(code=1008)
         return
@@ -787,7 +802,7 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
             }
 
             db.conversations.update_one(
-                {"_id": ObjectId(conversation_id)},
+                {"_id": conversation_oid},
                 {"$push": {"messages": user_message}},
             )
 
@@ -800,6 +815,7 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
                     "type": "message",
                     **user_message,
                 },
+                exclude_username=username,
             )
 
             # generate
@@ -832,7 +848,13 @@ async def handle_llm_reply(
 ):
 
     try:
-        conversation = db.conversations.find_one({"_id": ObjectId(conversation_id)})
+        try:
+            conversation_oid = _parse_conversation_object_id(conversation_id)
+        except HTTPException:
+            await manager.broadcast(conversation_id, {"type": "error", "message": "Invalid conversation id"})
+            return
+
+        conversation = db.conversations.find_one({"_id": conversation_oid})
         if not conversation:
             return
 
@@ -895,7 +917,7 @@ async def handle_llm_reply(
         
         assistant_message = {"role": "assistant", "content": assistant_text}
         db.conversations.update_one(
-            {"_id": ObjectId(conversation_id)},
+            {"_id": conversation_oid},
             {"$push": {"messages": assistant_message}},
         )
 

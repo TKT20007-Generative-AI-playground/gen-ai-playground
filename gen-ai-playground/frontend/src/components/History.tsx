@@ -108,7 +108,6 @@ export default function History() {
           { headers: getAuthHeaders(), withCredentials: true, params }
         )
 
-        console.log("history", his)
         return {
           history: his.data.conversations || [],
           totalPages: his.data.total_pages || 1,
@@ -493,7 +492,7 @@ export default function History() {
           </ScrollArea>
           )
         ) : activeTab === "conversations" && conversationHistory.length === 0 ? (
-        <EmptyState label="No shared conversation history yet. Start a sharedconversation to see responses here." />
+        <EmptyState label="No shared conversation history yet. Start a shared conversation to see responses here." />
         ) : (
         <ScrollArea>
           <Stack gap={12}>

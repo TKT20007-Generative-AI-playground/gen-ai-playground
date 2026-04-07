@@ -17,7 +17,15 @@ class ConnectionManager:
             if not self.active_connections[conversation_id]:
                 del self.active_connections[conversation_id]
 
-    async def broadcast(self, conversation_id: str, message: dict):
+    async def broadcast(self, conversation_id: str, message: dict, exclude_username: str | None = None):
         connections = self.active_connections.get(conversation_id, {})
-        for websocket in connections.values():
-            await websocket.send_json(message)
+        failed_usernames = []
+        for username, websocket in list(connections.items()):
+            if exclude_username is not None and username == exclude_username:
+                continue
+            try:
+                await websocket.send_json(message)
+            except Exception:
+                failed_usernames.append(username)
+        for username in failed_usernames:
+            self.disconnect(conversation_id, username)
