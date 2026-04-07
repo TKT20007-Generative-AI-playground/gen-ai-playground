@@ -162,7 +162,7 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
               <ClockIcon />
             </Box>
             <Text size="xs" c="dimmed" style={{ fontSize: 10 }}>
-              {formatDate(item.timestamp)}
+              {formatDate(item.created_at)}
             </Text>
           </Group>
         </Group>

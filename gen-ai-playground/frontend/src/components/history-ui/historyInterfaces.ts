@@ -48,5 +48,5 @@ export interface ConversationRecord {
     participants: string[]
     model: string
     messages: ConversationMessage[]
-    timestamp: string
+    created_at: string
 }
