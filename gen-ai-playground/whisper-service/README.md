@@ -87,11 +87,25 @@ If you see an error like:
 rebuild and publish a fresh image tag, then redeploy template:
 
 ```bash
-docker build -t honjen/whisper-service:v5 ./whisper-service
-docker push honjen/whisper-service:v5
+export GHCR_OWNER=tkt20007-generative-ai-playground
+export GHCR_REPO=gen-ai-playground
+export IMAGE=ghcr.io/${GHCR_OWNER}/${GHCR_REPO}/whisper-service:v6
+
+# Requires a token with write:packages scope.
+echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+
+docker build -t "$IMAGE" ./whisper-service
+docker push "$IMAGE"
 ```
 
-The backend whisper templates are pinned to `honjen/whisper-service:v5`.
+Use lowercase values for `GHCR_OWNER` and `GHCR_REPO` even if your GitHub org/repo has uppercase letters.
+
+The backend whisper templates are pinned to `ghcr.io/tkt20007-generative-ai-playground/gen-ai-playground/whisper-service:v6`.
+
+If your cluster or runtime cannot pull the image, ensure the GHCR package is visible to your deploy target:
+
+- Public package: set package visibility to public in GitHub Packages.
+- Private package: configure an image pull secret/token in your deployment platform.
 
 Then verify:
 
