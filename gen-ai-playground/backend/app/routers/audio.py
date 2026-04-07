@@ -460,6 +460,7 @@ async def transcribe_audio(
 def get_audio_history_sidebar(
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
+    limit: int = Query(15, ge=1, le=200),
 ) -> dict[str, list[dict[str, Any]]]:
     records = list(
         db.audio_transcriptions.find(
@@ -478,7 +479,9 @@ def get_audio_history_sidebar(
                 "transcription_time_ms": 1,
                 "source": 1,
             },
-        ).sort("timestamp", -1)
+        )
+        .sort("timestamp", -1)
+        .limit(limit)
     )
 
     return {"history": records}

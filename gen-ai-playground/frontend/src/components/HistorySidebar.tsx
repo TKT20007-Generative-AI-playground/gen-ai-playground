@@ -43,6 +43,8 @@ interface HistoryRecord {
 }
 
 const backendUrl = import.meta.env.VITE_API_URL
+const AUDIO_SIDEBAR_MAX_FETCH = 200
+const AUDIO_RECORDS_PER_SESSION = 4
 
 export default function HistorySidebar({ opened }: { opened: boolean }) {
   const [items, setItems] = useState<HistoryRecord[]>([])
@@ -141,7 +143,12 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
             ? `${backendUrl}/text/history-sidebar`
             : `${backendUrl}/audio/history-sidebar`
 
-      const res = await axios.get(url, { withCredentials: true })
+      const audioFetchLimit = Math.min(AUDIO_SIDEBAR_MAX_FETCH, limit * AUDIO_RECORDS_PER_SESSION)
+
+      const res = await axios.get(url, {
+        withCredentials: true,
+        params: historyType === "audio" ? { limit: audioFetchLimit } : undefined,
+      })
       const history: HistoryRecord[] = res.data.history
 
       setItems(history)

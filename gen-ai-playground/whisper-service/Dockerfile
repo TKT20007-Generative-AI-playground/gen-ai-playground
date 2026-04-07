@@ -6,6 +6,8 @@ ENV LD_LIBRARY_PATH=/usr/local/lib/python3.11/site-packages/ctranslate2.libs:/us
 
 WORKDIR /app
 
+RUN useradd --create-home --uid 10001 appuser
+
 # Required by faster-whisper for decoding most common audio formats.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg \
@@ -14,8 +16,10 @@ RUN apt-get update \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py .
+COPY --chown=appuser:appuser app.py .
 
 EXPOSE 9000
+
+USER appuser
 
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "9000"]

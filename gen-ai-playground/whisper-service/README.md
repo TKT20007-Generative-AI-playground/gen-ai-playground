@@ -9,7 +9,7 @@ Standalone containerized transcription API using faster-whisper.
 
 ## Environment variables
 
-- `WHISPER_MODEL` (default: `openai/whisper-large-v3-turbo`)
+- `WHISPER_MODEL` (default: `whisper-large-v3-turbo`)
 - `WHISPER_DEVICE` (default: `cpu`)
 - `WHISPER_COMPUTE_TYPE` (default: `int8`)
 - `WHISPER_DOWNLOAD_ROOT` (optional)
@@ -35,6 +35,7 @@ docker run --rm -p 9000:9000 \
 
 The image installs NVIDIA CUDA runtime libraries (`nvidia-cublas-cu12`,
 `nvidia-cudnn-cu12`) so GPU transcription can load `libcublas.so.12`.
+The container runs as a non-root user (`appuser`) at runtime.
 
 ## Test with curl
 
@@ -56,8 +57,8 @@ Example response:
     {"start": 0.0, "end": 1.2, "text": "hello"},
     {"start": 1.2, "end": 2.0, "text": " world"}
   ],
-  "model": "openai/whisper-large-v3-turbo",
-  "resolved_model": "turbo"
+  "configured_model": "openai/whisper-large-v3-turbo",
+  "model": "whisper-large-v3-turbo"
 }
 ```
 
@@ -100,5 +101,5 @@ curl http://localhost:9000/health
 
 Expected:
 
-- `model` is `openai/whisper-large-v3-turbo`
-- `resolved_model` is `turbo`
+- `configured_model` reflects the raw `WHISPER_MODEL` env value
+- `model` is the normalized model identifier used by the service

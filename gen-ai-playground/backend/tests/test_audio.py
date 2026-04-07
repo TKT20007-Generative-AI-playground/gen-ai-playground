@@ -383,3 +383,42 @@ class TestAudioHistoryEndpoints:
         assert len(history) == 2
         assert history[0]["transcription_text"] == "second"
         assert history[1]["transcription_text"] == "first"
+
+    def test_audio_history_sidebar_respects_limit(self, client, mock_db, registered_user, auth_headers):
+        now = datetime.utcnow()
+        mock_db.audio_transcriptions.insert_many(
+            [
+                {
+                    "type": "transcription",
+                    "transcription_text": "third",
+                    "model": "whisper-a",
+                    "timestamp": now - timedelta(minutes=3),
+                    "username": "audio-user",
+                },
+                {
+                    "type": "transcription",
+                    "transcription_text": "second",
+                    "model": "whisper-a",
+                    "timestamp": now - timedelta(minutes=2),
+                    "username": "audio-user",
+                },
+                {
+                    "type": "transcription",
+                    "transcription_text": "first",
+                    "model": "whisper-a",
+                    "timestamp": now - timedelta(minutes=1),
+                    "username": "audio-user",
+                },
+            ]
+        )
+
+        response = client.get("/audio/history-sidebar", headers=auth_headers, params={"limit": 1})
+
+        assert response.status_code == 200
+        history = response.json()["history"]
+        assert len(history) == 1
+        assert history[0]["transcription_text"] == "first"
+
+    def test_audio_history_sidebar_rejects_invalid_limit(self, client, registered_user, auth_headers):
+        response = client.get("/audio/history-sidebar", headers=auth_headers, params={"limit": 0})
+        assert response.status_code == 422
