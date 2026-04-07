@@ -1,6 +1,6 @@
 import axios from "axios"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Alert, Button, FileInput, Group, MultiSelect, Text, Textarea } from "@mantine/core"
+import { Alert, Button, FileInput, MultiSelect, Text, Textarea } from "@mantine/core"
 
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
@@ -507,23 +507,45 @@ export default function Transcribe() {
                 </Alert>
               ) : (
                 <>
-                  <Group>
-                    <Button onClick={startRecording} disabled={!canStartRecording}>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      gap: "8px",
+                      width: "100%",
+                    }}
+                  >
+                    <Button onClick={startRecording} disabled={!canStartRecording} fullWidth>
                       {recordingButtonText}
                     </Button>
-                    <Button color="orange" onClick={stopRecording} disabled={!canStopRecording}>
+                    <Button color="orange" onClick={stopRecording} disabled={!canStopRecording} fullWidth>
                       Stop recording
                     </Button>
-                    <Button variant="default" onClick={clearRecording} disabled={isRecording || !recordedBlob}>
+                    <Button
+                      variant="default"
+                      onClick={clearRecording}
+                      disabled={isRecording || !recordedBlob}
+                      fullWidth
+                    >
                       Clear recording
                     </Button>
-                  </Group>
+                  </div>
 
                   {isRecording && recordingStartTime ? (
                     <ActionStatus actionText="Recording" startTime={recordingStartTime} />
                   ) : null}
 
-                  {recordedAudioUrl ? <audio controls src={recordedAudioUrl} /> : null}
+                  {recordedAudioUrl ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        width: "100%",
+                      }}
+                    >
+                      <audio controls src={recordedAudioUrl} style={{ width: "min(100%, 440px)" }} />
+                    </div>
+                  ) : null}
 
                   <Button
                     onClick={onTranscribeRecording}
@@ -599,8 +621,10 @@ export default function Transcribe() {
                       overflowY: "auto",
                     }}
                   >
-                    {modelResult?.loading && modelResult.startTime ? (
-                      <ActionStatus actionText="Transcribing" startTime={modelResult.startTime} />
+                    {modelResult?.loading ? (
+                      <Text size="sm" c="dimmed">
+                        Transcribing...
+                      </Text>
                     ) : null}
 
                     {modelResult?.error ? (
@@ -643,7 +667,7 @@ export default function Transcribe() {
 
                     {!modelResult ? (
                       <Text size="sm" c="dimmed">
-                        Run transcription to see this model output.
+                        Run transcription to see the model's output.
                       </Text>
                     ) : null}
                   </div>
