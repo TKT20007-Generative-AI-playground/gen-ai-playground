@@ -313,6 +313,38 @@ class TestAudioHistoryPersistence:
         assert response.status_code == 200
         assert response.json()["text"] == "ok"
 
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    def test_transcribe_normalizes_unknown_source_to_none(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        mock_db,
+        registered_user,
+        auth_headers,
+    ):
+        mock_proxy_call.return_value = {
+            "text": "ok",
+            "model": "Whisper A",
+        }
+
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
+            data={
+                "task": "transcribe",
+                "model_path": "Whisper A",
+                "source": "mic-input",
+            },
+            files={"file": ("audio.wav", b"abc", "audio/wav")},
+        )
+
+        assert response.status_code == 200
+        record = mock_db.audio_transcriptions.find_one({"username": "audio-user"})
+        assert record is not None
+        assert record["source"] is None
+
 
 class TestAudioHistoryEndpoints:
     def test_audio_history_returns_user_items(self, client, mock_db, registered_user, auth_headers):

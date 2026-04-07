@@ -53,6 +53,6 @@ class Settings:
     }
 
     # Audio
-    MAX_AUDIO_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "50"))
+    MAX_AUDIO_UPLOAD_MB: int = int(os.getenv("MAX_AUDIO_UPLOAD_MB", os.getenv("MAX_UPLOAD_MB", "50")))
 
 settings = Settings()

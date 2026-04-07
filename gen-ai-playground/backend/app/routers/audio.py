@@ -210,6 +210,17 @@ def _safe_int(value: Any) -> int | None:
         return None
 
 
+def _normalize_transcription_source(source: str | None) -> str | None:
+    if not isinstance(source, str):
+        return None
+
+    normalized = source.strip().lower()
+    if normalized in {"uploaded", "recording"}:
+        return normalized
+
+    return None
+
+
 def _normalize_whisper_model_identifier(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
@@ -379,7 +390,7 @@ async def transcribe_audio(
         raise HTTPException(status_code=400, detail="task must be either 'transcribe' or 'translate'")
 
     deployment_name, endpoint_url = _resolve_audio_endpoint(model_path=model_path, require_healthy=True)
-    normalized_source = source if source in {"uploaded", "recording"} else source
+    normalized_source = _normalize_transcription_source(source)
     normalized_run_id = (run_id or "").strip()[:128] or None
 
     print(
