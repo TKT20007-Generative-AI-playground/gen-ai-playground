@@ -2,9 +2,11 @@ import axios from "axios"
 import { useAuth } from "../context/AuthContext"
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
 
-import { Alert, Button, MultiSelect, Paper, Text, ScrollArea, TextInput } from "@mantine/core"
+import { Alert, Button, MultiSelect, Paper, Text, ScrollArea, TextInput, Modal } from "@mantine/core"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
+import { ShareConversationModal } from "./SharedConversationsModal"
+import { useNavigate } from "react-router-dom"
 
 type ModelOption = {
   value: string
@@ -100,6 +102,7 @@ type ChatPanelProps = {
   isBusy: boolean
   modelStatus: ModelStatus
   statusMessage: string | null
+  onShare: () => void
 }
 
 function ChatPanel({
@@ -110,6 +113,7 @@ function ChatPanel({
   isBusy,
   modelStatus,
   statusMessage,
+  onShare,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -159,6 +163,9 @@ function ChatPanel({
           Clear
         </Button>
       </div>
+      <Button size="xs" variant="light" onClick={onShare}>
+        Share conversation
+      </Button>
 
       <ScrollArea
         style={{
@@ -239,12 +246,16 @@ function ChatPanel({
 export default function TextGenerator({ opened }: { opened: boolean }) {
   const { isLoggedIn } = useAuth()
   const backendUrl = import.meta.env.VITE_API_URL
+  const enableTestModel = import.meta.env.DEV && import.meta.env.VITE_ENABLE_TEST_MODEL !== "false"
 
   const [prompt, setPrompt] = useState("")
   const [selectedModels, setSelectedModels] = useState<string[]>([])
   const [messagesByModel, setMessagesByModel] = useState<Record<string, Message[]>>({})
   const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
+
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareTargetModel, setShareTargetModel] = useState<string | null>(null)
 
   const sidebarOpen = opened
 
@@ -263,6 +274,23 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
   const [statusMsgs, setStatusMsgs] = useState<Record<string, string | null>>({})
 
+  const [joinModalOpen, setJoinModalOpen] = useState(false)
+  const [joinId, setJoinId] = useState("")
+  const navigate = useNavigate()
+
+  const handleJoin = () => {
+    const input = joinId.trim()
+    if (!input) return
+    const id = input.split("/").pop() ?? input
+
+    setJoinModalOpen(false)
+    setJoinId("")
+    navigate(`/chat/conversations/${id}`, {
+      state: { conversationId: id, modelValue: "", modelLabel: "Assistant" }
+    })
+  }
+
+
   // Fetch available models from backend
   useEffect(() => {
     if (!isLoggedIn) return
@@ -278,13 +306,16 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
             label: m.label,
           }),
         )
+        if (enableTestModel) {
+          models.push({ value: "test_model", label: "test_model" })
+        }
         setModelOptions(models)
       } catch {
         // silent
       }
     }
     fetchModels()
-  }, [backendUrl, isLoggedIn])
+  }, [backendUrl, enableTestModel, isLoggedIn])
 
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
@@ -293,11 +324,16 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         headers: getAuthHeaders(),
         withCredentials: true,
       })
-      setModelStatuses(res.data)
+
+      if (enableTestModel) {
+        setModelStatuses({ ...res.data, test_model: "live" })
+      } else {
+        setModelStatuses({ ...res.data })
+      }
     } catch {
       // silent
     }
-  }, [backendUrl])
+  }, [backendUrl, enableTestModel])
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -337,7 +373,6 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         },
         { headers: getAuthHeaders(), withCredentials: true },
       )
-
       const result = response.data
       const parsed = parseModelReply(result.reply)
       if (parsed.thinking) console.log("Thinking:", parsed.thinking)
@@ -345,13 +380,13 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
         message.id === pendingMessageId
           ? {
-              ...message,
-              content: parsed.actualReply,
-              modelLabel: label,
-              generationTimeMs: result.generation_time_ms ?? undefined,
-              isPending: false,
-              pendingStartTime: undefined,
-            }
+            ...message,
+            content: parsed.actualReply,
+            modelLabel: label,
+            generationTimeMs: result.generation_time_ms ?? undefined,
+            isPending: false,
+            pendingStartTime: undefined,
+          }
           : message,
       )
       setMessagesForModel(modelValue, replaced)
@@ -362,11 +397,11 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
         message.id === pendingMessageId
           ? {
-              ...message,
-              content: "Failed to generate a response.",
-              isPending: false,
-              pendingStartTime: undefined,
-            }
+            ...message,
+            content: "Failed to generate a response.",
+            isPending: false,
+            pendingStartTime: undefined,
+          }
           : message,
       )
       setMessagesForModel(modelValue, replaced)
@@ -435,6 +470,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const isBreakout = selectedModels.length > 2
   const dropdownData = buildDropdownData(modelOptions, modelStatuses)
 
+
   return (
     <div
       style={{
@@ -463,6 +499,27 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         clearable
         disabled={isAnyLoading}
       />
+      <Button variant="light" onClick={() => setJoinModalOpen(true)}>
+        Join conversation
+      </Button>
+
+      <Modal
+        opened={joinModalOpen}
+        onClose={() => setJoinModalOpen(false)}
+        title="Join conversation"
+        size="sm"
+      >
+        <TextInput
+          label="Conversation Link"
+          placeholder="Paste conversation link here..."
+          value={joinId}
+          onChange={e => setJoinId(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") handleJoin() }}
+        />
+        <Button fullWidth mt="md" onClick={handleJoin} disabled={!joinId.trim()}>
+          Join
+        </Button>
+      </Modal>
 
       {selectedModels.length > 0 && (
         <>
@@ -497,6 +554,10 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                   isBusy={isAnyLoading}
                   modelStatus={modelStatuses[modelValue] ?? "unknown"}
                   statusMessage={statusMsgs[modelValue] ?? null}
+                  onShare={() => {
+                    setShareTargetModel(modelValue)
+                    setShareModalOpen(true)
+                  }}
                 />
               ))}
             </div>
@@ -526,6 +587,10 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                   isBusy={isAnyLoading}
                   modelStatus={modelStatuses[modelValue] ?? "unknown"}
                   statusMessage={statusMsgs[modelValue] ?? null}
+                  onShare={() => {
+                    setShareTargetModel(modelValue)
+                    setShareModalOpen(true)
+                  }}
                 />
               ))}
             </div>
@@ -550,7 +615,16 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
             </Button>
           </div>
         </>
-      )}
-    </div>
+      )
+      }
+      <ShareConversationModal
+        opened={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        currentMessages={shareTargetModel ? (messagesByModel[shareTargetModel] ?? []) : []}
+        modelValue={shareTargetModel ?? ""}
+        backendUrl={backendUrl}
+      />
+    </div >
+
   )
 }
