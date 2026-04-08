@@ -246,6 +246,7 @@ function ChatPanel({
 export default function TextGenerator({ opened }: { opened: boolean }) {
   const { isLoggedIn } = useAuth()
   const backendUrl = import.meta.env.VITE_API_URL
+  const enableTestModel = import.meta.env.DEV && import.meta.env.VITE_ENABLE_TEST_MODEL !== "false"
 
   const [prompt, setPrompt] = useState("")
   const [selectedModels, setSelectedModels] = useState<string[]>([])
@@ -305,14 +306,16 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
             label: m.label,
           }),
         )
-        models.push({ value: "fakeModel", label: "fakeModel" })
+        if (enableTestModel) {
+          models.push({ value: "test_model", label: "test_model" })
+        }
         setModelOptions(models)
       } catch {
         // silent
       }
     }
     fetchModels()
-  }, [backendUrl, isLoggedIn])
+  }, [backendUrl, enableTestModel, isLoggedIn])
 
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
@@ -322,11 +325,15 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         withCredentials: true,
       })
 
-      setModelStatuses({ ...res.data, fakeModel: "live" })
+      if (enableTestModel) {
+        setModelStatuses({ ...res.data, test_model: "live" })
+      } else {
+        setModelStatuses({ ...res.data })
+      }
     } catch {
       // silent
     }
-  }, [backendUrl])
+  }, [backendUrl, enableTestModel])
 
   useEffect(() => {
     if (!isLoggedIn) return
