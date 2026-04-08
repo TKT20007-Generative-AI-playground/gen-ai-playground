@@ -220,6 +220,7 @@ const Front = () => {
             slideGap="md"
             emblaOptions={{ loop: true, align: "start" }}
             plugins={[autoplay.current]}
+            className="showcase-carousel"
           >
             {showcaseImages.map(img => (
               <Carousel.Slide key={img.name}>
