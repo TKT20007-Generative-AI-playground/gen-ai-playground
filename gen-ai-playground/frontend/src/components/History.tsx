@@ -187,22 +187,19 @@ export default function History() {
 
   const fetchAudioHistory = useCallback(
     async (range: [Date | null, Date | null], pageNum: number) => {
-      const headers = {
-        "Content-Type": "application/json",
-      }
-
       const params = buildParams(range, pageNum)
 
       const res = await axios.get(`${backendUrl}/audio/history`, {
-        headers,
+        headers: getAuthHeaders(),
         params,
+        withCredentials: true,
       })
 
       return {
         history: res.data.history || [],
         totalPages: res.data.total_pages || 1,
       }
-    },
+    },  
     [backendUrl],
   )
 
@@ -427,7 +424,7 @@ export default function History() {
 
             <HoverTab value="audio" leftSection={<AudioIcon />}>
               Transcribe
-              {audioHistory.length > 0 && (
+              {totalItems.audio > 0 && (
                 <Badge
                   ml={8}
                   size="xs"
@@ -441,7 +438,7 @@ export default function History() {
                     height: 18,
                   }}
                 >
-                  {audioHistory.length}
+                  {totalItems.audio}
                 </Badge>
               )}
             </HoverTab>

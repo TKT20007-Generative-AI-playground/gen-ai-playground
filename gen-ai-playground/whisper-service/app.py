@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 import time
@@ -9,6 +10,7 @@ from typing import Any
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from faster_whisper import WhisperModel
 
+logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_NAME = "whisper-large-v3-turbo"
 
@@ -37,6 +39,13 @@ def _normalize_model_name(model_name: str) -> str:
     if cleaned.lower() in PLACEHOLDER_MODEL_NAMES:
         return DEFAULT_MODEL_NAME
     return cleaned
+
+
+def _canonical_model_name(model_name: str) -> str:
+    normalized = _normalize_model_name(model_name)
+    if normalized.lower().startswith("openai/"):
+        return normalized.split("/", 1)[1]
+    return normalized
 
 
 def _resolve_model_name(model_name: str) -> str:
@@ -81,11 +90,10 @@ def _startup() -> None:
 
 @app.get("/health")
 def health() -> dict[str, Any]:
-    normalized_model = _normalize_model_name(settings.model_size)
     return {
         "status": "ok",
         "configured_model": settings.model_size,
-        "model": normalized_model,
+        "model": _canonical_model_name(settings.model_size),
         "device": settings.device,
         "compute_type": settings.compute_type,
         "model_loaded": _state["model"] is not None,
@@ -145,6 +153,7 @@ async def transcribe_audio(
                 }
             )
             full_text_parts.append(seg.text)
+
         transcription_time_ms = int((time.perf_counter() - transcription_start) * 1000)
 
         return {
@@ -154,12 +163,13 @@ async def transcribe_audio(
             "segments": output_segments,
             "transcription_time_ms": transcription_time_ms,
             "configured_model": settings.model_size,
-            "model": _normalize_model_name(settings.model_size),
+            "model": _canonical_model_name(settings.model_size),
         }
     except HTTPException:
         raise
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Transcription failed: {exc}") from exc
+    except Exception:
+        logger.exception("Transcription failed")
+        raise HTTPException(status_code=500, detail="Transcription failed") from None
     finally:
         await file.close()
         if temp_path and os.path.exists(temp_path):
