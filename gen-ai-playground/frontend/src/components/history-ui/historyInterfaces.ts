@@ -49,3 +49,17 @@ export interface AudioRecord {
   transcription_time_ms?: number
   source?: string
 }
+export interface ConversationMessage {
+  role: string
+  content: string
+  sender: string 
+}
+
+export interface ConversationRecord {
+    _id: string
+    title: string
+    participants: string[]
+    model: string
+    messages: ConversationMessage[]
+    created_at: string
+}

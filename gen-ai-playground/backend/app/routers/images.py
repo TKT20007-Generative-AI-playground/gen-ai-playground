@@ -326,6 +326,15 @@ async def edit_image(
         )
 
 
+@router.get("/history-length")
+def get_images_history_length(
+    current_user: UserInfo = Depends(get_current_user),
+    db: Database = Depends(get_database),
+):
+    length = db.images.count_documents({"username": current_user.username})
+    return {"length": length}
+
+
 def build_timed_image_response(
     db: Database,
     prompt: str,

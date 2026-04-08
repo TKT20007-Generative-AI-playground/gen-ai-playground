@@ -41,6 +41,8 @@ services:
       dockerfile: Dockerfile.dev
       args:
         VITE_API_URL: http://localhost:8000  
+    environment:
+      - VITE_ENABLE_TEST_MODEL=true
     volumes:
       - ./frontend:/app          
       - /app/node_modules        

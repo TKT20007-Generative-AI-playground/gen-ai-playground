@@ -6,6 +6,7 @@ interface AuthContextType {
   isAdmin: boolean
   login: (token: string, username: string, isAdmin: boolean) => void // ← updated
   logout: () => void
+  getAccessToken: () => string | null
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null)

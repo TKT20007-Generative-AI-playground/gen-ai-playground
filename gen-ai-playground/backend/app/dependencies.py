@@ -1,7 +1,7 @@
 """
 FastAPI dependencies for authentication and authorization
 """
-from fastapi import HTTPException, Header, Depends, Cookie
+from fastapi import HTTPException, Header, Depends, Cookie, WebSocket
 from pymongo.database import Database
 import jwt
 from app.config import settings
@@ -65,6 +65,18 @@ def get_current_user(
             detail=f"Authentication failed: {str(e)}"
         )
 
+def verify_token(token: str, db) -> UserInfo | None:
+    try:
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=["HS256"])
+        username = payload.get("username")
+        if not username:
+            return None
+        user = db.users.find_one({"username": username})
+        if not user:
+            return None
+        return UserInfo(username=username, is_admin=user.get("is_admin", False))
+    except Exception:
+        return None
 
 def validate_csrf_token(
     csrf_cookie: str = Cookie(None, alias="csrf_token"),
