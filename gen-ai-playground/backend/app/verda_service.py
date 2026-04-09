@@ -147,8 +147,8 @@ class VerdaService:
             return cmd
 
         elif cfg.engine == "custom":
-            # Custom engine: caller must provide image; no default command
-            raise RuntimeError("Custom engine templates must provide their own entrypoint via the image")
+            # Custom engine uses image entrypoint by default (no override command).
+            return []
 
         else:
             raise RuntimeError(f"Unsupported engine: {cfg.engine}")
@@ -175,19 +175,34 @@ class VerdaService:
             image = cfg.custom.image
             if ":" not in image and cfg.image_tag:
                 image = f"{image}:{cfg.image_tag}"
+
+            # Verda rejects untagged images and the ':latest' tag.
+            if "@sha256:" not in image:
+                last_segment = image.rsplit("/", 1)[-1]
+                if ":" not in last_segment:
+                    raise RuntimeError(
+                        "Custom image must include a non-latest tag or digest (example: your-repo/whisper-service:v0.1.0)."
+                    )
+                tag = last_segment.rsplit(":", 1)[-1].lower()
+                if tag == "latest":
+                    raise RuntimeError(
+                        "Custom image tag ':latest' is not allowed. Use a versioned tag or digest."
+                    )
             return image
 
         raise RuntimeError(f"Cannot resolve image for engine: {cfg.engine}")
     
-    def available_models(self) -> list[dict]:
-        """Return template name and availability from all JSON templates."""
-        from app.template_discovery import get_template_map
-        
+    def available_models(self, template_map: Optional[dict[str, str]] = None) -> list[dict]:
+        """Return template names and availability from a template map."""
+        if template_map is None:
+            from app.template_discovery import get_template_map
+            template_map = get_template_map()
+
         # Fetch available resources once to avoid multiple api calls in the loop
         all_resources = self.check_compute_resources(1)
 
         results = []
-        for template_name, display_name in get_template_map().items():
+        for template_name, display_name in template_map.items():
             cfg = self._parse_and_validate_template(template_name)
             compute_name, gpu_count = self._resolve_gpu(cfg, all_resources)
             
@@ -284,8 +299,6 @@ class VerdaService:
         Returns:
             dict with deployment info (name, status, model)
         """
-        from app.template_models import TemplateConfig
-
         # Parse and validate template
         cfg = self._parse_and_validate_template(template_json)
 
@@ -293,7 +306,7 @@ class VerdaService:
         # Add host and port defaults, and model path 
         cfg.host = "0.0.0.0"
         if not cfg.port:
-            cfg.port = APP_PORT
+            cfg.port = 9000 if cfg.engine == "custom" else APP_PORT
 
         client = self._get_client()
 
@@ -301,8 +314,9 @@ class VerdaService:
         if deployment_name is None:
             from app.template_discovery import _deployment_name_from_filename
             deployment_name = _deployment_name_from_filename(template_json)      
-        # ensure hf secret exists
-        self._ensure_hf_secret()
+        # ensure hf secret exists when model engine needs model downloads
+        if cfg.engine in {"sglang", "vllm"}:
+            self._ensure_hf_secret()
         
         # Check compute resources and determine compute name and GPU count
         compute_name, gpu_count = self._resolve_gpu(cfg)
@@ -315,12 +329,67 @@ class VerdaService:
         # Resolve image
         image = self._resolve_image_from_template(cfg)
 
-        print(f"Deploying from template...")
+        print("Deploying from template...")
         print(f"  Model: {cfg.model}")
         print(f"  Engine: {cfg.engine}")
         print(f"  Image: {image}")
         print(f"  GPU: {gpu_count} + {compute_name}")
-        print(f"  Command: {' '.join(cmd)}")
+        if cmd:
+            print(f"  Command: {' '.join(cmd)}")
+        else:
+            print("  Command: <image default entrypoint>")
+
+        env_vars: list[EnvVar] = []
+        if cfg.engine in {"sglang", "vllm"}:
+            env_vars.insert(
+                0,
+                EnvVar(
+                    name="HF_TOKEN",
+                    value_or_reference_to_secret=HF_SECRET_NAME,
+                    type=EnvVarType.SECRET,
+                ),
+            )
+            env_vars.append(
+                EnvVar(
+                    name="NCCL_DEBUG",
+                    value_or_reference_to_secret="INFO",
+                    type=EnvVarType.PLAIN,
+                )
+            )
+        elif cfg.engine == "custom":
+            custom_plain_env: dict[str, str] = {}
+            if cfg.model:
+                custom_plain_env["WHISPER_MODEL"] = cfg.model
+            if cfg.custom and cfg.custom.env:
+                custom_plain_env.update(cfg.custom.env)
+
+            # Safety fallback: keep Whisper custom templates on GPU even if
+            # a stale template payload does not include explicit env values.
+            if template_json.startswith("whisper-"):
+                custom_plain_env.setdefault("WHISPER_DEVICE", "cuda")
+                custom_plain_env.setdefault("WHISPER_COMPUTE_TYPE", "float16")
+
+            for env_name, env_value in custom_plain_env.items():
+                env_vars.append(
+                    EnvVar(
+                        name=env_name,
+                        value_or_reference_to_secret=str(env_value),
+                        type=EnvVarType.PLAIN,
+                    )
+                )
+
+        entrypoint_overrides = EntrypointOverridesSettings(
+            enabled=cfg.engine != "custom",
+            cmd=cmd,
+        )
+
+        volume_mounts = []
+        if cfg.engine in {"sglang", "vllm"}:
+            volume_mounts = [VolumeMount(
+                type=VolumeMountType.MEMORY,
+                mount_path="/dev/shm",
+                size_in_mb=2048,
+            )]
 
         # Build Verda container
         container = Container(
@@ -329,28 +398,9 @@ class VerdaService:
             healthcheck=HealthcheckSettings(
                 enabled=True, port=cfg.port, path="/health"
             ),
-            entrypoint_overrides=EntrypointOverridesSettings(
-                enabled=True,
-                cmd=cmd,
-            ),
-            env=[
-                EnvVar(
-                    name="HF_TOKEN",
-                    value_or_reference_to_secret=HF_SECRET_NAME,
-                    type=EnvVarType.SECRET,
-                ),
-                EnvVar(
-                    name="NCCL_DEBUG",
-                    value_or_reference_to_secret="INFO",
-                    type=EnvVarType.PLAIN,
-                ),
-            ],
-            # for bigger models->
-            volume_mounts=[VolumeMount(
-                type=VolumeMountType.MEMORY,
-                mount_path="/dev/shm",
-                size_in_mb=2048,
-            )],
+            entrypoint_overrides=entrypoint_overrides,
+            env=env_vars,
+            volume_mounts=volume_mounts,
         )
 
         scaling_options = ScalingOptions(

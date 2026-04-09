@@ -5,16 +5,18 @@ Provides endpoints to deploy an LLM on Verda, check deployment status,
 generate text completions, chat with the model, and clean up.
 """
 import math
-
-from fastapi import APIRouter, HTTPException, Depends, Query
+import secrets
+from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
 from pymongo.database import Database
 from datetime import datetime, timezone
 from typing import Optional
 import time
+from bson import ObjectId
+import asyncio
 
 
 from app.database import get_database
-from app.dependencies import get_current_user, get_admin_user, validate_csrf_token
+from app.dependencies import get_current_user, verify_token, get_admin_user, validate_csrf_token
 from app.models import (
     HistoryResponseText,
     TextGenerateRequest,
@@ -25,15 +27,27 @@ from app.models import (
     DeploymentStatusResponse,
     ConnectDeploymentRequest,
     UserInfo,
+    ConversationCreateRequest,
 )
 from app.verda_service import verda_service
 from app.template_discovery import get_template_map, _deployment_name_from_filename
 from verda.containers import ContainerDeploymentStatus
+from app.connection_manager import ConnectionManager
+
 
 def _sanitize_slug(model_path: str) -> str:
     """Convert a model path to a deployment-name-compatible slug."""
     return model_path.split("/")[-1].lower().replace(".", "-")
 
+
+def _parse_conversation_object_id(conversation_id: str) -> ObjectId:
+    """Parse conversation id and return a client error for malformed ids."""
+    try:
+        return ObjectId(conversation_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid conversation id")
+
+manager = ConnectionManager()
 
 router = APIRouter(
     prefix="/text",
@@ -631,4 +645,345 @@ def history(
     except Exception as e:
         print(f"Error getting history: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting history: {e}")
+    
+    
+@router.post("/conversations")
+async def create_conversation(
+    conversation: ConversationCreateRequest,
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    username = cur_user.username
+    participants = list(set(conversation.participants or []) | {username})
+    initial_messages = conversation.initial_messages or []
+    model_key = conversation.model_key or "default"
+    
+    doc = {
+        "title": conversation.title or "Untitled Conversation",
+        "participants": participants,
+        "messages": initial_messages,
+        "created_by": username,
+        "model": model_key,
+        "invite_code": secrets.token_hex(8),
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    }
 
+    result = db.conversations.insert_one(doc)
+
+    return {
+        "conversation_id": str(result.inserted_id),
+        "participants": participants,
+        "title": doc["title"],
+        "model": model_key,
+        "invite_code": doc["invite_code"],
+        "created_at": doc["created_at"],
+    }
+
+
+@router.post("/conversations/{conversation_id}/join")
+def join_conversation(
+    conversation_id: str,
+    body: dict,
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    conversation_oid = _parse_conversation_object_id(conversation_id)
+    conversation = db.conversations.find_one({"_id": conversation_oid})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if cur_user.username not in conversation["participants"]:
+        if body.get("invite_code") != conversation.get("invite_code"):
+            raise HTTPException(status_code=403, detail="Invalid invite code")
+
+    db.conversations.update_one(
+        {"_id": conversation_oid},
+        {"$addToSet": {"participants": cur_user.username}},
+    )
+    return {"ok": True}
+
+
+@router.get("/conversations/{conversation_id}/check-participant")
+def check_participant(
+    conversation_id: str,
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    conversation_oid = _parse_conversation_object_id(conversation_id)
+    conversation = db.conversations.find_one({"_id": conversation_oid})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    if cur_user.username not in conversation["participants"]:
+        raise HTTPException(status_code=403, detail="Not a participant")
+    return {"ok": True}
+
+
+@router.get("/conversation-history/{conversation_id}")
+def conversation_history(
+    conversation_id: str,
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    conversation_oid = _parse_conversation_object_id(conversation_id)
+    conversation = db.conversations.find_one({"_id": conversation_oid})
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    if cur_user.username not in conversation["participants"]:
+        raise HTTPException(status_code=403, detail="Not a participant of this conversation")
+
+    return {
+        "messages": conversation.get("messages", []),
+        "title": conversation.get("title", "Untitled Conversation"),
+        "model": conversation.get("model", "default"),
+    }
+    
+
+@router.websocket("/ws/conversations/{conversation_id}")
+async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends(get_database)):
+    await websocket.accept()
+
+    try:
+        conversation_oid = _parse_conversation_object_id(conversation_id)
+    except HTTPException:
+        await websocket.close(code=1008, reason="Invalid conversation id")
+        return
+
+    try:
+        auth_data = await asyncio.wait_for(websocket.receive_json(), timeout=5.0)
+    except asyncio.TimeoutError:
+        await websocket.close(code=1008)
+        return
+
+    if auth_data.get("type") != "auth":
+        await websocket.close(code=1008)
+        return
+
+    user = verify_token(auth_data.get("token", ""), db)
+    if not user:
+        await websocket.close(code=1008)
+        return
+
+
+    username = user.username
+
+    conversation = db.conversations.find_one({"_id": conversation_oid})
+    if not conversation:
+        await websocket.close(code=1008)
+        return
+
+    if username not in conversation["participants"]:
+        await websocket.close(code=1008)
+        return
+
+    await websocket.send_json({"type": "auth_ok"})
+    await manager.connect(conversation_id, username, websocket)
+
+    try:
+        while True:
+            data = await websocket.receive_json()
+
+            content = data.get("content")
+            model_key = data.get("model")
+            no_ai = data.get("noAI", False)
+
+            if not content:
+                continue
+
+          
+            # save user message to db
+           
+            user_message = {
+                "sender": username,
+                "role": "user",
+                "content": content,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+            db.conversations.update_one(
+                {"_id": conversation_oid},
+                {"$push": {"messages": user_message}},
+            )
+
+         
+            # Broadcast user message to other participants
+            
+            await manager.broadcast(
+                conversation_id,
+                {
+                    "type": "message",
+                    **user_message,
+                },
+                exclude_username=username,
+            )
+
+            # generate
+            if not no_ai:
+                asyncio.create_task(
+                    handle_llm_reply(
+                        conversation_id,
+                        model_key,
+                        db,
+                        user,
+                    )
+                )
+
+    except WebSocketDisconnect:
+        manager.disconnect(conversation_id, username)
+
+        await manager.broadcast(
+            conversation_id,
+            {
+                "type": "user_left",
+                "user": username,
+            },
+        )
+        
+async def handle_llm_reply(
+    conversation_id: str,
+    model_key: str,
+    db: Database = Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+
+    try:
+        try:
+            conversation_oid = _parse_conversation_object_id(conversation_id)
+        except HTTPException:
+            await manager.broadcast(conversation_id, {"type": "error", "message": "Invalid conversation id"})
+            return
+
+        conversation = db.conversations.find_one({"_id": conversation_oid})
+        if not conversation:
+            return
+
+        messages = [
+            {"role": m["role"], "content": m["content"]}
+            for m in conversation.get("messages", [])
+        ]
+
+        template_name = _resolve_template_name(model_key)
+        expected_dep = _deployment_name_from_filename(template_name) if template_name else None
+
+        try:
+            deployments = verda_service.list_deployments()
+        except Exception as e:
+            await manager.broadcast(conversation_id, {"type": "error", "message": "Could not reach deployment service."})
+            return
+
+        existing = None
+        for d in deployments:
+            if expected_dep and d.get("name", "").lower() == expected_dep:
+                existing = d
+                break
+
+        if not existing:
+            await manager.broadcast(conversation_id, {"type": "error", "message": f"Model {model_key} is not deployed."})
+            return
+
+        deployment_name = existing["name"]
+
+        try:
+            client = verda_service._get_client()
+            dep_status = client.containers.get_deployment_status(deployment_name)
+            status_str = dep_status.value if hasattr(dep_status, "value") else str(dep_status)
+            if status_str != "healthy":
+                await manager.broadcast(conversation_id, {"type": "error", "message": f"Model not healthy: {status_str}"})
+                return
+        except Exception as e:
+            await manager.broadcast(conversation_id, {"type": "error", "message": f"Failed to check deployment: {str(e)}"})
+            return
+
+        await manager.broadcast(conversation_id, {"type": "assistant_typing"})
+
+        # chat
+        try:
+            model_path = choose_text_model_path(model_key)
+            result = await asyncio.to_thread(
+                verda_service.chat,
+                messages=messages,
+                max_tokens=256,
+                temperature=0.7,
+                top_p=0.9,
+                deployment_name=deployment_name,
+                model_path=model_path,
+            )
+            assistant_text = result["reply"]
+        except Exception as e:
+            await manager.broadcast(conversation_id, {"type": "error", "message": str(e)})
+            return
+
+        
+        assistant_message = {"role": "assistant", "content": assistant_text}
+        db.conversations.update_one(
+            {"_id": conversation_oid},
+            {"$push": {"messages": assistant_message}},
+        )
+
+        await manager.broadcast(conversation_id, {"type": "assistant_done", "message": assistant_message})
+
+    except Exception as e:
+        await manager.broadcast(conversation_id, {"type": "error", "message": str(e)})
+        
+
+@router.get("/all-conversations")
+def all_conversations(
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+    from_date: Optional[int] = Query(None, alias="from"),
+    to_date: Optional[int] = Query(None, alias="to"),
+    page: int = Query(1, alias="page", ge=1),
+):
+    page_size = 10
+
+    query = {"participants": cur_user.username}
+
+    if from_date or to_date:
+        date_filter = {}
+        if from_date:
+            date_filter["$gte"] = datetime.fromtimestamp(from_date / 1000, tz=timezone.utc)
+        if to_date:
+            date_filter["$lte"] = datetime.fromtimestamp(to_date / 1000, tz=timezone.utc)
+        query["created_at"] = date_filter
+
+    total = db.conversations.count_documents(query)
+
+    if total == 0:
+        return {"conversations": [], "total": 0, "page": page, "total_pages": 0}
+
+    total_pages = math.ceil(total / page_size)
+    page = min(page, total_pages)
+    start = (page - 1) * page_size
+
+    conversations = list(
+        db.conversations.find(query)
+        .sort("created_at", -1)
+        .skip(start)
+        .limit(page_size)
+    )
+    for c in conversations:
+        c["_id"] = str(c["_id"])
+    return {
+        "conversations": conversations,
+        "total": total,
+        "page": page,
+        "total_pages": total_pages,
+    }
+
+
+@router.get("/conversations-length")
+def conversations_length(
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    length = db.conversations.count_documents({"participants": cur_user.username})
+    return {"length": length}
+
+@router.get("/chat-messages-length")
+def chat_messages_length(
+    db=Depends(get_database),
+    cur_user: UserInfo = Depends(get_current_user),
+):
+    length = db.text_generations.count_documents({"username": cur_user.username})
+    return {"length": length}

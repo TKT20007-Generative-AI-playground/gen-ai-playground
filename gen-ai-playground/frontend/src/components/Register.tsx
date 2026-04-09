@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useNavigate, Navigate } from "react-router-dom";
-import axios from "axios";
-import { useAuth } from "../context/AuthContext";
+import { useState } from "react"
+import { useNavigate, Navigate } from "react-router-dom"
+import axios from "axios"
+import { useAuth } from "../context/AuthContext"
 import {
   Container,
   Paper,

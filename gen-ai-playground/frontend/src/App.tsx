@@ -13,12 +13,13 @@ import HistorySidebar from "./components/HistorySidebar";
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "./context/AuthContext";
 import HistoryPage from "./pages/HistoryPage"
+import SharedChat from "./components/SharedChat"
 
 
 
 function AppContent() {
   const location = useLocation()
-  
+
   // Hide Header on dashboard routes
   const isDashboardRoute = location.pathname.startsWith('/dashboard')
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -116,7 +117,7 @@ function AppContent() {
         <div style={{ flex: 1 }}>
           <Routes>
             <Route path="/" element={<Front />} />
-            
+
             <Route path="/register" element={<Register />} />
 
             <Route
@@ -124,6 +125,14 @@ function AppContent() {
               element={<Navigate to="/playground/ImageGenerator" replace />}
             />
 
+            <Route
+              path="/chat/conversations/:conversationId"
+              element={
+                <ProtectedRoute>
+                  <SharedChat />
+                </ProtectedRoute>
+              } 
+            />
             <Route
               path="/playground/:tab"
               element={

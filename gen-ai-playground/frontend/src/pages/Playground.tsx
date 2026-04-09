@@ -6,6 +6,7 @@ import type { ReactNode } from "react"
 import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
 import TextGenerator from "../components/TextGenerator"
+import Transcribe from "../components/Transcribe"
 import { PLAYGROUND_TABS } from "../constants/tabs"
 
 type Tab = (typeof PLAYGROUND_TABS)[number]
@@ -24,6 +25,7 @@ export default function Playground({ historyOpen }: { historyOpen: boolean }) {
     ImageGenerator: <ImageGenerator />,
     ImageEditor: <ImageEditor imageToEdit={imageToEdit} />,
     TextGenerator: <TextGenerator opened={historyOpen} />,
+    Transcribe: <Transcribe />,
   }
 
   // If tab is invalid, redirect to default

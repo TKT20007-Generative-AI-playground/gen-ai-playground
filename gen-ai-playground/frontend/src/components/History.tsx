@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useState } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
-import type { ImageRecord, PromptGroup, TextRecord } from "./history-ui/historyInterfaces"
+import type {
+  AudioRecord,
+  ConversationRecord,
+  ImageRecord,
+  PromptGroup,
+  TextRecord,
+} from "./history-ui/historyInterfaces"
 import DateRangePicker from "./history-ui/DateRangePicker"
 import ImageCard from "./history-ui/ImageCard"
 import TextCard from "./history-ui/TextCard"
+import AudioCard from "./history-ui/AudioCard"
 import EmptyState from "./history-ui/EmptyState"
-import { TextIcon, ImageIcon, DownloadIcon, EditIcon } from "./history-ui/Icons"
+import { TextIcon, ImageIcon, DownloadIcon, EditIcon, AudioIcon } from "./history-ui/Icons"
 import { getTypeColor, getTypeIcon, getTypeLabel, formatDate } from "./history-ui/ImageUtils"
 import { HoverTab } from "./history-ui/HoverTab"
 import {
@@ -29,6 +36,21 @@ import {
 } from "@mantine/core"
 import { useMediaQuery } from "@mantine/hooks"
 import { EDIT_MODELS } from "../constants/models"
+import ConversationCard from "./history-ui/ConversationCard"
+
+const getCsrfToken = (): string => {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; csrf_token=`)
+  if (parts.length === 2) return parts.pop()!.split(";").shift()!
+  return ""
+}
+
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  "X-CSRF-Token": getCsrfToken(),
+})
+
+
 
 export default function History() {
   const backendUrl = import.meta.env.VITE_API_URL
@@ -38,20 +60,34 @@ export default function History() {
 
   const [imageHistory, setImageHistory] = useState<PromptGroup[]>([])
   const [textHistory, setTextHistory] = useState<TextRecord[]>([])
+  const [audioHistory, setAudioHistory] = useState<AudioRecord[]>([])
+  const [conversationHistory, setConversationHistory] = useState<ConversationRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null)
 
-  type Tab = "images" | "text"
+  type Tab = "images" | "text" | "audio" | "conversations"
   const [activeTab, setActiveTab] = useState<Tab>("images")
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null])
+
+  const [totalItems, setTotalItems] = useState<Record<Tab, number>>({
+    images: 0,
+    text: 0,
+    audio: 0,
+    conversations: 0,
+  })
+
 
   const [pages, setPages] = useState<Record<Tab, number>>({
     images: 1,
     text: 1,
+    audio: 1,
+    conversations: 1,
   })
   const [totalPages, setTotalPages] = useState<Record<Tab, number>>({
     images: 1,
     text: 1,
+    audio: 1,
+    conversations: 1,
   })
   const currentPage = pages[activeTab]
 
@@ -72,6 +108,31 @@ export default function History() {
 
     return params
   }
+
+  const fetchConversationHistory = useCallback(
+    async (range: [Date | null, Date | null], pageNum: number) => {
+      const params = buildParams(range, pageNum)
+
+      try {
+        const his = await axios.get(
+          `${backendUrl}/text/all-conversations`,
+          { headers: getAuthHeaders(), withCredentials: true, params }
+        )
+
+        return {
+          history: his.data.conversations || [],
+          totalPages: his.data.total_pages || 1,
+        }
+      } catch (e) {
+        console.log("Failed to fetch conversations", e)
+        return {
+          history: [],
+          totalPages: 1,
+        }
+      }
+    },
+    [backendUrl],
+  )
 
   const fetchTextHistory = useCallback(
     async (range: [Date | null, Date | null], pageNum: number) => {
@@ -107,11 +168,11 @@ export default function History() {
       })
 
       const groups: { [prompt: string]: ImageRecord[] } = {}
-      ;(imgRes.data.history || []).forEach((item: ImageRecord) => {
-        const key = item.prompt.trim().toLowerCase()
-        if (!groups[key]) groups[key] = []
-        groups[key].push(item)
-      })
+        ; (imgRes.data.history || []).forEach((item: ImageRecord) => {
+          const key = item.prompt.trim().toLowerCase()
+          if (!groups[key]) groups[key] = []
+          groups[key].push(item)
+        })
 
       return {
         grouped: Object.keys(groups).map(prompt => ({
@@ -124,9 +185,90 @@ export default function History() {
     [backendUrl],
   )
 
+  const fetchAudioHistory = useCallback(
+    async (range: [Date | null, Date | null], pageNum: number) => {
+      const params = buildParams(range, pageNum)
+
+      const res = await axios.get(`${backendUrl}/audio/history`, {
+        headers: getAuthHeaders(),
+        params,
+        withCredentials: true,
+      })
+
+      return {
+        history: res.data.history || [],
+        totalPages: res.data.total_pages || 1,
+      }
+    },  
+    [backendUrl],
+  )
+
+  const getImagesLength = useCallback(async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/images/history-length`, {
+        headers: getAuthHeaders(),
+        withCredentials: true,
+      })
+      return res.data.length ?? 0
+    } catch {
+      return 0
+    }
+  }, [backendUrl])
+
+  const getTextLength = useCallback(async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/text/chat-messages-length`, {
+        headers: getAuthHeaders(),
+        withCredentials: true,
+      })
+      return res.data.length ?? 0
+    } catch {
+      return 0
+    }
+  }, [backendUrl])
+
+  const getAudioLength = useCallback(async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/audio/history`, {
+        headers: getAuthHeaders(),
+        withCredentials: true,
+        params: { page: 1 },
+      })
+      return res.data.total ?? 0
+    } catch {
+      return 0
+    }
+  }, [backendUrl])
+
+  const getConversationLength = useCallback(async () => {
+    try {
+      const res = await axios.get(`${backendUrl}/text/conversations-length`, {
+        headers: getAuthHeaders(),
+        withCredentials: true,
+      })
+      return res.data.length ?? 0
+    } catch {
+      return 0
+    }
+  }, [backendUrl])
+
   useEffect(() => {
     const run = async () => {
       setLoading(true)
+
+      const [imagesLength, textLength, audioLength, conversationLength] = await Promise.all([
+        getImagesLength(),
+        getTextLength(),
+        getAudioLength(),
+        getConversationLength(),
+      ])
+
+      setTotalItems({
+        images: imagesLength,
+        text: textLength,
+        audio: audioLength,
+        conversations: conversationLength,
+      })
 
       try {
         if (activeTab === "images") {
@@ -137,13 +279,29 @@ export default function History() {
             ...prev,
             images: data.totalPages,
           }))
-        } else {
+        } else if (activeTab === "text") {
           const data = await fetchTextHistory(dateRange, currentPage)
 
           setTextHistory(data.history)
           setTotalPages(prev => ({
             ...prev,
             text: data.totalPages,
+          }))
+        } else if (activeTab === "audio") {
+          const data = await fetchAudioHistory(dateRange, currentPage)
+
+          setAudioHistory(data.history)
+          setTotalPages(prev => ({
+            ...prev,
+            audio: data.totalPages,
+          }))
+        } else if (activeTab === "conversations") {
+          const data = await fetchConversationHistory(dateRange, currentPage)
+
+          setConversationHistory(data.history)
+          setTotalPages(prev => ({
+            ...prev,
+            conversations: data.totalPages,
           }))
         }
       } catch (err) {
@@ -154,18 +312,21 @@ export default function History() {
     }
 
     run()
-  }, [activeTab, dateRange, currentPage, fetchImagesHistory, fetchTextHistory])
+  }, [activeTab, dateRange, currentPage,
+    fetchImagesHistory, fetchTextHistory, fetchAudioHistory, fetchConversationHistory,
+    getImagesLength, getTextLength, getAudioLength, getConversationLength])
 
   const handleDateChange = (range: [Date | null, Date | null]) => {
     setDateRange(range)
     setPages({
       images: 1,
       text: 1,
+      audio: 1,
+      conversations: 1,
     })
   }
 
   const columns = isMobile ? 2 : isTablet ? 3 : 4
-  const totalImages = imageHistory.reduce((acc, g) => acc + g.images.length, 0)
 
   return (
     <Box
@@ -201,7 +362,7 @@ export default function History() {
           <Tabs.List>
             <HoverTab value="images" leftSection={<ImageIcon />}>
               Images
-              {totalImages > 0 && (
+              {totalItems.images > 0 && (
                 <Badge
                   ml={8}
                   size="xs"
@@ -215,14 +376,14 @@ export default function History() {
                     height: 18,
                   }}
                 >
-                  {totalImages}
+                  {totalItems.images}
                 </Badge>
               )}
             </HoverTab>
 
             <HoverTab value="text" leftSection={<TextIcon />}>
               Text
-              {textHistory.length > 0 && (
+              {totalItems.text > 0 && (
                 <Badge
                   ml={8}
                   size="xs"
@@ -236,7 +397,48 @@ export default function History() {
                     height: 18,
                   }}
                 >
-                  {textHistory.length}
+                  {totalItems.text}
+                </Badge>
+              )}
+            </HoverTab>
+            <HoverTab value="conversations" leftSection={<TextIcon />}>
+              Conversations
+              {totalItems.conversations > 0 && (
+                <Badge
+                  ml={8}
+                  size="xs"
+                  variant="filled"
+                  radius="xl"
+                  style={{
+                    background: "rgba(10, 10, 10, 0.08)",
+                    color: "black",
+                    fontWeight: 600,
+                    minWidth: 22,
+                    height: 18,
+                  }}
+                >
+                  {totalItems.conversations}
+                </Badge>
+              )}
+            </HoverTab>
+
+            <HoverTab value="audio" leftSection={<AudioIcon />}>
+              Transcribe
+              {totalItems.audio > 0 && (
+                <Badge
+                  ml={8}
+                  size="xs"
+                  variant="filled"
+                  radius="xl"
+                  style={{
+                    background: "rgba(10, 10, 10, 0.08)",
+                    color: "black",
+                    fontWeight: 600,
+                    minWidth: 22,
+                    height: 18,
+                  }}
+                >
+                  {totalItems.audio}
                 </Badge>
               )}
             </HoverTab>
@@ -329,16 +531,80 @@ export default function History() {
               </Stack>
             </ScrollArea>
           )
-        ) : textHistory.length === 0 ? (
-          <EmptyState label="No text history yet. Start a conversation to see responses here." />
+        ) : activeTab === "text" ? (
+          textHistory.length === 0 ? (
+            <EmptyState label="No text history yet. Start a conversation to see responses here." />
+          ) : (
+            <ScrollArea>
+              <Stack gap={12}>
+                {textHistory.map((item, idx) => (
+                  <Transition key={idx} mounted transition="fade" duration={200}>
+                    {styles => (
+                      <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
+                        <TextCard item={item} />
+                      </div>
+                    )}
+                  </Transition>
+                ))}
+                <Group justify="center" mt="md">
+                  <Pagination
+                    total={totalPages[activeTab]}
+                    value={pages[activeTab]}
+                    onChange={newPage => {
+                      if (newPage == null) return
+                      setPages(prev => ({
+                        ...prev,
+                        [activeTab]: newPage,
+                      }))
+                      window.scrollTo({ top: 0, behavior: "smooth" })
+                    }}
+                  />
+                </Group>
+              </Stack>
+            </ScrollArea>
+          )
+        ) : activeTab === "audio" ? (
+          audioHistory.length === 0 ? (
+            <EmptyState label="No transcription history yet. Run transcription to see outputs here." />
+          ) : (
+            <ScrollArea>
+              <Stack gap={12}>
+                {audioHistory.map((item, idx) => (
+                  <Transition key={idx} mounted transition="fade" duration={200}>
+                    {styles => (
+                      <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
+                        <AudioCard item={item} />
+                      </div>
+                    )}
+                  </Transition>
+                ))}
+                <Group justify="center" mt="md">
+                  <Pagination
+                    total={totalPages[activeTab]}
+                    value={pages[activeTab]}
+                    onChange={newPage => {
+                      if (newPage == null) return
+                      setPages(prev => ({
+                        ...prev,
+                        [activeTab]: newPage,
+                      }))
+                      window.scrollTo({ top: 0, behavior: "smooth" })
+                    }}
+                  />
+                </Group>
+              </Stack>
+            </ScrollArea>
+          )
+        ) : conversationHistory.length === 0 ? (
+          <EmptyState label="No shared conversation history yet. Start a shared conversation to see responses here." />
         ) : (
           <ScrollArea>
             <Stack gap={12}>
-              {textHistory.map((item, idx) => (
+              {conversationHistory.map((item, idx) => (
                 <Transition key={idx} mounted transition="fade" duration={200}>
                   {styles => (
                     <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
-                      <TextCard item={item} />
+                      <ConversationCard item={item} />
                     </div>
                   )}
                 </Transition>
@@ -359,7 +625,8 @@ export default function History() {
               </Group>
             </Stack>
           </ScrollArea>
-        )}
+        )
+      }
       </Box>
 
       {/* Image Modal */}

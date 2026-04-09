@@ -152,7 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (!isReady) return null // prevents flashing logged-out UI
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, username, isAdmin, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, username, isAdmin, login, logout, getAccessToken: () => accessTokenRef.current }}>
       {children}
     </AuthContext.Provider>
   )
