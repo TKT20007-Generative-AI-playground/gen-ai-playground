@@ -44,15 +44,15 @@ test("clicking cards takes to correct page when logged in", async ({ page, reque
   await expectLoggedIn(page);
 
   await page.click('text=Go to image generators');
-  await expect(page.locator('#root')).toContainText('Select at least 1 model for image generation');
+  await expect(page).toHaveURL(/\/playground\/ImageGenerator/)
   
   await gotoHome(page);
   await page.click('text=Go to image editor');
-  await expect(page.locator('#root')).toContainText('Upload an image, select a model, and enter a prompt to enable editing.');
+  await expect(page).toHaveURL(/\/playground\/ImageEditor/)
 
   await gotoHome(page);
   await page.click('text=Go to text generators');
-  await expect(page.locator('#root')).toContainText('Select up to 4 models for text generation.');
+  await expect(page).toHaveURL(/\/playground\/TextGenerator/)
 });
 
 test("get started button takes to login when not logged in", async ({ page }) => {
