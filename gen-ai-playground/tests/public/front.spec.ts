@@ -82,7 +82,7 @@ test("clicking a card then logging in lands on the originally requested page", a
 
 test("featured works carousel is visible and has images", async ({ page }) => {
   await gotoHome(page);
-  const carousel = page.locator('.showcase-carousel');
+  const carousel = page.getByTestId('showcase-carousel');
   await expect(carousel).toBeVisible();
   const images = carousel.locator('img');
   await expect(images.first()).toBeVisible();
@@ -94,7 +94,7 @@ test("hovering carousel cards shows button and clicking it takes to correct page
   await loginViaUI(page, user);
   await expectLoggedIn(page);
 
-  const slide = page.locator('.showcase-slide').first()
+  const slide = page.getByTestId('showcase-slide').first();
   await slide.hover({ force: true });
   await slide.getByRole('button', { name: 'Edit' }).click({ force: true });
   await expect(page.locator('#root')).toContainText('Upload an image, select a model, and enter a prompt to enable editing.');
