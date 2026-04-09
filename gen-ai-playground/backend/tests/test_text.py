@@ -578,6 +578,7 @@ class TestTemplateFiles:
     def test_cmd_generation_from_template(self):
         from app.verda_service import VerdaService
         from app.template_models import TemplateConfig
+        from app.template_discovery import _SKIP_TEMPLATES
         from pathlib import Path
         
         verda_service = VerdaService()
@@ -585,7 +586,11 @@ class TestTemplateFiles:
         backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
         templates_dir = Path(backend_dir) / "templates"
         
-        template_files = [f for f in templates_dir.iterdir() if f.suffix == ".json"]
+        template_files = [
+            f
+            for f in templates_dir.iterdir()
+            if f.suffix == ".json" and f.name not in _SKIP_TEMPLATES
+        ]
         assert len(template_files) > 0, "No template files found"
         
         for template_file in template_files:

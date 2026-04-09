@@ -13,6 +13,8 @@ import {
 } from "@mantine/core"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
+import { formatDate } from "./history-ui/ImageUtils"
+import { formatAudioModelName, getAudioInputTitle } from "./history-ui/audioHistoryUtils"
 
 interface ChatMessage {
   role: "user" | "assistant"
@@ -20,12 +22,18 @@ interface ChatMessage {
 }
 
 interface HistoryRecord {
-  type: "image" | "text" | "chat"
+  type: "image" | "text" | "chat" | "transcription"
   prompt?: string
   generated_text?: string
   messages?: ChatMessage[]
   reply?: string
   response?: string
+  transcription_text?: string
+  language?: string
+  transcription_time_ms?: number
+  source?: string
+  input_name?: string
+  run_id?: string
   model: string
   timestamp: string
   image_data?: string
@@ -35,13 +43,15 @@ interface HistoryRecord {
 }
 
 const backendUrl = import.meta.env.VITE_API_URL
+const AUDIO_SIDEBAR_MAX_FETCH = 200
+const AUDIO_RECORDS_PER_SESSION = 4
 
 export default function HistorySidebar({ opened }: { opened: boolean }) {
   const [items, setItems] = useState<HistoryRecord[]>([])
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [limit, setLimit] = useState(5)
-  const [historyType, setHistoryType] = useState<"image" | "text">("image")
+  const [historyType, setHistoryType] = useState<"image" | "text" | "audio">("image")
 
   const conversations = []
   let last = null
@@ -74,6 +84,54 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
   conversations.sort((a, b) => b.timestamp - a.timestamp)
   const limited = conversations.slice(0, limit)
 
+  const audioRuns = []
+  let lastAudioRun = null
+
+  for (const item of items) {
+    const ts = new Date(item.timestamp).getTime()
+    const response = item.transcription_text ?? item.response ?? item.reply ?? null
+    const title = getAudioInputTitle(item)
+
+    const normalizedRunId = item.run_id?.trim() || null
+    const lastRunId = lastAudioRun?.runId ?? null
+    const hasRunIdPair = !!normalizedRunId && !!lastRunId
+
+    const isSameRun =
+      lastAudioRun &&
+      (hasRunIdPair
+        ? normalizedRunId === lastRunId
+        : Math.abs(ts - lastAudioRun.timestamp) < 10000 &&
+          (lastAudioRun.source ?? null) === (item.source ?? null))
+
+    if (isSameRun && lastAudioRun) {
+      lastAudioRun.models.push({
+        model: item.model,
+        response,
+        language: item.language,
+        transcriptionTimeMs: item.transcription_time_ms ?? null,
+      })
+    } else {
+      lastAudioRun = {
+        timestamp: ts,
+        runId: normalizedRunId,
+        source: item.source,
+        title,
+        models: [
+          {
+            model: item.model,
+            response,
+            language: item.language,
+            transcriptionTimeMs: item.transcription_time_ms ?? null,
+          },
+        ],
+      }
+      audioRuns.push(lastAudioRun)
+    }
+  }
+
+  audioRuns.sort((a, b) => b.timestamp - a.timestamp)
+  const limitedAudioRuns = audioRuns.slice(0, limit)
+
   async function refetch() {
     setLoading(true)
 
@@ -81,9 +139,16 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
       const url =
         historyType === "image"
           ? `${backendUrl}/images/history`
-          : `${backendUrl}/text/history-sidebar`
+          : historyType === "text"
+            ? `${backendUrl}/text/history-sidebar`
+            : `${backendUrl}/audio/history-sidebar`
 
-      const res = await axios.get(url, { withCredentials: true })
+      const audioFetchLimit = Math.min(AUDIO_SIDEBAR_MAX_FETCH, limit * AUDIO_RECORDS_PER_SESSION)
+
+      const res = await axios.get(url, {
+        withCredentials: true,
+        params: historyType === "audio" ? { limit: audioFetchLimit } : undefined,
+      })
       const history: HistoryRecord[] = res.data.history
 
       setItems(history)
@@ -143,13 +208,14 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
             label="Type: "
             value={historyType}
             onChange={(value: string | null) => {
-              if (value === "image" || value === "text") {
+              if (value === "image" || value === "text" || value === "audio") {
                 setHistoryType(value)
               }
             }}
             data={[
               { value: "image", label: "Generated images" },
               { value: "text", label: "Generated text" },
+              { value: "audio", label: "Transcriptions" },
             ]}
           />
 
@@ -176,7 +242,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                 <Paper key={i} p="md" radius="xl" shadow="sm" withBorder bg="rgba(0,0,0,0.06)">
                   <Stack gap="xs">
                     <Text size="xs" c="dimmed">
-                      {new Date(item.timestamp).toLocaleString()}
+                      {formatDate(item.timestamp)}
                     </Text>
 
                     <Stack gap={4}>
@@ -197,6 +263,42 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                                 ? m.response.slice(0, 50) + "..."
                                 : m.response
                               : "(no response)"}
+                          </Text>
+                        ))}
+                      </Stack>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              )
+            })}
+          </>
+        )}
+
+        {historyType === "audio" && (
+          <>
+            {limitedAudioRuns.map((run, i) => {
+              return (
+                <Paper key={i} p="md" radius="xl" shadow="sm" withBorder bg="rgba(0,0,0,0.06)">
+                  <Stack gap="xs">
+                    <Text size="xs" c="dimmed">
+                      {formatDate(run.timestamp)}
+                    </Text>
+
+                    <Stack gap={4}>
+                      <Text size="md" fw={600} style={{ whiteSpace: "pre-wrap" }}>
+                        {run.title}
+                      </Text>
+
+                      <Stack gap={2} mt={4}>
+                        {run.models.map((m, idx) => (
+                          <Text key={idx} size="sm" c="gray.6">
+                            <strong>{formatAudioModelName(m.model)}:</strong>{" "}
+                            {m.response
+                              ? m.response.length > 50
+                                ? m.response.slice(0, 50) + "..."
+                                : m.response
+                              : "(no transcription)"}
+                            {typeof m.transcriptionTimeMs === "number" ? ` (${m.transcriptionTimeMs} ms)` : ""}
                           </Text>
                         ))}
                       </Stack>

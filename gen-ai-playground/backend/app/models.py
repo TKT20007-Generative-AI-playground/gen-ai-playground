@@ -220,6 +220,28 @@ class HistoryResponseText(BaseModel):
     total: int
     page: int
     total_pages: int
+
+
+class HistoryItemAudio(BaseModel):
+    type: str
+    transcription_text: str
+    model: str
+    timestamp: datetime
+    username: str
+    run_id: Optional[str] = None
+    input_name: Optional[str] = None
+    language: Optional[str] = None
+    duration: Optional[float] = None
+    transcription_time_ms: Optional[int] = None
+    source: Optional[str] = None
+
+
+class HistoryResponseAudio(BaseModel):
+    """Response model for audio transcription history endpoint"""
+    history: List[HistoryItemAudio]
+    total: int
+    page: int
+    total_pages: int
     
 class ConversationCreateRequest(BaseModel):
     """Request model for creating a new conversation"""

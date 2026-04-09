@@ -1,5 +1,5 @@
 // Shared constants for playground tabs
-export const PLAYGROUND_TABS = ['ImageGenerator', 'ImageEditor', 'TextGenerator'] as const
+export const PLAYGROUND_TABS = ['ImageGenerator', 'ImageEditor', 'TextGenerator', 'Transcribe'] as const
 
 export type PlaygroundTab = typeof PLAYGROUND_TABS[number]
 
