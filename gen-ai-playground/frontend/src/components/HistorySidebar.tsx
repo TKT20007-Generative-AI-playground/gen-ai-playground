@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import {
   Stack,
   Text,
@@ -74,7 +74,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
   conversations.sort((a, b) => b.timestamp - a.timestamp)
   const limited = conversations.slice(0, limit)
 
-  async function refetch() {
+  const refetch = useCallback(async () => {
     setLoading(true)
 
     try {
@@ -92,12 +92,12 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [historyType])
 
   // Fetch when sidebar opens
   useEffect(() => {
     if (opened) refetch()
-  }, [opened, limit, historyType])
+  }, [opened, limit, historyType, refetch])
 
   // Fetch when new image is generated
   useEffect(() => {
@@ -119,7 +119,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
       }
       window.removeEventListener("history-update", handler)
     }
-  }, [limit, historyType, opened])
+  }, [limit, historyType, opened, refetch])
 
   if (loading)
     return (
