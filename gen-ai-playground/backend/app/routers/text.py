@@ -739,6 +739,38 @@ def conversation_history(
         "model": conversation.get("model", "default"),
     }
     
+    
+@router.get("/shared-conversations-sidebar")
+def get_shared_conversations_sidebar(
+    limit: int = Query(5, description="How many conversations to return (5, 10, or 15)"),
+    current_user: UserInfo = Depends(get_current_user),
+    db: Database = Depends(get_database),
+):
+    if limit not in {5, 10, 15}:
+        raise HTTPException(status_code=400, detail="limit must be one of: 5, 10, 15")
+
+    conversations = list(
+        db.conversations.find(
+            {"participants": current_user.username},
+            {
+                "_id": 1,
+                "title": 1,
+                "participants": 1,
+                "model": 1,
+                "messages": 1,
+                "created_at": 1,
+                "updated_at": 1,
+            },
+        )
+        .sort("updated_at", -1)
+        .limit(limit)
+    )
+
+    for conversation in conversations:
+        conversation["_id"] = str(conversation["_id"])
+
+    return {"history": conversations}
+    
 
 @router.websocket("/ws/conversations/{conversation_id}")
 async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends(get_database)):

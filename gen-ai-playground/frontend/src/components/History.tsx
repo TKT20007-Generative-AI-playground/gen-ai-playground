@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import axios from "axios"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import type {
   AudioRecord,
   ConversationRecord,
@@ -55,6 +55,7 @@ const getAuthHeaders = () => ({
 export default function History() {
   const backendUrl = import.meta.env.VITE_API_URL
   const navigate = useNavigate()
+  const location = useLocation()
   const isMobile = useMediaQuery("(max-width: 600px)")
   const isTablet = useMediaQuery("(max-width: 900px)")
 
@@ -66,7 +67,16 @@ export default function History() {
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null)
 
   type Tab = "images" | "text" | "audio" | "conversations"
-  const [activeTab, setActiveTab] = useState<Tab>("images")
+  const [activeTab, setActiveTab] = useState<Tab>(
+    (location.state?.tab as Tab) ?? "images"
+  )
+
+  useEffect(() => {
+    if (location.state?.tab) {
+      setActiveTab(location.state.tab as Tab)
+    }
+  }, [location.state])
+  
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null])
 
   const [totalItems, setTotalItems] = useState<Record<Tab, number>>({
@@ -199,7 +209,7 @@ export default function History() {
         history: res.data.history || [],
         totalPages: res.data.total_pages || 1,
       }
-    },  
+    },
     [backendUrl],
   )
 
@@ -626,7 +636,7 @@ export default function History() {
             </Stack>
           </ScrollArea>
         )
-      }
+        }
       </Box>
 
       {/* Image Modal */}
