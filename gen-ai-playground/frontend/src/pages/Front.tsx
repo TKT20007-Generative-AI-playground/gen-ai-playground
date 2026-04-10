@@ -220,6 +220,7 @@ const Front = () => {
             slideGap="md"
             emblaOptions={{ loop: true, align: "start" }}
             plugins={[autoplay.current]}
+            data-testid="showcase-carousel"
           >
             {showcaseImages.map(img => (
               <Carousel.Slide key={img.name}>
@@ -231,6 +232,7 @@ const Front = () => {
                     borderRadius: "var(--mantine-radius-md)",
                   }}
                   className="showcase-slide"
+                  data-testid="showcase-slide"
                 >
                   <Image src={img.url} h="100%" fit="cover" />
                   <Button
