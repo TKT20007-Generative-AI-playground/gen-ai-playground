@@ -54,12 +54,18 @@ function AppContent() {
     }
   }, [onMouseMove, onMouseUp])
 
+  useEffect(() => {
+    if (isDashboardRoute) {
+      setHistoryOpen(false)
+    }
+  }, [isDashboardRoute])
+
   return (
     <>
       {!isDashboardRoute && <Header />}
 
       {/* Sidebar toggle button */}
-      {auth.isLoggedIn && (
+      {auth.isLoggedIn && !isDashboardRoute && (
         <button
           type="button"
           aria-label="Toggle history sidebar"
