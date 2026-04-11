@@ -151,7 +151,16 @@ def choose_text_model_path(model: str) -> str:
     configs = get_template_configs()
     for template_name, display_name in get_template_map().items():
         if display_name == model:
-            return configs[template_name].model
+            cfg = configs.get(template_name)
+            if cfg is not None:
+                return cfg.model
+
+            # Fallback for stale template maps (for example, tests that patch only
+            # display-name mapping): try parsing the template on demand.
+            try:
+                return verda_service._parse_and_validate_template(template_name).model
+            except Exception:
+                break
 
     raise HTTPException(
         status_code=400,

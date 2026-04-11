@@ -570,7 +570,7 @@ class TestAuthRequired:
 
     def test_delete_requires_auth(self, client):
         response = client.delete("/text/deploy?deployment_name=x")
-        assert response.status_code == 422
+        assert response.status_code == 401
 
 
 # ===========================================================================
