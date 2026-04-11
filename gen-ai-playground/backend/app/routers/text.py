@@ -169,6 +169,24 @@ def _resolve_template_name(model: str) -> str | None:
     return None
 
 
+def _model_supports_thinking(template_name: str | None) -> bool:
+    """Return whether the model template supports thinking mode."""
+    if not template_name:
+        return False
+
+    cfg = get_template_configs().get(template_name)
+    if cfg is None:
+        return False
+
+    if cfg.model_mode in {"thinking", "hybrid"}:
+        return True
+    if cfg.sglang is not None and cfg.sglang.reasoning_parser is not None:
+        return True
+    if cfg.vllm is not None and cfg.vllm.reasoning_parser is not None:
+        return True
+    return False
+
+
 def _deploy_model_internal(model_key: str) -> dict:
     """
     Internal helper to deploy a model by key.
@@ -489,16 +507,7 @@ def chat_with_model(
         raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
 
     # Detect if model supports thinking from template config
-    supports_thinking = False
-    if template_name:
-        cfg = get_template_configs().get(template_name)
-        if cfg is not None:
-            if cfg.model_mode in {"thinking", "hybrid"}:
-                supports_thinking = True
-            elif cfg.sglang is not None and cfg.sglang.reasoning_parser is not None:
-                supports_thinking = True
-            elif cfg.vllm is not None and cfg.vllm.reasoning_parser is not None:
-                supports_thinking = True
+    supports_thinking = _model_supports_thinking(template_name)
 
     # Chat
     try:
@@ -799,6 +808,17 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
             content = data.get("content")
             model_key = data.get("model")
             no_ai = data.get("noAI", False)
+            requested_max_tokens = data.get("max_tokens", 256)
+            enable_thinking = data.get("enable_thinking", False) is True
+
+            try:
+                max_tokens = int(requested_max_tokens)
+            except (TypeError, ValueError):
+                max_tokens = 256
+
+            max_tokens = max(1, min(max_tokens, 32768))
+            if enable_thinking:
+                max_tokens = max(max_tokens, 2)
 
             if not content:
                 continue
@@ -836,8 +856,10 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
                     handle_llm_reply(
                         conversation_id,
                         model_key,
-                        db,
-                        user,
+                        max_tokens=max_tokens,
+                        enable_thinking=enable_thinking,
+                        db=db,
+                        cur_user=user,
                     )
                 )
 
@@ -855,6 +877,8 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
 async def handle_llm_reply(
     conversation_id: str,
     model_key: str,
+    max_tokens: int = 256,
+    enable_thinking: bool = False,
     db: Database = Depends(get_database),
     cur_user: UserInfo = Depends(get_current_user),
 ):
@@ -895,6 +919,8 @@ async def handle_llm_reply(
             return
 
         deployment_name = existing["name"]
+        supports_thinking = _model_supports_thinking(template_name)
+        effective_enable_thinking = enable_thinking and supports_thinking
 
         try:
             client = verda_service._get_client()
@@ -915,19 +941,25 @@ async def handle_llm_reply(
             result = await asyncio.to_thread(
                 verda_service.chat,
                 messages=messages,
-                max_tokens=256,
+                max_tokens=max_tokens,
                 temperature=0.7,
                 top_p=0.9,
+                enable_thinking=effective_enable_thinking,
+                supports_thinking=supports_thinking,
                 deployment_name=deployment_name,
                 model_path=model_path,
             )
             assistant_text = result["reply"]
+            assistant_reasoning = result.get("reasoning")
         except Exception as e:
             await manager.broadcast(conversation_id, {"type": "error", "message": str(e)})
             return
 
-        
-        assistant_message = {"role": "assistant", "content": assistant_text}
+        assistant_message = {
+            "role": "assistant",
+            "content": assistant_text,
+            "reasoning": assistant_reasoning,
+        }
         db.conversations.update_one(
             {"_id": conversation_oid},
             {"$push": {"messages": assistant_message}},

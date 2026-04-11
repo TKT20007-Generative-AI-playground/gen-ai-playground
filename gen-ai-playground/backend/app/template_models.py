@@ -36,8 +36,12 @@ class SGLangConfig(BaseModel):
     @model_validator(mode="after")
     # This is needed to ensure that if dp > 1, then enable_dp_attention must be True
     def check_if_dp_is_valid(self):
-        if self.dp and self.dp > 1 and not self.enable_dp_attention:
-            raise ValueError("enable_dp_attention must be True when dp > 1")
+        if self.dp and self.dp > 1:
+            # External templates may omit this; default it to the only valid setting.
+            if self.enable_dp_attention is None:
+                self.enable_dp_attention = True
+            elif self.enable_dp_attention is False:
+                raise ValueError("enable_dp_attention must be True when dp > 1")
         return self
     
     

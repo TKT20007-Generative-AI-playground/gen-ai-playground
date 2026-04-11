@@ -1,6 +1,6 @@
 import { useAuth } from "../context/AuthContext"
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react"
-import { Alert, Badge, Button, Checkbox, Paper, ScrollArea, Text, TextInput } from "@mantine/core"
+import { Alert, Badge, Button, Checkbox, NumberInput, Paper, ScrollArea, Switch, Text, TextInput } from "@mantine/core"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { useLocation, useParams, useSearchParams } from "react-router-dom"
@@ -12,6 +12,7 @@ type Message = {
     role: "user" | "assistant"
     sender?: string
     content: string
+    reasoning?: string | null
     modelLabel?: string
     generationTimeMs?: number
     isPending?: boolean
@@ -23,7 +24,16 @@ type ConversationHistoryMessage = {
     role: "user" | "assistant"
     content: string
     sender?: string
+    reasoning?: string | null
 }
+
+type ModelOption = {
+    value: string
+    label: string
+    supportsThinking: boolean
+    modelMode?: "thinking" | "hybrid" | "instruct" | null
+}
+
 const getCsrfToken = (): string => {
     const value = `; ${document.cookie}`
     const parts = value.split(`; csrf_token=`)
@@ -43,6 +53,19 @@ const makeMessageId = () => {
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+function parseModelReply(rawReply: string): {
+    thinking: string | null
+    actualReply: string
+} {
+    const thinkingMatch = rawReply.match(/<think>([\s\S]*?)<\/think>/)
+    if (thinkingMatch) {
+        const thinking = thinkingMatch[1].trim()
+        const actualReply = rawReply.replace(/<think>[\s\S]*?<\/think>/, "").trim()
+        return { thinking, actualReply }
+    }
+    return { thinking: null, actualReply: rawReply.trim() }
+}
+
 export default function SharedChat() {
     const { isLoggedIn, getAccessToken } = useAuth()
     const { state } = useLocation()
@@ -58,7 +81,10 @@ export default function SharedChat() {
     const [chatTitle, setChatTitle] = useState(state?.title ?? "")
 
     const currentModelRef = useRef<string>(state?.modelValue ?? "")
-    const [noAI, setNoAI] = useState(false);
+    const [noAI, setNoAI] = useState(false)
+    const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
+    const [maxTokens, setMaxTokens] = useState<number>(256)
+    const [enableThinking, setEnableThinking] = useState(false)
 
     const [prompt, setPrompt] = useState("")
     const [isTyping, setIsTyping] = useState(false)
@@ -80,6 +106,48 @@ export default function SharedChat() {
     const [inviteCode, setInviteCode] = useState(searchParams.get("invite") ?? state?.invCode ?? "")
     const [joined, setJoined] = useState(false)
     const [joining, setJoining] = useState(false)
+
+    const currentModel = currentModelRef.current
+    const thinkingMode = modelOptions.find(option => option.value === currentModel)?.modelMode ?? null
+    const isThinkingEnabled = thinkingMode === "thinking" || (thinkingMode === "hybrid" && enableThinking)
+
+    useEffect(() => {
+        if (!isThinkingEnabled) return
+        setMaxTokens(prev => Math.max(prev, 2))
+    }, [isThinkingEnabled])
+
+    useEffect(() => {
+        if (!isLoggedIn) return
+
+        const fetchModels = async () => {
+            try {
+                const res = await axios.get(`${backendUrl}/text/models`, {
+                    headers: getAuthHeaders(),
+                    withCredentials: true,
+                })
+
+                const models: ModelOption[] = (res.data.available_models ?? []).map(
+                    (model: {
+                        value: string
+                        label: string
+                        supports_thinking?: boolean
+                        model_mode?: "thinking" | "hybrid" | "instruct" | null
+                    }) => ({
+                        value: model.value,
+                        label: model.label,
+                        supportsThinking: model.supports_thinking ?? false,
+                        modelMode: model.model_mode ?? null,
+                    }),
+                )
+
+                setModelOptions(models)
+            } catch {
+                // silent
+            }
+        }
+
+        fetchModels()
+    }, [backendUrl, isLoggedIn])
 
 
     const handleJoin = useCallback(async (code?: string) => {
@@ -126,13 +194,19 @@ export default function SharedChat() {
                 )
                 setChatTitle(res.data.title ?? "")
                 currentModelRef.current = res.data.model ?? modelValue
-                const historical: Message[] = ((res.data.messages ?? []) as ConversationHistoryMessage[]).map((m) => ({
-                    id: makeMessageId(),
-                    role: m.role,
-                    content: m.content,
-                    sender: m.sender,
-                    modelLabel: m.role === "assistant" ? (currentModelRef.current || modelLabel) : undefined,
-                }))
+                const historical: Message[] = ((res.data.messages ?? []) as ConversationHistoryMessage[]).map((m) => {
+                    const parsed = parseModelReply(m.content)
+                    const reasoning = m.reasoning ?? parsed.thinking
+
+                    return {
+                        id: makeMessageId(),
+                        role: m.role,
+                        content: parsed.actualReply,
+                        reasoning,
+                        sender: m.sender,
+                        modelLabel: m.role === "assistant" ? (currentModelRef.current || modelLabel) : undefined,
+                    }
+                })
                 updateMessages(historical)
             } catch {
                 // non-fatal if we fail to load history, we can still chat
@@ -189,9 +263,17 @@ export default function SharedChat() {
 
                 } else if (data.type === "assistant_done") {
                     setIsTyping(false)
+                    const parsed = parseModelReply(data.message.content ?? "")
+                    const reasoning = data.message.reasoning ?? parsed.thinking
                     const resolved = messagesRef.current.map(m =>
                         m.id === pendingIdRef.current
-                            ? { ...m, content: data.message.content, isPending: false, pendingStartTime: undefined }
+                            ? {
+                                ...m,
+                                content: parsed.actualReply,
+                                reasoning,
+                                isPending: false,
+                                pendingStartTime: undefined,
+                            }
                             : m
                     )
                     updateMessages(resolved)
@@ -248,6 +330,8 @@ export default function SharedChat() {
         wsRef.current.send(JSON.stringify({
             content: text,
             model: currentModelRef.current,
+            max_tokens: maxTokens,
+            enable_thinking: isThinkingEnabled,
             noAI: noAI, // if true, backend will not involve the AI and just broadcast the message to other participants
         }))
     }
@@ -304,10 +388,39 @@ export default function SharedChat() {
             )}
 
             {/* Toolbar */}
-            <div style={{ display: "flex", gap: "8px" }}>
+            <div style={{ display: "flex", gap: "12px", alignItems: "flex-end", flexWrap: "wrap" }}>
                 <Button size="xs" color="orange" variant="light" onClick={clearMessages} disabled={isTyping}>
                     Clear
                 </Button>
+
+                <NumberInput
+                    label="Max Output Tokens"
+                    value={maxTokens}
+                    onChange={val => {
+                        const next = typeof val === "number" ? val : 256
+                        setMaxTokens(next)
+                    }}
+                    min={isThinkingEnabled ? 2 : 1}
+                    max={32768}
+                    step={64}
+                    clampBehavior="strict"
+                    style={{ width: 180 }}
+                    disabled={isTyping}
+                />
+
+                {thinkingMode === "thinking" ? (
+                    <Text size="xs" c="dimmed" pb={6}>
+                        Thinking only
+                    </Text>
+                ) : thinkingMode === "hybrid" ? (
+                    <Switch
+                        label="Thinking"
+                        checked={enableThinking}
+                        onChange={e => setEnableThinking(e.currentTarget.checked)}
+                        disabled={isTyping}
+                        pb={6}
+                    />
+                ) : null}
             </div>
 
             {/* Message list */}
@@ -363,12 +476,30 @@ export default function SharedChat() {
                                     <ActionStatus actionText="Generating" startTime={message.pendingStartTime} />
                                 ) : null
                             ) : (
-                                <Text
-                                    size="sm"
-                                    style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}
-                                >
-                                    {message.content}
-                                </Text>
+                                <>
+                                    <Text
+                                        size="sm"
+                                        style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}
+                                    >
+                                        {message.content}
+                                    </Text>
+
+                                    {message.role === "assistant" && message.reasoning && (
+                                        <details style={{ marginTop: "8px" }}>
+                                            <summary style={{ cursor: "pointer", color: "#666", fontSize: "12px" }}>
+                                                Show reasoning
+                                            </summary>
+                                            <Text
+                                                size="xs"
+                                                c="dimmed"
+                                                mt={6}
+                                                style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}
+                                            >
+                                                {message.reasoning}
+                                            </Text>
+                                        </details>
+                                    )}
+                                </>
                             )}
                         </Paper>
                     ))
