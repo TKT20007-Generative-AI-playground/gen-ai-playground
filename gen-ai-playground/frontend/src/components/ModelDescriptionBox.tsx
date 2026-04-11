@@ -14,7 +14,7 @@ export default function ModelDescriptionBox({ model, height }: Props) {
 
   const paragraphs = description
     .split(/\n\s*\n/g)
-    .map((p) => p.trim())
+    .map(p => p.trim())
     .filter(Boolean)
 
   const bodyRef = useRef<HTMLDivElement>(null)

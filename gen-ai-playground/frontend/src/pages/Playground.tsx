@@ -6,29 +6,31 @@ import type { ReactNode } from "react"
 import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
 import TextGenerator from "../components/TextGenerator"
+import Transcribe from "../components/Transcribe"
+import { PLAYGROUND_TABS } from "../constants/tabs"
 
-export default function Playground() {
+type Tab = (typeof PLAYGROUND_TABS)[number]
+
+export default function Playground({ historyOpen }: { historyOpen: boolean }) {
   const { tab } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
 
   const imageToEdit = location.state?.imageToEdit || null
 
-  const tabs = ["ImageGenerator", "ImageEditor", "TextGenerator"] as const
-  type Tab = (typeof tabs)[number]
-
   const selectedComponent: Tab =
-    tab && tabs.includes(tab as Tab) ? (tab as Tab) : "ImageGenerator"
+    tab && PLAYGROUND_TABS.includes(tab as Tab) ? (tab as Tab) : "ImageGenerator"
 
   const componentsMap: Record<Tab, ReactNode> = {
     ImageGenerator: <ImageGenerator />,
     ImageEditor: <ImageEditor imageToEdit={imageToEdit} />,
-    TextGenerator: <TextGenerator />,
+    TextGenerator: <TextGenerator opened={historyOpen} />,
+    Transcribe: <Transcribe />,
   }
 
   // If tab is invalid, redirect to default
   useEffect(() => {
-    if (!tab || !tabs.includes(tab as Tab)) {
+    if (!tab || !PLAYGROUND_TABS.includes(tab as Tab)) {
       navigate("/playground/ImageGenerator", { replace: true })
     }
   }, [tab, navigate])
@@ -38,21 +40,20 @@ export default function Playground() {
       <Group gap="md" p="md">
         <Select
           label="Select playground component"
-          data={tabs.map((t) => ({ value: t, label: t }))}
+          data={PLAYGROUND_TABS.map((t) => ({ value: t, label: t }))}
           value={selectedComponent}
-          onChange={(value) => {
+          onChange={value => {
             if (value) navigate(`/playground/${value}`)
           }}
-        data-testid="playground-select" 
+          data-testid="playground-select"
         />
       </Group>
 
       <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
-        <div style={{ width: "100%", maxWidth: 1100, padding: "0 16px" }}>
+        <div style={{ width: "100%", maxWidth: 1100, padding: "0 16px 24px" }}>
           {componentsMap[selectedComponent]}
         </div>
       </div>
     </>
   )
 }
-

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, images, text, dashboard
+from app.routers import auth, images, text, dashboard, invitations, audio
 
 
 # Initialize FastAPI app
@@ -24,7 +24,8 @@ app.add_middleware(
     allow_origins=settings.ALLOWED_ORIGINS.split(","),
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    expose_headers=["X-Generation-Time-Ms","X-Image-Id"],
 )
 
 # Register routers
@@ -32,6 +33,8 @@ app.include_router(auth.router)
 app.include_router(images.router)
 app.include_router(text.router)
 app.include_router(dashboard.router)
+app.include_router(invitations.router)
+app.include_router(audio.router)
 
 
 @app.get("/")

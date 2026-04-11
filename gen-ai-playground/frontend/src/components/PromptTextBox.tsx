@@ -20,7 +20,7 @@ export function PromptTextBox({ onSubmit, value, onChange, usage }: PromptTextBo
     <Stack gap="sm" w="100%">
       <Textarea
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={e => onChange(e.target.value)}
         ref={promptRef}
         placeholder="Prompt here"
         autosize

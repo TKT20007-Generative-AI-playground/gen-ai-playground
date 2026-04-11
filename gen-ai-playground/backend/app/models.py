@@ -12,6 +12,7 @@ class ImageRequestBody(BaseModel):
     model: str
     image: Optional[str] = None  
     image_to_edit: Optional[str] = None
+    id: Optional[str] = None
     parent_image_id: Optional[str] = None
 
 
@@ -45,6 +46,8 @@ class RegisterResponse(BaseModel):
 
 class HistoryItem(BaseModel):
     """Model for a single history item"""
+    id: str 
+    username: str
     prompt: str
     model: str
     timestamp: datetime
@@ -52,16 +55,38 @@ class HistoryItem(BaseModel):
     image_data: str
     image_type: str
 
-
 class HistoryResponse(BaseModel):
     """Response model for history endpoint"""
     history: List[HistoryItem]
+    total: int
+    page: int
+    total_pages: int
 
 
 class UserInfo(BaseModel):
     """Model for authenticated user information"""
     username: str
     is_admin: bool = False
+
+
+# ---- User management models ----
+
+class UserListItem(BaseModel):
+    """Model for a single user in the user list"""
+    username: str
+    is_admin: bool = False
+    created_at: Optional[datetime] = None
+
+
+class UserListResponse(BaseModel):
+    """Response model for user list endpoint"""
+    users: List[UserListItem]
+
+
+class DeleteUserResponse(BaseModel):
+    """Response model for user deletion"""
+    message: str
+    username: str
 
 
 # ---- Text generation models ----
@@ -117,6 +142,7 @@ class TextGenerateResponse(BaseModel):
     model: str
     prompt: str
     usage: Dict[str, Any] = {}
+    generation_time_ms: Optional[int] = None
 
 
 class ChatMessage(BaseModel):
@@ -135,12 +161,93 @@ class ChatRequest(BaseModel):
     enable_thinking: bool = False
 
 
+# ---- Invitation code models ----
+
+class InvitationCodeCreate(BaseModel):
+    """Request model for creating an invitation code"""
+    code: str = Field(min_length=5, max_length=64, pattern=r"^[a-zA-Z0-9_-]+$")
+    expiration_days: int = Field(default=30, ge=1, le=365)
+    max_uses: int = Field(default=1, ge=1, le=100)
+
+
+class InvitationCodeInfo(BaseModel):
+    """Model for invitation code information"""
+    code: str
+    created_at: datetime
+    expires_at: datetime
+    max_uses: int
+    uses_count: int = 0
+    is_active: bool = True
+    used_by: Optional[List[str]] = None
+
+
+class InvitationCodeCreateResponse(BaseModel):
+    """Response model for creating an invitation code"""
+    message: str
+    code: InvitationCodeInfo
+
+
+class InvitationCodeListResponse(BaseModel):
+    """Response model for listing invitation codes"""
+    codes: List[InvitationCodeInfo]
+
+
+class InvitationCodeDeleteResponse(BaseModel):
+    """Response model for deleting an invitation code"""
+    message: str
+    code: str
+
+
 class ChatResponse(BaseModel):
     """Response model for chat completions"""
     reply: str
     reasoning: Optional[str] = None
     model: str
     usage: Dict[str, Any] = {}
+    generation_time_ms: Optional[int] = None
+
+class HistoryItemText(BaseModel):
+    type: str
+    messages: List[ChatMessage]
+    reply: str
+    model: str
+    timestamp: datetime
+    username: str
+    usage: Optional[Dict[str, Any]] = {}
+    generation_time_ms: Optional[int] = None
+
+class HistoryResponseText(BaseModel):
+    """Response model for text generation history endpoint"""
+    history: List[HistoryItemText]
+    total: int
+    page: int
+    total_pages: int
 
 
+class HistoryItemAudio(BaseModel):
+    type: str
+    transcription_text: str
+    model: str
+    timestamp: datetime
+    username: str
+    run_id: Optional[str] = None
+    input_name: Optional[str] = None
+    language: Optional[str] = None
+    duration: Optional[float] = None
+    transcription_time_ms: Optional[int] = None
+    source: Optional[str] = None
 
+
+class HistoryResponseAudio(BaseModel):
+    """Response model for audio transcription history endpoint"""
+    history: List[HistoryItemAudio]
+    total: int
+    page: int
+    total_pages: int
+    
+class ConversationCreateRequest(BaseModel):
+    """Request model for creating a new conversation"""
+    title: Optional[str] = None
+    participants: Optional[List[str]] = None
+    model_key: Optional[str] = None
+    initial_messages: Optional[List[Dict[str, Any]]] = Field(default_factory=list)

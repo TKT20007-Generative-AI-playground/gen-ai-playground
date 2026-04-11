@@ -13,7 +13,13 @@ import {
   Text,
   ScrollArea,
   TextInput,
+  Modal,
 } from "@mantine/core"
+
+import ActionStatus from "./ActionStatus"
+import { formatDurationMs } from "../utils/time"
+import { ShareConversationModal } from "./SharedConversationsModal"
+import { useNavigate } from "react-router-dom"
 
 type ModelOption = {
   value: string
@@ -28,11 +34,15 @@ type Message = {
   content: string
   reasoning?: string | null
   modelLabel?: string
+  generationTimeMs?: number
+  isPending?: boolean
+  pendingStartTime?: number
 }
 
 type ChatApiResponse = {
   reply: string
   reasoning?: string | null
+  generation_time_ms?: number | null
 }
 
 type ModelStatus = "live" | "starting" | "offline" | "unknown"
@@ -46,6 +56,18 @@ const makeMessageId = () => {
 }
 
 const MAX_MODELS = 4
+
+const getCsrfToken = (): string => {
+  const value = `; ${document.cookie}`
+  const parts = value.split(`; csrf_token=`)
+  if (parts.length === 2) return parts.pop()!.split(";").shift()!
+  return ""
+}
+
+const getAuthHeaders = () => ({
+  "Content-Type": "application/json",
+  "X-CSRF-Token": getCsrfToken(),
+})
 
 function parseModelReply(rawReply: string): {
   thinking: string | null
@@ -68,12 +90,9 @@ const modelStatusPriority: Record<ModelStatus, number> = {
 }
 
 // Build dropdown data with colored status dots; disable non-live models
-function buildDropdownData(
-  modelOptions: ModelOption[],
-  statuses: Record<string, ModelStatus>
-) {
+function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string, ModelStatus>) {
   return modelOptions
-    .map((m) => {
+    .map(m => {
       const st = statuses[m.value]
       const isLive = st === "live"
       const emoji = isLive ? "\u{1F7E2}" : st === "starting" ? "\u{1F7E1}" : "\u26AA"
@@ -86,8 +105,7 @@ function buildDropdownData(
     })
     .sort((a, b) => {
       const statusDiff =
-        modelStatusPriority[statuses[a.value]] -
-        modelStatusPriority[statuses[b.value]]
+        modelStatusPriority[statuses[a.value]] - modelStatusPriority[statuses[b.value]]
 
       if (statusDiff !== 0) return statusDiff
 
@@ -109,6 +127,7 @@ type ChatPanelProps = {
   thinkingMode?: "thinking" | "hybrid" | "instruct" | null
   enableThinking: boolean
   onToggleThinking: (enabled: boolean) => void
+  onShare: () => void
 }
 
 function ChatPanel({
@@ -122,6 +141,7 @@ function ChatPanel({
   thinkingMode,
   enableThinking,
   onToggleThinking,
+  onShare,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -184,6 +204,9 @@ function ChatPanel({
           />
         ) : null}
       </div>
+      <Button size="xs" variant="light" onClick={onShare}>
+        Share conversation
+      </Button>
 
       <ScrollArea
         style={{
@@ -201,7 +224,7 @@ function ChatPanel({
           </Text>
         ) : (
           <>
-            {messages.map((message) => (
+            {messages.map(message => (
               <Paper
                 key={message.id}
                 p="sm"
@@ -212,45 +235,68 @@ function ChatPanel({
                   marginRight: message.role === "user" ? "0" : "15%",
                 }}
               >
-                <Text fw={700} size="xs" mb={4}>
-                  {message.role === "user" ? "You" : message.modelLabel ?? modelLabel}
-                </Text>
-                <Text
-                  size="sm"
+                <div
                   style={{
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    overflowWrap: "break-word",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    width: "100%",
+                    gap: "8px",
+                    marginBottom: "4px",
                   }}
                 >
-                  {message.content}
-                </Text>
-                {message.role === "assistant" && message.reasoning && (
-                  <details style={{ marginTop: "8px" }}>
-                    <summary style={{ cursor: "pointer", color: "#666", fontSize: "12px" }}>
-                      Show reasoning
-                    </summary>
+                  <Text fw={700} size="xs">
+                    {message.role === "user" ? "You" : (message.modelLabel ?? modelLabel)}
+                  </Text>
+                  {message.role === "assistant" && message.generationTimeMs != null && (
+                    <Text size="xs" c="dimmed" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+                      Response time: {formatDurationMs(message.generationTimeMs)}
+                    </Text>
+                  )}
+                </div>
+
+                {message.isPending ? (
+                  message.pendingStartTime ? (
+                    <div>
+                      <ActionStatus actionText="Generating" startTime={message.pendingStartTime} />
+                    </div>
+                  ) : null
+                ) : (
+                  <>
                     <Text
-                      size="xs"
-                      c="dimmed"
-                      mt={6}
+                      size="sm"
                       style={{
                         whiteSpace: "pre-wrap",
                         wordBreak: "break-word",
                         overflowWrap: "break-word",
                       }}
                     >
-                      {message.reasoning}
+                      {message.content}
                     </Text>
-                  </details>
+
+                    {message.role === "assistant" && message.reasoning && (
+                      <details style={{ marginTop: "8px" }}>
+                        <summary style={{ cursor: "pointer", color: "#666", fontSize: "12px" }}>
+                          Show reasoning
+                        </summary>
+                        <Text
+                          size="xs"
+                          c="dimmed"
+                          mt={6}
+                          style={{
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            overflowWrap: "break-word",
+                          }}
+                        >
+                          {message.reasoning}
+                        </Text>
+                      </details>
+                    )}
+                  </>
                 )}
               </Paper>
             ))}
-            {isLoading && (
-              <Text c="dimmed" size="sm" ta="center">
-                Generating...
-              </Text>
-            )}
           </>
         )}
         <div ref={bottomRef} />
@@ -261,9 +307,10 @@ function ChatPanel({
 
 // --- Main component ---
 
-export default function TextGenerator() {
+export default function TextGenerator({ opened }: { opened: boolean }) {
   const { isLoggedIn } = useAuth()
   const backendUrl = import.meta.env.VITE_API_URL
+  const enableTestModel = import.meta.env.DEV && import.meta.env.VITE_ENABLE_TEST_MODEL !== "false"
 
   const [prompt, setPrompt] = useState("")
   const [selectedModels, setSelectedModels] = useState<string[]>([])
@@ -273,12 +320,17 @@ export default function TextGenerator() {
   const [maxTokens, setMaxTokens] = useState<number>(256)
   const [enableThinkingByModel, setEnableThinkingByModel] = useState<Record<string, boolean>>({})
 
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareTargetModel, setShareTargetModel] = useState<string | null>(null)
+
+  const sidebarOpen = opened
+
   // Keep a ref so async loops always see the latest messages.
   const messagesByModelRef = useRef<Record<string, Message[]>>({})
 
   const setMessagesForModel = (modelValue: string, next: Message[]) => {
     messagesByModelRef.current = { ...messagesByModelRef.current, [modelValue]: next }
-    setMessagesByModel((prev) => ({ ...prev, [modelValue]: next }))
+    setMessagesByModel(prev => ({ ...prev, [modelValue]: next }))
   }
 
   const clearMessagesForModel = (modelValue: string) => {
@@ -288,14 +340,22 @@ export default function TextGenerator() {
   const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
   const [statusMsgs, setStatusMsgs] = useState<Record<string, string | null>>({})
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("token")
-    if (!token) throw new Error("Token puuttuu")
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    }
+  const [joinModalOpen, setJoinModalOpen] = useState(false)
+  const [joinId, setJoinId] = useState("")
+  const navigate = useNavigate()
+
+  const handleJoin = () => {
+    const input = joinId.trim()
+    if (!input) return
+    const id = input.split("/").pop() ?? input
+
+    setJoinModalOpen(false)
+    setJoinId("")
+    navigate(`/chat/conversations/${id}`, {
+      state: { conversationId: id, modelValue: "", modelLabel: "Assistant" }
+    })
   }
+
 
   // Fetch available models from backend
   useEffect(() => {
@@ -304,6 +364,7 @@ export default function TextGenerator() {
       try {
         const res = await axios.get(`${backendUrl}/text/models`, {
           headers: getAuthHeaders(),
+          withCredentials: true,
         })
         const models: ModelOption[] = (res.data.available_models ?? []).map(
           (m: { value: string; label: string; supports_thinking?: boolean; model_mode?: "thinking" | "hybrid" | "instruct" | null }) => ({
@@ -313,25 +374,39 @@ export default function TextGenerator() {
             modelMode: m.model_mode ?? null,
           })
         )
+        if (enableTestModel) {
+          models.push({
+            value: "test_model",
+            label: "test_model",
+            supportsThinking: false,
+            modelMode: null,
+          })
+        }
         setModelOptions(models)
       } catch {
-        // silent 
+        // silent
       }
     }
     fetchModels()
-  }, [backendUrl, isLoggedIn])
+  }, [backendUrl, enableTestModel, isLoggedIn])
 
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
     try {
       const res = await axios.get(`${backendUrl}/text/model-statuses`, {
         headers: getAuthHeaders(),
+        withCredentials: true,
       })
-      setModelStatuses(res.data)
+
+      if (enableTestModel) {
+        setModelStatuses({ ...res.data, test_model: "live" })
+      } else {
+        setModelStatuses({ ...res.data })
+      }
     } catch {
       // silent
     }
-  }, [backendUrl])
+  }, [backendUrl, enableTestModel])
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -359,22 +434,27 @@ export default function TextGenerator() {
   const sendToPanel = async (
     modelValue: string,
     messagesWithUser: Message[],
+    pendingMessageId: string,
   ) => {
-    setLoadingByModel((prev) => ({ ...prev, [modelValue]: true }))
+    setLoadingByModel(prev => ({ ...prev, [modelValue]: true }))
     console.log(`Sending to ${modelValue}:`, messagesWithUser)
 
     try {
+      const requestMessages = messagesWithUser
+        .filter(message => !message.isPending)
+        .map(message => ({ role: message.role, content: message.content }))
+
       const response = await axios.post(
         `${backendUrl}/text/chat`,
         {
           model_path: modelValue,
-          messages: messagesWithUser,
+          messages: requestMessages,
           max_tokens: maxTokens,
           temperature: 0.7,
           top_p: 0.9,
           enable_thinking: isThinkingEnabled(modelValue),
         },
-        { headers: getAuthHeaders() }
+        { headers: getAuthHeaders(), withCredentials: true },
       )
 
       const result = response.data as ChatApiResponse
@@ -382,20 +462,41 @@ export default function TextGenerator() {
       const reasoning = result.reasoning ?? parsed.thinking
       if (reasoning) console.log("Thinking:", reasoning)
       const label = getModelLabel(modelValue)
-      const withReply = messagesWithUser.concat({
-        id: makeMessageId(),
-        role: "assistant",
-        content: parsed.actualReply,
-        reasoning,
-        modelLabel: label,
-      })
-      setMessagesForModel(modelValue, withReply)
+      const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
+        message.id === pendingMessageId
+          ? {
+              ...message,
+              content: parsed.actualReply,
+              reasoning,
+              modelLabel: label,
+              generationTimeMs: result.generation_time_ms ?? undefined,
+              isPending: false,
+              pendingStartTime: undefined,
+            }
+          : message,
+      )
+      setMessagesForModel(modelValue, replaced)
     } catch (error: unknown) {
       console.error("chat error:", error)
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setStatusMsgs((prev) => ({ ...prev, [modelValue]: detail || "Failed to reach the server." }))
+      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
+        ?.detail
+      const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
+        message.id === pendingMessageId
+          ? {
+            ...message,
+            content: "Failed to generate a response.",
+            isPending: false,
+            pendingStartTime: undefined,
+          }
+          : message,
+      )
+      setMessagesForModel(modelValue, replaced)
+      setStatusMsgs(prev => ({
+        ...prev,
+        [modelValue]: detail || "Failed to reach the server.",
+      }))
     } finally {
-      setLoadingByModel((prev) => ({ ...prev, [modelValue]: false }))
+      setLoadingByModel(prev => ({ ...prev, [modelValue]: false }))
     }
   }
 
@@ -412,9 +513,18 @@ export default function TextGenerator() {
 
     for (const modelValue of selectedModels) {
       const existingMessages = messagesByModelRef.current[modelValue] ?? []
-      const updatedMessages = existingMessages.concat(userMessage)
+      const pendingMessageId = makeMessageId()
+      const pendingAssistantMessage: Message = {
+        id: pendingMessageId,
+        role: "assistant",
+        content: "",
+        modelLabel: getModelLabel(modelValue),
+        isPending: true,
+        pendingStartTime: Date.now(),
+      }
+      const updatedMessages = existingMessages.concat(userMessage, pendingAssistantMessage)
       setMessagesForModel(modelValue, updatedMessages)
-      promises.push(sendToPanel(modelValue, updatedMessages))
+      promises.push(sendToPanel(modelValue, updatedMessages, pendingMessageId))
     }
 
     await Promise.all(promises)
@@ -446,6 +556,7 @@ export default function TextGenerator() {
   const isBreakout = selectedModels.length > 2
   const dropdownData = buildDropdownData(modelOptions, modelStatuses)
 
+
   return (
     <div
       style={{
@@ -474,6 +585,27 @@ export default function TextGenerator() {
         clearable
         disabled={isAnyLoading}
       />
+      <Button variant="light" onClick={() => setJoinModalOpen(true)}>
+        Join conversation
+      </Button>
+
+      <Modal
+        opened={joinModalOpen}
+        onClose={() => setJoinModalOpen(false)}
+        title="Join conversation"
+        size="sm"
+      >
+        <TextInput
+          label="Conversation Link"
+          placeholder="Paste conversation link here..."
+          value={joinId}
+          onChange={e => setJoinId(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") handleJoin() }}
+        />
+        <Button fullWidth mt="md" onClick={handleJoin} disabled={!joinId.trim()}>
+          Join
+        </Button>
+      </Modal>
 
       {selectedModels.length > 0 && (
         <Group gap="md">
@@ -537,25 +669,36 @@ export default function TextGenerator() {
                           setMaxTokens(effectiveMax)
                         }
                       }}
+                      onShare={() => {
+                        setShareTargetModel(modelValue)
+                        setShareModalOpen(true)
+                      }}
                     />
                   ))}
                 </div>
               </div>
             </div>
           ) : (
-            // 1–2 models: keep the compact layout.
+            // 1-2 models: keep the compact layout.
             <div
               style={{
                 display: "grid",
                 gap: "20px",
-                gridTemplateColumns:
-                  selectedModels.length === 1 ? "minmax(320px, 1fr)" : "repeat(2, minmax(320px, 1fr))",
                 width: "100%",
-                margin: "0 auto",
                 alignItems: "stretch",
+
+                // If historysidebar open, show 2×2 grid
+                // Otherwise auto-fit layout
+                gridTemplateColumns:
+                  sidebarOpen && selectedModels.length >= 3
+                    ? "repeat(2, 1fr)"
+                    : "repeat(auto-fit, minmax(280px, 1fr))",
+
+                transition: "padding-right 0.3s ease",
+                paddingRight: sidebarOpen ? "260px" : "0px",
               }}
             >
-              {selectedModels.map((modelValue) => (
+              {selectedModels.map(modelValue => (
                 <ChatPanel
                   key={modelValue}
                   modelValue={modelValue}
@@ -569,11 +712,15 @@ export default function TextGenerator() {
                   thinkingMode={getThinkingMode(modelValue)}
                   enableThinking={enableThinkingByModel[modelValue] ?? false}
                   onToggleThinking={(enabled) => {
-                    setEnableThinkingByModel((prev) => ({ ...prev, [modelValue]: enabled }))
+                    setEnableThinkingByModel(prev => ({ ...prev, [modelValue]: enabled }))
                     if (enabled) {
                       const effectiveMax = Math.max(maxTokens, 2)
                       setMaxTokens(effectiveMax)
                     }
+                  }}
+                  onShare={() => {
+                    setShareTargetModel(modelValue)
+                    setShareModalOpen(true)
                   }}
                 />
               ))}
@@ -586,16 +733,29 @@ export default function TextGenerator() {
               style={{ flex: 1, minWidth: 0 }}
               placeholder="Type your message to send to selected models..."
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={e => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isAnyLoading}
             />
-            <Button onClick={generateText} disabled={!prompt.trim() || isAnyLoading} loading={isAnyLoading}>
+            <Button
+              onClick={generateText}
+              disabled={!prompt.trim() || isAnyLoading}
+              loading={isAnyLoading}
+            >
               Send
             </Button>
           </div>
         </>
-      )}
+      )
+      }
+      <ShareConversationModal
+        opened={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        currentMessages={shareTargetModel ? (messagesByModel[shareTargetModel] ?? []) : []}
+        modelValue={shareTargetModel ?? ""}
+        backendUrl={backendUrl}
+      />
     </div>
+
   )
 }
