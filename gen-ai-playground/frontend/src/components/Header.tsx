@@ -76,7 +76,7 @@ export default function Header() {
           isLoggedIn ? (
             <Group gap="md">
               <Text fw={500} c="white">
-                Welcome {username} !
+                Welcome{username} !
               </Text>
               <Button variant="white" color="dark" onClick={logout} style={{ flexShrink: 0 }}>Logout</Button>
             </Group>

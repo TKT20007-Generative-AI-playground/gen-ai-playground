@@ -249,7 +249,7 @@ export default function DashboardContainers() {
           ))}
         </Stack>
       ) : (
-        // DESKTOP: taulukko
+
         <ScrollArea w="100%">
           <Table striped highlightOnHover withColumnBorders>
             <Table.Thead>
