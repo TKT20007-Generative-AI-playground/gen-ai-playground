@@ -12,7 +12,7 @@ export default function DashboardLayout() {
 
   const [opened, setOpened] = useState(false)
 
-  // Mantine v7: tämä korvaa MediaQueryn
+  // Mantine v7: this replaces MediaQuery
   const isMobile = useMediaQuery("(max-width: 768px)")
 
   const handlePlaygroundClick = () => {
