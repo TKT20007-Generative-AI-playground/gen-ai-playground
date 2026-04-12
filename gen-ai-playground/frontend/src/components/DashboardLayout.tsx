@@ -110,7 +110,7 @@ export default function DashboardLayout() {
           <Button variant="default" fullWidth component={Link} to="/dashboard/users" onClick={() => setOpened(false)}>
             Users
           </Button>
-          <Button variant="default" fullWidth onClick={handlePlaygroundClick}>
+          <Button variant="default" fullWidth onClick={() => { handlePlaygroundClick(); setOpened(false) }}>
             Playground
           </Button>
           <Button variant="default" fullWidth onClick={() => { logout(); setOpened(false) }}>
