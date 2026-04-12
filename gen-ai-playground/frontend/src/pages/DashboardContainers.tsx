@@ -222,7 +222,7 @@ export default function DashboardContainers() {
       {containers.length === 0 ? (
         <Text c="dimmed">No deployments found.</Text>
       ) : isMobile ? (
-        // MOBILE: kortit
+        // MOBILE: cards
         <Stack>
           {containers.map(c => (
             <Card key={c.container_id} withBorder radius="md" shadow="xs">
