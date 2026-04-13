@@ -76,7 +76,7 @@ export default function Header() {
           isLoggedIn ? (
             <Group gap="md">
               <Text fw={500} c="white">
-                Hello {username} !
+                Hello {username}!
               </Text>
               <Button variant="white" color="dark" onClick={logout} style={{ flexShrink: 0 }}>Logout</Button>
             </Group>
@@ -89,7 +89,7 @@ export default function Header() {
           <Group gap="md">
             {isLoggedIn && (
               <Text fw={500} c="white">
-                Hello {username} !
+                Hello {username}!
               </Text>
             )}
             <Burger

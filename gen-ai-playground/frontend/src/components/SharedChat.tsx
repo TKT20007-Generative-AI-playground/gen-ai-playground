@@ -1,6 +1,6 @@
 import { useAuth } from "../context/AuthContext"
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react"
-import { Alert, Badge, Button, Checkbox, Paper, ScrollArea, Text, TextInput } from "@mantine/core"
+import { Alert, Badge, Button, Checkbox, NumberInput, Paper, ScrollArea, Switch, Text, TextInput } from "@mantine/core"
 import { useMediaQuery } from "@mantine/hooks"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"

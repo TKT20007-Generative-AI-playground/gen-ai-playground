@@ -16,6 +16,7 @@ import {
   Modal,
 } from "@mantine/core"
 
+import { useMediaQuery } from "@mantine/hooks"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { ShareConversationModal } from "./SharedConversationsModal"
@@ -89,8 +90,6 @@ const modelStatusPriority: Record<ModelStatus, number> = {
   offline: 3,
 }
 
-const isMobile = window.matchMedia("(max-width: 768px)").matches
-
 // Build dropdown data with colored status dots; disable non-live models
 function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string, ModelStatus>) {
   return modelOptions
@@ -145,6 +144,7 @@ function ChatPanel({
   onToggleThinking,
   onShare,
 }: ChatPanelProps) {
+  const isMobile = useMediaQuery("(max-width: 768px)")
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -213,8 +213,8 @@ function ChatPanel({
       <ScrollArea
         style={{
           flex: 1,
-          minHeight: "300px",
-          maxHeight: "65vh",
+          minHeight: isMobile ? "200px" : "300px",
+          maxHeight: isMobile ? "55vh" : "65vh",
           border: "1px solid #ddd",
           borderRadius: "8px",
           padding: "12px",
@@ -310,6 +310,7 @@ function ChatPanel({
 // --- Main component ---
 
 export default function TextGenerator({ opened }: { opened: boolean }) {
+  const isMobile = useMediaQuery("(max-width: 768px)")
   const { isLoggedIn } = useAuth()
   const backendUrl = import.meta.env.VITE_API_URL
   const enableTestModel = import.meta.env.DEV && import.meta.env.VITE_ENABLE_TEST_MODEL !== "false"
@@ -689,12 +690,12 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                 width: "100%",
                 alignItems: "stretch",
 
-                // If historysidebar open, show 2×2 grid
-                // Otherwise auto-fit layout
-                gridTemplateColumns:
-                  sidebarOpen && selectedModels.length >= 3
+                gridTemplateColumns: isMobile
+                  ? "1fr"
+                  : sidebarOpen && selectedModels.length >= 3
                     ? "repeat(2, 1fr)"
                     : "repeat(auto-fit, minmax(280px, 1fr))",
+
                 transition: "padding-right 0.3s ease",
                 paddingRight: sidebarOpen ? "260px" : "0px",
               }}
@@ -710,36 +711,19 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                   isBusy={isAnyLoading}
                   modelStatus={modelStatuses[modelValue] ?? "unknown"}
                   statusMessage={statusMsgs[modelValue] ?? null}
-                />
-              ))}
-            </div>
-          ) : (
-            // 1–2 models: keep the compact layout.
-            <div
-              style={{
-                display: "grid",
-                gap: "20px",
-                gridTemplateColumns: isMobile
-                  ? "1fr"
-                  : selectedModels.length === 1
-                    ? "minmax(320px, 1fr)"
-                    : "repeat(2, minmax(320px, 1fr))",
-                width: "100%",
-                margin: "0 auto",
-                alignItems: "stretch",
-              }}
-            >
-              {selectedModels.map(modelValue => (
-                <ChatPanel
-                  key={modelValue}
-                  modelValue={modelValue}
-                  modelLabel={getModelLabel(modelValue)}
-                  messages={messagesByModel[modelValue] ?? []}
-                  onClearMessages={() => clearMessagesForModel(modelValue)}
-                  isLoading={loadingByModel[modelValue] ?? false}
-                  isBusy={isAnyLoading}
-                  modelStatus={modelStatuses[modelValue] ?? "unknown"}
-                  statusMessage={statusMsgs[modelValue] ?? null}
+                  thinkingMode={getThinkingMode(modelValue)}
+                  enableThinking={enableThinkingByModel[modelValue] ?? false}
+                  onToggleThinking={(enabled) => {
+                    setEnableThinkingByModel(prev => ({ ...prev, [modelValue]: enabled }))
+                    if (enabled) {
+                      const effectiveMax = Math.max(maxTokens, 2)
+                      setMaxTokens(effectiveMax)
+                    }
+                  }}
+                  onShare={() => {
+                    setShareTargetModel(modelValue)
+                    setShareModalOpen(true)
+                  }}
                 />
               ))}
             </div>
