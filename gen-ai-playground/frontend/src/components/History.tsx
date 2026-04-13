@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import axios from "axios"
 import { useNavigate, useLocation } from "react-router-dom"
 import type {
@@ -77,6 +77,9 @@ export default function History() {
   }
 
   const locationState = (location.state ?? {}) as HistoryLocationState
+  const normalizedTargetIndex = Number.isInteger(locationState.targetIndex) && (locationState.targetIndex as number) >= 0
+    ? (locationState.targetIndex as number)
+    : null
 
   const [activeTab, setActiveTab] = useState<Tab>(
     locationState.tab ?? "images"
@@ -141,10 +144,22 @@ export default function History() {
 
 
   const [pages, setPages] = useState<Record<Tab, number>>({
-    images: 1,
-    text: 1,
-    audio: 1,
-    conversations: 1,
+    images:
+      locationState.tab === "images" && normalizedTargetIndex !== null
+        ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
+        : 1,
+    text:
+      locationState.tab === "text" && normalizedTargetIndex !== null
+        ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
+        : 1,
+    audio:
+      locationState.tab === "audio" && normalizedTargetIndex !== null
+        ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
+        : 1,
+    conversations:
+      locationState.tab === "conversations" && normalizedTargetIndex !== null
+        ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
+        : 1,
   })
   const [totalPages, setTotalPages] = useState<Record<Tab, number>>({
     images: 1,
@@ -153,6 +168,7 @@ export default function History() {
     conversations: 1,
   })
   const currentPage = pages[activeTab]
+  const requestIdRef = useRef(0)
 
   const buildParams = (range: [Date | null, Date | null], pageNum: number) => {
     const [from, to] = range
@@ -316,6 +332,10 @@ export default function History() {
   }, [backendUrl])
 
   useEffect(() => {
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
+    let isCancelled = false
+
     const run = async () => {
       setLoading(true)
 
@@ -325,6 +345,10 @@ export default function History() {
         getAudioLength(),
         getConversationLength(),
       ])
+
+      if (isCancelled || requestIdRef.current !== requestId) {
+        return
+      }
 
       setTotalItems({
         images: imagesLength,
@@ -336,6 +360,7 @@ export default function History() {
       try {
         if (activeTab === "images") {
           const data = await fetchImagesHistory(dateRange, currentPage)
+          if (isCancelled || requestIdRef.current !== requestId) return
 
           setImageHistory(data.grouped)
           setTotalPages(prev => ({
@@ -344,6 +369,7 @@ export default function History() {
           }))
         } else if (activeTab === "text") {
           const data = await fetchTextHistory(dateRange, currentPage)
+          if (isCancelled || requestIdRef.current !== requestId) return
 
           setTextHistory(data.history)
           setTotalPages(prev => ({
@@ -352,6 +378,7 @@ export default function History() {
           }))
         } else if (activeTab === "audio") {
           const data = await fetchAudioHistory(dateRange, currentPage)
+          if (isCancelled || requestIdRef.current !== requestId) return
 
           setAudioHistory(data.history)
           setTotalPages(prev => ({
@@ -360,6 +387,7 @@ export default function History() {
           }))
         } else if (activeTab === "conversations") {
           const data = await fetchConversationHistory(dateRange, currentPage)
+          if (isCancelled || requestIdRef.current !== requestId) return
 
           setConversationHistory(data.history)
           setTotalPages(prev => ({
@@ -370,11 +398,17 @@ export default function History() {
       } catch (err) {
         console.error("Failed to fetch history:", err)
       } finally {
-        setLoading(false)
+        if (!isCancelled && requestIdRef.current === requestId) {
+          setLoading(false)
+        }
       }
     }
 
     run()
+
+    return () => {
+      isCancelled = true
+    }
   }, [activeTab, dateRange, currentPage,
     fetchImagesHistory, fetchTextHistory, fetchAudioHistory, fetchConversationHistory,
     getImagesLength, getTextLength, getAudioLength, getConversationLength])
