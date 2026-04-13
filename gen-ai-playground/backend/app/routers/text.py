@@ -766,7 +766,7 @@ def get_shared_conversations_sidebar(
                 "updated_at": 1,
             },
         )
-        .sort("updated_at", -1)
+        .sort("created_at", -1)
         .limit(limit)
     )
 
