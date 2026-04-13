@@ -50,6 +50,8 @@ const getAuthHeaders = () => ({
   "X-CSRF-Token": getCsrfToken(),
 })
 
+const HISTORY_PAGE_SIZE = 10
+
 
 
 export default function History() {
@@ -67,15 +69,66 @@ export default function History() {
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null)
 
   type Tab = "images" | "text" | "audio" | "conversations"
+  type HistoryLocationState = {
+    tab?: Tab
+    targetIndex?: number
+    targetConversationId?: string
+    scrollBlock?: ScrollLogicalPosition
+  }
+
+  const locationState = (location.state ?? {}) as HistoryLocationState
+
   const [activeTab, setActiveTab] = useState<Tab>(
-    (location.state?.tab as Tab) ?? "images"
+    locationState.tab ?? "images"
   )
+  const [scrollTarget, setScrollTarget] = useState<{
+    tab: Tab
+    targetIndex: number
+    targetConversationId?: string
+    pageSize: number
+    scrollBlock: ScrollLogicalPosition
+  } | null>(null)
 
   useEffect(() => {
-    if (location.state?.tab) {
-      setActiveTab(location.state.tab as Tab)
+    if (locationState.tab) {
+      setActiveTab(locationState.tab)
     }
-  }, [location.state])
+  }, [locationState.tab])
+
+  useEffect(() => {
+    if (!locationState.tab) {
+      return
+    }
+    const targetTab: Tab = locationState.tab
+
+    const normalizedIndex = Number.isInteger(locationState.targetIndex) && (locationState.targetIndex as number) >= 0
+      ? (locationState.targetIndex as number)
+      : null
+
+    if (normalizedIndex === null) {
+      return
+    }
+
+    const targetPage = Math.floor(normalizedIndex / HISTORY_PAGE_SIZE) + 1
+
+    setPages(prev => ({
+      ...prev,
+      [targetTab]: targetPage,
+    }))
+
+    setScrollTarget({
+      tab: targetTab,
+      targetIndex: normalizedIndex,
+      targetConversationId: locationState.targetConversationId,
+      pageSize: HISTORY_PAGE_SIZE,
+      scrollBlock: locationState.scrollBlock ?? (normalizedIndex % HISTORY_PAGE_SIZE === HISTORY_PAGE_SIZE - 1 ? "end" : "start"),
+    })
+  }, [
+    locationState.scrollBlock,
+    locationState.tab,
+    locationState.targetConversationId,
+    locationState.targetIndex,
+  ])
   
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null])
 
@@ -337,6 +390,61 @@ export default function History() {
   }
 
   const columns = isMobile ? 2 : isTablet ? 3 : 4
+  let imageLocalIndex = -1
+
+  useEffect(() => {
+    if (!scrollTarget || loading || activeTab !== scrollTarget.tab) {
+      return
+    }
+
+    const hasRenderedDataForTab =
+      (activeTab === "images" && imageHistory.length > 0) ||
+      (activeTab === "text" && textHistory.length > 0) ||
+      (activeTab === "audio" && audioHistory.length > 0) ||
+      (activeTab === "conversations" && conversationHistory.length > 0)
+
+    if (!hasRenderedDataForTab) {
+      return
+    }
+
+    const executeFallbackScroll = () => {
+      const fallbackTop = scrollTarget.scrollBlock === "end"
+        ? Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
+        : 0
+      window.scrollTo({ top: fallbackTop, behavior: "smooth" })
+    }
+
+    const tryScroll = () => {
+      const localIndex = scrollTarget.targetIndex % scrollTarget.pageSize
+      const selectorById = scrollTarget.tab === "conversations" && scrollTarget.targetConversationId
+        ? `[data-history-tab="conversations"][data-conversation-id="${scrollTarget.targetConversationId}"]`
+        : null
+      const selectorByTabAndIndex = `[data-history-tab="${scrollTarget.tab}"][data-history-local-index="${localIndex}"]`
+
+      const targetElement = selectorById
+        ? document.querySelector(selectorById)
+        : document.querySelector(selectorByTabAndIndex)
+
+      if (targetElement instanceof HTMLElement) {
+        targetElement.scrollIntoView({ behavior: "smooth", block: scrollTarget.scrollBlock })
+      } else {
+        executeFallbackScroll()
+      }
+
+      setScrollTarget(null)
+    }
+
+    const frameId = window.requestAnimationFrame(tryScroll)
+    return () => window.cancelAnimationFrame(frameId)
+  }, [
+    activeTab,
+    loading,
+    scrollTarget,
+    imageHistory.length,
+    textHistory.length,
+    audioHistory.length,
+    conversationHistory.length,
+  ])
 
   return (
     <Box
@@ -516,9 +624,18 @@ export default function History() {
 
                     {/* Image grid */}
                     <SimpleGrid cols={columns} spacing={isMobile ? 10 : 16}>
-                      {group.images.filter(Boolean).map((item, i) => (
-                        <ImageCard key={i} item={item} onClick={() => setSelectedImage(item)} />
-                      ))}
+                      {group.images.filter(Boolean).map((item, i) => {
+                        imageLocalIndex += 1
+                        return (
+                          <div
+                            key={i}
+                            data-history-tab="images"
+                            data-history-local-index={imageLocalIndex}
+                          >
+                            <ImageCard item={item} onClick={() => setSelectedImage(item)} />
+                          </div>
+                        )
+                      })}
                     </SimpleGrid>
                   </Stack>
                 ))}
@@ -550,7 +667,11 @@ export default function History() {
                 {textHistory.map((item, idx) => (
                   <Transition key={idx} mounted transition="fade" duration={200}>
                     {styles => (
-                      <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
+                      <div
+                        style={{ ...styles, animationDelay: `${idx * 30}ms` }}
+                        data-history-tab="text"
+                        data-history-local-index={idx}
+                      >
                         <TextCard item={item} />
                       </div>
                     )}
@@ -582,7 +703,11 @@ export default function History() {
                 {audioHistory.map((item, idx) => (
                   <Transition key={idx} mounted transition="fade" duration={200}>
                     {styles => (
-                      <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
+                      <div
+                        style={{ ...styles, animationDelay: `${idx * 30}ms` }}
+                        data-history-tab="audio"
+                        data-history-local-index={idx}
+                      >
                         <AudioCard item={item} />
                       </div>
                     )}
@@ -613,7 +738,12 @@ export default function History() {
               {conversationHistory.map((item, idx) => (
                 <Transition key={idx} mounted transition="fade" duration={200}>
                   {styles => (
-                    <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
+                    <div
+                      style={{ ...styles, animationDelay: `${idx * 30}ms` }}
+                      data-history-tab="conversations"
+                      data-history-local-index={idx}
+                      data-conversation-id={item._id}
+                    >
                       <ConversationCard item={item} />
                     </div>
                   )}

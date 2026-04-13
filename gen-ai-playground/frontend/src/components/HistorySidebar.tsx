@@ -56,6 +56,8 @@ interface SharedConversationRecord {
   updated_at?: string
 }
 
+type SidebarHistoryType = "image" | "text" | "shared-chat" | "audio"
+
 const backendUrl = import.meta.env.VITE_API_URL
 const AUDIO_SIDEBAR_MAX_FETCH = 200
 const AUDIO_RECORDS_PER_SESSION = 4
@@ -66,7 +68,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
   const [limit, setLimit] = useState(5)
-  const [historyType, setHistoryType] = useState<"image" | "text" | "shared-chat" | "audio" >("image")
+  const [historyType, setHistoryType] = useState<SidebarHistoryType>("image")
 
   const conversations = []
   let last = null
@@ -151,25 +153,24 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
     setLoading(true)
 
     try {
-      const url =
-        historyType === "image"
-          ? `${backendUrl}/images/history`
-          : historyType === "text"
-            ? `${backendUrl}/text/history-sidebar`
-            : historyType === "audio"
-              ? `${backendUrl}/audio/history-sidebar`
-              : `${backendUrl}/text/shared-conversations-sidebar`
-
       const audioFetchLimit = Math.min(AUDIO_SIDEBAR_MAX_FETCH, limit * AUDIO_RECORDS_PER_SESSION)
+      const endpointByType: Record<SidebarHistoryType, string> = {
+        image: `${backendUrl}/images/history-sidebar`,
+        text: `${backendUrl}/text/history-sidebar`,
+        audio: `${backendUrl}/audio/history-sidebar`,
+        "shared-chat": `${backendUrl}/text/shared-conversations-sidebar`,
+      }
 
-      const res = await axios.get(url, {
+      const paramsByType: Record<SidebarHistoryType, { limit: number } | undefined> = {
+        image: { limit },
+        text: undefined,
+        audio: { limit: audioFetchLimit },
+        "shared-chat": { limit },
+      }
+
+      const res = await axios.get(endpointByType[historyType], {
         withCredentials: true,
-        params:
-          historyType === "audio"
-            ? { limit: audioFetchLimit }
-            : historyType === "shared-chat"
-              ? { limit }
-              : undefined,
+        params: paramsByType[historyType],
       })
       if (historyType === "shared-chat") {
         setSharedConversations(res.data.history ?? [])
@@ -298,7 +299,14 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                         mt="xs"
                         size="xs"
                         variant="light"
-                        onClick={() => navigate("/history", { state: { tab: "text" } })}
+                        onClick={() =>
+                          navigate("/history", {
+                            state: {
+                              tab: "text",
+                              targetIndex: i,
+                            },
+                          })
+                        }
                       >
                         View in History
                       </Button>
@@ -347,7 +355,16 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                         mt="xs"
                         size="xs"
                         variant="light"
-                        onClick={() => navigate("/history", { state: { tab: "conversations" } })}
+                        onClick={() =>
+                          navigate("/history", {
+                            state: {
+                              tab: "conversations",
+                              targetIndex: i,
+                              targetConversationId: item._id,
+                              scrollBlock: i % 10 === 9 ? "end" : "start",
+                            },
+                          })
+                        }
                       >
                         View in History
                       </Button>
@@ -399,7 +416,14 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                         mt="xs"
                         size="xs"
                         variant="light"
-                        onClick={() => navigate("/history", { state: { tab: "audio" } })}
+                        onClick={() =>
+                          navigate("/history", {
+                            state: {
+                              tab: "audio",
+                              targetIndex: i,
+                            },
+                          })
+                        }
                       >
                         View in History
                       </Button>
@@ -448,7 +472,14 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                         mt="xs"
                         size="xs"
                         variant="light"
-                        onClick={() => navigate("/history", { state: { tab: "images" } })}
+                        onClick={() =>
+                          navigate("/history", {
+                            state: {
+                              tab: "images",
+                              targetIndex: i,
+                            },
+                          })
+                        }
                       >
                         View in History
                       </Button>
