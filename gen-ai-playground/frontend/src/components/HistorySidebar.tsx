@@ -163,7 +163,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
 
       const paramsByType: Record<SidebarHistoryType, { limit: number } | undefined> = {
         image: { limit },
-        text: undefined,
+        text: { limit },
         audio: { limit: audioFetchLimit },
         "shared-chat": { limit },
       }

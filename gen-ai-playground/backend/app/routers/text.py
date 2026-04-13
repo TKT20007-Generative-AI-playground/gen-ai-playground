@@ -541,13 +541,17 @@ def chat_with_model(
 
 @router.get("/history-sidebar")
 def get_text_history(
+    limit: int = Query(5, description="How many text history items to return (5, 10, or 15)"),
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
 ):
+    if limit not in {5, 10, 15}:
+        raise HTTPException(status_code=400, detail="limit must be one of: 5, 10, 15")
+
     records = list(
         db.text_generations.find(
             {"username": current_user.username}
-        ).sort("timestamp", -1)
+        ).sort("timestamp", -1).limit(limit)
     )
 
     # Convert ObjectId to string
