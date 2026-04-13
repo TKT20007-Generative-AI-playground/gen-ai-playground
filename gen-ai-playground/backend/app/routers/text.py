@@ -30,7 +30,7 @@ from app.models import (
     ConversationCreateRequest,
 )
 from app.verda_service import verda_service
-from app.template_discovery import get_template_map, _deployment_name_from_filename
+from app.template_discovery import get_template_map, get_template_configs, _deployment_name_from_filename
 from verda.containers import ContainerDeploymentStatus
 from app.connection_manager import ConnectionManager
 
@@ -148,10 +148,19 @@ def connect_to_deployment(
 def choose_text_model_path(model: str) -> str:
     """Map a user-friendly display name to the actual model path used for deployment."""
     model = model.strip()
+    configs = get_template_configs()
     for template_name, display_name in get_template_map().items():
         if display_name == model:
-            cfg = verda_service._parse_and_validate_template(template_name)
-            return cfg.model
+            cfg = configs.get(template_name)
+            if cfg is not None:
+                return cfg.model
+
+            # Fallback for stale template maps (for example, tests that patch only
+            # display-name mapping): try parsing the template on demand.
+            try:
+                return verda_service._parse_and_validate_template(template_name).model
+            except Exception:
+                break
 
     raise HTTPException(
         status_code=400,
@@ -167,6 +176,24 @@ def _resolve_template_name(model: str) -> str | None:
         if display_name == model:
             return template_name
     return None
+
+
+def _model_supports_thinking(template_name: str | None) -> bool:
+    """Return whether the model template supports thinking mode."""
+    if not template_name:
+        return False
+
+    cfg = get_template_configs().get(template_name)
+    if cfg is None:
+        return False
+
+    if cfg.model_mode in {"thinking", "hybrid"}:
+        return True
+    if cfg.sglang is not None and cfg.sglang.reasoning_parser is not None:
+        return True
+    if cfg.vllm is not None and cfg.vllm.reasoning_parser is not None:
+        return True
+    return False
 
 
 def _deploy_model_internal(model_key: str) -> dict:
@@ -336,14 +363,11 @@ def generate_text(
                 dep_status = client.containers.get_deployment_status(d["name"])
                 if dep_status == ContainerDeploymentStatus.HEALTHY:
                     deployment_name = d["name"]
+                    configs = get_template_configs()
                     for tpl in get_template_map():
-                        try:
-                            if _deployment_name_from_filename(tpl) == d["name"].lower():
-                                cfg = verda_service._parse_and_validate_template(tpl)
-                                used_model_path = cfg.model
-                                break
-                        except Exception:
-                            continue
+                        if _deployment_name_from_filename(tpl) == d["name"].lower():
+                            used_model_path = configs[tpl].model
+                            break
                     break
             except Exception:
                 continue
@@ -491,6 +515,9 @@ def chat_with_model(
         print(f"Failed to check deployment status for '{deployment_name}': {e}")
         raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
 
+    # Detect if model supports thinking from template config
+    supports_thinking = _model_supports_thinking(template_name)
+
     # Chat
     try:
         chat_start_time = time.perf_counter()
@@ -499,6 +526,8 @@ def chat_with_model(
             max_tokens=request.max_tokens,
             temperature=request.temperature,
             top_p=request.top_p,
+            enable_thinking=request.enable_thinking,
+            supports_thinking=supports_thinking,
             deployment_name=deployment_name,
             model_path=model_path,
         )
@@ -522,6 +551,7 @@ def chat_with_model(
 
         return ChatResponse(
             reply=result["reply"],
+            reasoning=result.get("reasoning"),
             model=result["model"],
             usage=result.get("usage", {}),
             generation_time_ms=chat_time_ms,
@@ -787,6 +817,17 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
             content = data.get("content")
             model_key = data.get("model")
             no_ai = data.get("noAI", False)
+            requested_max_tokens = data.get("max_tokens", 256)
+            enable_thinking = data.get("enable_thinking", False) is True
+
+            try:
+                max_tokens = int(requested_max_tokens)
+            except (TypeError, ValueError):
+                max_tokens = 256
+
+            max_tokens = max(1, min(max_tokens, 32768))
+            if enable_thinking:
+                max_tokens = max(max_tokens, 2)
 
             if not content:
                 continue
@@ -824,8 +865,10 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
                     handle_llm_reply(
                         conversation_id,
                         model_key,
-                        db,
-                        user,
+                        max_tokens=max_tokens,
+                        enable_thinking=enable_thinking,
+                        db=db,
+                        cur_user=user,
                     )
                 )
 
@@ -843,6 +886,8 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
 async def handle_llm_reply(
     conversation_id: str,
     model_key: str,
+    max_tokens: int = 256,
+    enable_thinking: bool = False,
     db: Database = Depends(get_database),
     cur_user: UserInfo = Depends(get_current_user),
 ):
@@ -883,6 +928,8 @@ async def handle_llm_reply(
             return
 
         deployment_name = existing["name"]
+        supports_thinking = _model_supports_thinking(template_name)
+        effective_enable_thinking = enable_thinking and supports_thinking
 
         try:
             client = verda_service._get_client()
@@ -903,19 +950,25 @@ async def handle_llm_reply(
             result = await asyncio.to_thread(
                 verda_service.chat,
                 messages=messages,
-                max_tokens=256,
+                max_tokens=max_tokens,
                 temperature=0.7,
                 top_p=0.9,
+                enable_thinking=effective_enable_thinking,
+                supports_thinking=supports_thinking,
                 deployment_name=deployment_name,
                 model_path=model_path,
             )
             assistant_text = result["reply"]
+            assistant_reasoning = result.get("reasoning")
         except Exception as e:
             await manager.broadcast(conversation_id, {"type": "error", "message": str(e)})
             return
 
-        
-        assistant_message = {"role": "assistant", "content": assistant_text}
+        assistant_message = {
+            "role": "assistant",
+            "content": assistant_text,
+            "reasoning": assistant_reasoning,
+        }
         db.conversations.update_one(
             {"_id": conversation_oid},
             {"$push": {"messages": assistant_message}},

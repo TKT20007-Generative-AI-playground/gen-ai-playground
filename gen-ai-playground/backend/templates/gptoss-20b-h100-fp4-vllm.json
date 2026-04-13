@@ -1,10 +1,12 @@
 {
   "engine": "vllm",
   "model": "openai/gpt-oss-20b",
+  "name": "GPT-OSS 20B · vLLM · FP4 · H100",
   "explanation": "OpenAI GPT-OSS 20B with FP4 quantization for efficient single-GPU deployment on H100. Based on InferenceMAX benchmarks, this configuration uses high GPU memory utilization (0.9), async scheduling, and optimized token batching for maximum throughput. The gpt-oss-20b model can run on edge devices with just 16 GB of memory.",
   "short_explanation": "GPT-OSS 20B FP4 single H100 deployment",
   "quantization": "fp4",
   "gpu_types": ["h100"],
+  "model_mode": "thinking",
   "load_format": "auto",
   "model_loader_extra_config": {
     "enable_multithread_load": true
@@ -17,6 +19,7 @@
     "max_num_seqs": 512,
     "enable_prefix_caching": true,
     "enable_chunked_prefill": true,
-    "max_num_batched_tokens": 8192
+    "max_num_batched_tokens": 8192,
+    "reasoning_parser": "openai_gptoss"
   }
 }

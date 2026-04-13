@@ -23,6 +23,7 @@ function AppContent() {
   // Hide Header on dashboard routes
   const isDashboardRoute = location.pathname.startsWith('/dashboard')
   const [historyOpen, setHistoryOpen] = useState(false);
+  const isHistoryOpen = historyOpen && !isDashboardRoute;
   const [sidebarWidth, setSidebarWidth] = useState(420);
   const [resizing, setResizing] = useState(false);
   const auth = useAuth();
@@ -59,7 +60,7 @@ function AppContent() {
       {!isDashboardRoute && <Header />}
 
       {/* Sidebar toggle button */}
-      {auth.isLoggedIn && (
+      {auth.isLoggedIn && !isDashboardRoute && (
         <button
           type="button"
           aria-label="Toggle history sidebar"
@@ -68,7 +69,7 @@ function AppContent() {
             position: "fixed",
             top: "50%",
             transform: "translateY(-50%)",
-            left: historyOpen ? `${sidebarWidth + 10}px` : "10px",
+            left: isHistoryOpen ? `${sidebarWidth + 10}px` : "10px",
             zIndex: 2000,
             background: "white",
             border: "1px solid #ddd",
@@ -78,12 +79,12 @@ function AppContent() {
             transition: "left 0.25s ease",
           }}
         >
-          {historyOpen ? "←" : "→"}
+          {isHistoryOpen ? "←" : "→"}
         </button>
       )}
 
       <div style={{ display: "flex", minHeight: "100vh", height: "100%" }}>
-        {auth.isLoggedIn && historyOpen && (
+        {auth.isLoggedIn && isHistoryOpen && (
           <div
             style={{
               width: sidebarWidth,
@@ -96,7 +97,7 @@ function AppContent() {
               boxSizing: "border-box",
             }}
           >
-            <HistorySidebar opened={historyOpen} />
+            <HistorySidebar opened={isHistoryOpen} />
 
             {/* Resizer handle */}
             <div

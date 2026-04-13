@@ -7,6 +7,7 @@ type Message = {
     id: string
     role: "user" | "assistant"
     content: string
+    reasoning?: string | null
     modelLabel?: string
     generationTimeMs?: number
     isPending?: boolean
@@ -62,6 +63,7 @@ export function ShareConversationModal({
                     initial_messages: currentMessages.map(m => ({
                         role: m.role,
                         content: m.content,
+                        reasoning: m.reasoning ?? null,
                     })),
                     model_key: modelValue,
                 },

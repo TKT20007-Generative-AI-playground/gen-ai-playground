@@ -571,7 +571,74 @@ class TestAuthRequired:
     def test_delete_requires_auth(self, client):
         response = client.delete("/text/deploy?deployment_name=x")
         assert response.status_code == 401
-        
+
+
+# ===========================================================================
+# 6. enable_thinking parameter handling
+# ===========================================================================
+
+class TestThinkingParams:
+    """enable_thinking pass-through behavior."""
+
+    @patch("app.routers.text.verda_service")
+    def test_enable_thinking_true_passed_to_service(
+        self, mock_vs, client, registered_user, auth_headers
+    ):
+        """enable_thinking=True is forwarded to chat()."""
+        _setup_deployment_discovery(mock_vs, healthy=True)
+        mock_vs.chat.return_value = {
+            "reply": "I thought about it.",
+            "model": "deepseek-ai/deepseek-llm-7b-chat",
+            "usage": {},
+        }
+
+        response = client.post(
+            "/text/chat",
+            json={
+                "model_path": TEST_DISPLAY_NAME,
+                "messages": [{"role": "user", "content": "Think hard"}],
+                "max_tokens": 512,
+                "enable_thinking": True,
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        assert response.json()["reply"] == "I thought about it."
+
+        _, call_kwargs = mock_vs.chat.call_args
+        assert call_kwargs["enable_thinking"] is True
+
+    @patch("app.routers.text.verda_service")
+    def test_enable_thinking_false_passed_to_service(
+        self, mock_vs, client, registered_user, auth_headers
+    ):
+        """enable_thinking=False is forwarded to chat()."""
+        _setup_deployment_discovery(mock_vs, healthy=True)
+        mock_vs.chat.return_value = {
+            "reply": "Answer only.",
+            "model": "deepseek-ai/deepseek-llm-7b-chat",
+            "usage": {},
+        }
+
+        response = client.post(
+            "/text/chat",
+            json={
+                "model_path": TEST_DISPLAY_NAME,
+                "messages": [{"role": "user", "content": "Think"}],
+                "max_tokens": 256,
+                "enable_thinking": False,
+            },
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        assert response.json()["reply"] == "Answer only."
+
+        _, call_kwargs = mock_vs.chat.call_args
+        assert call_kwargs["enable_thinking"] is False
+
+
 class TestTemplateFiles:
     """Test that the command generation from templates works as expected."""
     

@@ -1,10 +1,12 @@
 {
   "engine": "vllm",
   "model": "casperhansen/llama-3-70b-instruct-awq",
+  "name": "Llama 3 70B AWQ · vLLM · 2-GPU",
   "explanation": "Llama 3 70B with AWQ quantization for efficient deployment on 2 GPUs. Higher memory utilization (0.95) is safe with quantized models. Uses runai_streamer for fast loading.",
   "short_explanation": "Llama 3 70B AWQ quantized for 2 GPUs",
   "quantization": "awq",
   "gpu_types": ["h100", "h200", "b200", "a100"],
+  "model_mode": "instruct",
   "load_format": "runai_streamer",
   "model_loader_extra_config": {
     "concurrency": 8

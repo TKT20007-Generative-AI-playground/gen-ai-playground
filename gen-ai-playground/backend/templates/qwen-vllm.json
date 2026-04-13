@@ -1,9 +1,11 @@
 {
   "engine": "vllm",
   "model": "Qwen/Qwen2.5-32B-Instruct",
+  "name": "Qwen 2.5 32B Instruct · vLLM",
   "explanation": "Qwen 2.5 32B with 2-way tensor parallelism using runai_streamer for fast model loading. Optimized with prefix caching and chunked prefill for high throughput.",
   "short_explanation": "Qwen 2.5 32B with fast loading and caching",
   "gpu_types": ["b200", "h100", "h200"],
+  "model_mode": "instruct",
   "load_format": "runai_streamer",
   "model_loader_extra_config": {
     "concurrency": 8

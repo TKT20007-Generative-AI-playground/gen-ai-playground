@@ -1,9 +1,11 @@
 {
   "engine": "sglang",
   "model": "meta-llama/Llama-3.1-70B-Instruct",
+  "name": "Llama 3.1 70B · SGLang · Throughput Optimized",
   "explanation": "Llama 3.1 70B optimized for throughput with data parallel attention. This configuration enables DP attention for better batching efficiency and sets memory fraction to 0.85 for optimal GPU utilization.",
   "short_explanation": "Llama 3.1 70B throughput-optimized with DP attention",
   "gpu_types": ["h100", "h200"],
+  "model_mode": "instruct",
   "model_loader_extra_config": {
     "enable_multithread_load": true,
     "num_threads": 8
