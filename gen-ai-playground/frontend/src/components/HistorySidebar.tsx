@@ -148,6 +148,9 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
 
   audioRuns.sort((a, b) => b.timestamp - a.timestamp)
   const limitedAudioRuns = audioRuns.slice(0, limit)
+  const limitedImageItems = items
+    .filter(item => item.image_type !== "original")
+    .slice(0, limit)
 
   const refetch = useCallback(async () => {
     setLoading(true)
@@ -221,13 +224,6 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
       </Center>
     )
 
-  if (items.length === 0 && sharedConversations.length === 0)
-    return (
-      <Center mt="md">
-        <Text c="dimmed">No recent history.</Text>
-      </Center>
-    )
-
   return (
     <ScrollArea h="100vh" offsetScrollbars={false} type="auto" scrollbarSize={8}>
       <Stack gap="lg" p={0} m={0}>
@@ -264,6 +260,11 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
 
         {historyType === "text" && (
           <>
+            {limited.length === 0 && (
+              <Center mt="md">
+                <Text c="dimmed">No recent text history.</Text>
+              </Center>
+            )}
             {limited.map((item, i) => {
               const startPrompt = item.startPrompt
 
@@ -319,6 +320,11 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
         )}
         {historyType === "shared-chat" && (
           <>
+            {sharedConversations.length === 0 && (
+              <Center mt="md">
+                <Text c="dimmed">No recent shared conversations.</Text>
+              </Center>
+            )}
             {sharedConversations.map((item, i) => {
               const firstUserMessage = item.messages?.find(message => message.role === "user")?.content
               const timestamp = item.updated_at ?? item.created_at
@@ -386,6 +392,11 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
 
         {historyType === "audio" && (
           <>
+            {limitedAudioRuns.length === 0 && (
+              <Center mt="md">
+                <Text c="dimmed">No recent transcription history.</Text>
+              </Center>
+            )}
             {limitedAudioRuns.map((run, i) => {
               return (
                 <Paper key={i} p="md" radius="xl" shadow="sm" withBorder bg="rgba(0,0,0,0.06)">
@@ -437,10 +448,12 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
 
         {historyType === "image" && (
           <>
-            {items
-              .filter(item => item.image_type !== "original")
-              .slice(0, limit)
-              .map((item, i) => {
+            {limitedImageItems.length === 0 && (
+              <Center mt="md">
+                <Text c="dimmed">No recent image history.</Text>
+              </Center>
+            )}
+            {limitedImageItems.map((item, i) => {
                 const base64 = item.image_data || item.user_base64_image
 
                 return (
@@ -504,7 +517,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                     </Stack>
                   </Paper>
                 )
-              })}
+            })}
           </>
         )}
       </Stack>
