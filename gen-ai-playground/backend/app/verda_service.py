@@ -131,6 +131,16 @@ class VerdaService:
                 "--host", host,
                 "--port", str(port),
             ]
+
+            if cfg.load_format:
+                cmd += ["--load-format", str(cfg.load_format)]
+            if cfg.quantization:
+                cmd += ["--quantization", str(cfg.quantization)]
+            if cfg.tokenizer:
+                cmd += ["--tokenizer", str(cfg.tokenizer)]
+            if cfg.seed is not None:
+                cmd += ["--seed", str(cfg.seed)]
+
             if cfg.vllm:
                 for field_name, value in cfg.vllm.model_dump(exclude_none=True).items():
                     flag = f"--{field_name.replace('_', '-')}"

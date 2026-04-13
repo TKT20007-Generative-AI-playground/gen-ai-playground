@@ -48,7 +48,7 @@ class VLLMConfig(BaseModel):
     tensor_parallel_size: Optional[int] = Field(default=None, ge=1)
     pipeline_parallel_size: Optional[int] = Field(default=None, ge=1)
     dtype: Optional[str] = None # deafault "auto" (infers from model)
-    max_model_length: Optional[int] = Field(default=None, ge=1)
+    max_model_len: Optional[int] = Field(default=None, ge=1)
     gpu_memory_utilization: Optional[float] = Field(default=None, ge=0.0, le=1.0) # default 0.9
     max_num_seqs: Optional[int] = Field(default=None, ge=1)
     enable_prefix_caching: Optional[bool] = None
