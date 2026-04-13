@@ -96,7 +96,7 @@ export default function History() {
     if (locationState.tab) {
       setActiveTab(locationState.tab)
     }
-  }, [locationState.tab])
+  }, [location.key, locationState.tab])
 
   useEffect(() => {
     if (!locationState.tab) {
@@ -127,6 +127,7 @@ export default function History() {
       scrollBlock: locationState.scrollBlock ?? (normalizedIndex % HISTORY_PAGE_SIZE === HISTORY_PAGE_SIZE - 1 ? "end" : "start"),
     })
   }, [
+    location.key,
     locationState.scrollBlock,
     locationState.tab,
     locationState.targetConversationId,
