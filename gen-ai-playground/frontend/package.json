@@ -17,7 +17,7 @@
     "@mantine/hooks": "8.3.18",
     "@mantine/dates": "^8.3.18",
     "@tabler/icons-react": "^3.28.1",
-    "axios": "^1.13.5",
+    "axios": "^1.15.0",
     "embla-carousel-auto-scroll": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
     "dayjs": "^1.11.20",

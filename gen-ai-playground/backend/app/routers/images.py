@@ -100,6 +100,37 @@ def get_history(
         raise HTTPException(status_code=500, detail=f"Error getting history: {e}")
 
 
+@router.get("/history-sidebar")
+def get_history_sidebar(
+    current_user: UserInfo = Depends(get_current_user),
+    db: Database = Depends(get_database),
+    limit: int = Query(5, description="How many items to return (5, 10, or 15)"),
+):
+    if limit not in {5, 10, 15}:
+        raise HTTPException(status_code=400, detail="limit must be one of: 5, 10, 15")
+
+    history = list(
+        db.images.find(
+            {"username": current_user.username},
+            {
+                "_id": 1,
+                "prompt": 1,
+                "model": 1,
+                "timestamp": 1,
+                "image_size": 1,
+                "image_data": 1,
+                "image_type": 1,
+                "parent_image_id": 1,
+            },
+        )
+        .sort("timestamp", -1)
+        .limit(limit)
+    )
+
+    history = convert_objects_to_str(history, current_user)
+    return {"history": history}
+
+
 
 
 @router.post('/generate')
@@ -456,7 +487,8 @@ def build_request_data(model: str,  prompt: str, image_base64: Optional[str] = N
 def convert_objects_to_str(history: list, cur_user: UserInfo) -> list:
     """Convert ObjectId to string for JSON serialization, also for parent_image_id if it exists."""
     for doc in history:
-        doc["id"] = str(doc["_id"])
+        doc["_id"] = str(doc["_id"])
+        doc["id"] = doc["_id"]
         if "parent_image_id" in doc and doc["parent_image_id"]:
             doc["parent_image_id"] = str(doc["parent_image_id"])
         doc["username"] = cur_user.username

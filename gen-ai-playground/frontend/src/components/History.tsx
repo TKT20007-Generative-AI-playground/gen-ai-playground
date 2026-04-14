@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import axios from "axios"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useLocation } from "react-router-dom"
 import type {
   AudioRecord,
   ConversationRecord,
@@ -50,11 +50,14 @@ const getAuthHeaders = () => ({
   "X-CSRF-Token": getCsrfToken(),
 })
 
+const HISTORY_PAGE_SIZE = 10
+
 
 
 export default function History() {
   const backendUrl = import.meta.env.VITE_API_URL
   const navigate = useNavigate()
+  const location = useLocation()
   const isMobile = useMediaQuery("(max-width: 600px)")
   const isTablet = useMediaQuery("(max-width: 900px)")
 
@@ -66,7 +69,71 @@ export default function History() {
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null)
 
   type Tab = "images" | "text" | "audio" | "conversations"
-  const [activeTab, setActiveTab] = useState<Tab>("images")
+  type HistoryLocationState = {
+    tab?: Tab
+    targetIndex?: number
+    targetConversationId?: string
+    scrollBlock?: ScrollLogicalPosition
+  }
+
+  const locationState = (location.state ?? {}) as HistoryLocationState
+  const normalizedTargetIndex = Number.isInteger(locationState.targetIndex) && (locationState.targetIndex as number) >= 0
+    ? (locationState.targetIndex as number)
+    : null
+
+  const [activeTab, setActiveTab] = useState<Tab>(
+    locationState.tab ?? "images"
+  )
+  const [scrollTarget, setScrollTarget] = useState<{
+    tab: Tab
+    targetIndex: number
+    targetConversationId?: string
+    pageSize: number
+    scrollBlock: ScrollLogicalPosition
+  } | null>(null)
+
+  useEffect(() => {
+    if (locationState.tab) {
+      setActiveTab(locationState.tab)
+    }
+  }, [location.key, locationState.tab])
+
+  useEffect(() => {
+    if (!locationState.tab) {
+      return
+    }
+    const targetTab: Tab = locationState.tab
+
+    const normalizedIndex = Number.isInteger(locationState.targetIndex) && (locationState.targetIndex as number) >= 0
+      ? (locationState.targetIndex as number)
+      : null
+
+    if (normalizedIndex === null) {
+      return
+    }
+
+    const targetPage = Math.floor(normalizedIndex / HISTORY_PAGE_SIZE) + 1
+
+    setPages(prev => ({
+      ...prev,
+      [targetTab]: targetPage,
+    }))
+
+    setScrollTarget({
+      tab: targetTab,
+      targetIndex: normalizedIndex,
+      targetConversationId: locationState.targetConversationId,
+      pageSize: HISTORY_PAGE_SIZE,
+      scrollBlock: locationState.scrollBlock ?? (normalizedIndex % HISTORY_PAGE_SIZE === HISTORY_PAGE_SIZE - 1 ? "end" : "start"),
+    })
+  }, [
+    location.key,
+    locationState.scrollBlock,
+    locationState.tab,
+    locationState.targetConversationId,
+    locationState.targetIndex,
+  ])
+  
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null])
 
   const [totalItems, setTotalItems] = useState<Record<Tab, number>>({
@@ -78,10 +145,22 @@ export default function History() {
 
 
   const [pages, setPages] = useState<Record<Tab, number>>({
-    images: 1,
-    text: 1,
-    audio: 1,
-    conversations: 1,
+    images:
+      locationState.tab === "images" && normalizedTargetIndex !== null
+        ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
+        : 1,
+    text:
+      locationState.tab === "text" && normalizedTargetIndex !== null
+        ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
+        : 1,
+    audio:
+      locationState.tab === "audio" && normalizedTargetIndex !== null
+        ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
+        : 1,
+    conversations:
+      locationState.tab === "conversations" && normalizedTargetIndex !== null
+        ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
+        : 1,
   })
   const [totalPages, setTotalPages] = useState<Record<Tab, number>>({
     images: 1,
@@ -90,6 +169,7 @@ export default function History() {
     conversations: 1,
   })
   const currentPage = pages[activeTab]
+  const requestIdRef = useRef(0)
 
   const buildParams = (range: [Date | null, Date | null], pageNum: number) => {
     const [from, to] = range
@@ -199,7 +279,7 @@ export default function History() {
         history: res.data.history || [],
         totalPages: res.data.total_pages || 1,
       }
-    },  
+    },
     [backendUrl],
   )
 
@@ -253,6 +333,10 @@ export default function History() {
   }, [backendUrl])
 
   useEffect(() => {
+    const requestId = requestIdRef.current + 1
+    requestIdRef.current = requestId
+    let isCancelled = false
+
     const run = async () => {
       setLoading(true)
 
@@ -262,6 +346,10 @@ export default function History() {
         getAudioLength(),
         getConversationLength(),
       ])
+
+      if (isCancelled || requestIdRef.current !== requestId) {
+        return
+      }
 
       setTotalItems({
         images: imagesLength,
@@ -273,6 +361,7 @@ export default function History() {
       try {
         if (activeTab === "images") {
           const data = await fetchImagesHistory(dateRange, currentPage)
+          if (isCancelled || requestIdRef.current !== requestId) return
 
           setImageHistory(data.grouped)
           setTotalPages(prev => ({
@@ -281,6 +370,7 @@ export default function History() {
           }))
         } else if (activeTab === "text") {
           const data = await fetchTextHistory(dateRange, currentPage)
+          if (isCancelled || requestIdRef.current !== requestId) return
 
           setTextHistory(data.history)
           setTotalPages(prev => ({
@@ -289,6 +379,7 @@ export default function History() {
           }))
         } else if (activeTab === "audio") {
           const data = await fetchAudioHistory(dateRange, currentPage)
+          if (isCancelled || requestIdRef.current !== requestId) return
 
           setAudioHistory(data.history)
           setTotalPages(prev => ({
@@ -297,6 +388,7 @@ export default function History() {
           }))
         } else if (activeTab === "conversations") {
           const data = await fetchConversationHistory(dateRange, currentPage)
+          if (isCancelled || requestIdRef.current !== requestId) return
 
           setConversationHistory(data.history)
           setTotalPages(prev => ({
@@ -307,11 +399,17 @@ export default function History() {
       } catch (err) {
         console.error("Failed to fetch history:", err)
       } finally {
-        setLoading(false)
+        if (!isCancelled && requestIdRef.current === requestId) {
+          setLoading(false)
+        }
       }
     }
 
     run()
+
+    return () => {
+      isCancelled = true
+    }
   }, [activeTab, dateRange, currentPage,
     fetchImagesHistory, fetchTextHistory, fetchAudioHistory, fetchConversationHistory,
     getImagesLength, getTextLength, getAudioLength, getConversationLength])
@@ -327,6 +425,61 @@ export default function History() {
   }
 
   const columns = isMobile ? 2 : isTablet ? 3 : 4
+  let imageLocalIndex = -1
+
+  useEffect(() => {
+    if (!scrollTarget || loading || activeTab !== scrollTarget.tab) {
+      return
+    }
+
+    const hasRenderedDataForTab =
+      (activeTab === "images" && imageHistory.length > 0) ||
+      (activeTab === "text" && textHistory.length > 0) ||
+      (activeTab === "audio" && audioHistory.length > 0) ||
+      (activeTab === "conversations" && conversationHistory.length > 0)
+
+    if (!hasRenderedDataForTab) {
+      return
+    }
+
+    const executeFallbackScroll = () => {
+      const fallbackTop = scrollTarget.scrollBlock === "end"
+        ? Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
+        : 0
+      window.scrollTo({ top: fallbackTop, behavior: "smooth" })
+    }
+
+    const tryScroll = () => {
+      const localIndex = scrollTarget.targetIndex % scrollTarget.pageSize
+      const selectorById = scrollTarget.tab === "conversations" && scrollTarget.targetConversationId
+        ? `[data-history-tab="conversations"][data-conversation-id="${scrollTarget.targetConversationId}"]`
+        : null
+      const selectorByTabAndIndex = `[data-history-tab="${scrollTarget.tab}"][data-history-local-index="${localIndex}"]`
+
+      const targetElement = selectorById
+        ? document.querySelector(selectorById)
+        : document.querySelector(selectorByTabAndIndex)
+
+      if (targetElement instanceof HTMLElement) {
+        targetElement.scrollIntoView({ behavior: "smooth", block: scrollTarget.scrollBlock })
+      } else {
+        executeFallbackScroll()
+      }
+
+      setScrollTarget(null)
+    }
+
+    const frameId = window.requestAnimationFrame(tryScroll)
+    return () => window.cancelAnimationFrame(frameId)
+  }, [
+    activeTab,
+    loading,
+    scrollTarget,
+    imageHistory.length,
+    textHistory.length,
+    audioHistory.length,
+    conversationHistory.length,
+  ])
 
   return (
     <Box
@@ -506,9 +659,18 @@ export default function History() {
 
                     {/* Image grid */}
                     <SimpleGrid cols={columns} spacing={isMobile ? 10 : 16}>
-                      {group.images.filter(Boolean).map((item, i) => (
-                        <ImageCard key={i} item={item} onClick={() => setSelectedImage(item)} />
-                      ))}
+                      {group.images.filter(Boolean).map((item, i) => {
+                        imageLocalIndex += 1
+                        return (
+                          <div
+                            key={i}
+                            data-history-tab="images"
+                            data-history-local-index={imageLocalIndex}
+                          >
+                            <ImageCard item={item} onClick={() => setSelectedImage(item)} />
+                          </div>
+                        )
+                      })}
                     </SimpleGrid>
                   </Stack>
                 ))}
@@ -540,7 +702,11 @@ export default function History() {
                 {textHistory.map((item, idx) => (
                   <Transition key={idx} mounted transition="fade" duration={200}>
                     {styles => (
-                      <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
+                      <div
+                        style={{ ...styles, animationDelay: `${idx * 30}ms` }}
+                        data-history-tab="text"
+                        data-history-local-index={idx}
+                      >
                         <TextCard item={item} />
                       </div>
                     )}
@@ -572,7 +738,11 @@ export default function History() {
                 {audioHistory.map((item, idx) => (
                   <Transition key={idx} mounted transition="fade" duration={200}>
                     {styles => (
-                      <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
+                      <div
+                        style={{ ...styles, animationDelay: `${idx * 30}ms` }}
+                        data-history-tab="audio"
+                        data-history-local-index={idx}
+                      >
                         <AudioCard item={item} />
                       </div>
                     )}
@@ -603,7 +773,12 @@ export default function History() {
               {conversationHistory.map((item, idx) => (
                 <Transition key={idx} mounted transition="fade" duration={200}>
                   {styles => (
-                    <div style={{ ...styles, animationDelay: `${idx * 30}ms` }}>
+                    <div
+                      style={{ ...styles, animationDelay: `${idx * 30}ms` }}
+                      data-history-tab="conversations"
+                      data-history-local-index={idx}
+                      data-conversation-id={item._id}
+                    >
                       <ConversationCard item={item} />
                     </div>
                   )}
@@ -626,7 +801,7 @@ export default function History() {
             </Stack>
           </ScrollArea>
         )
-      }
+        }
       </Box>
 
       {/* Image Modal */}
