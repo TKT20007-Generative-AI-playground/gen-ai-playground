@@ -185,10 +185,8 @@ export default function ModelSelector({
       <Stack
         gap={10}
         style={{
-          width,
-          minWidth: width,
+          width: "100%",
           maxWidth: width,
-          flexShrink: 0,
         }}
       >
         <div ref={selectContainerRef}>
@@ -198,8 +196,8 @@ export default function ModelSelector({
             data={selectData}
             value={value ?? null}
             onChange={handleChange}
-            clearable
             searchable
+            clearable
             data-testid={label === "Model 1" ? "model-1-selector" : "model-2-selector"}
             rightSectionWidth={80}
             styles={{
@@ -208,6 +206,7 @@ export default function ModelSelector({
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
+                fontSize: 16,
               },
               root: { width: "100%" },
               wrapper: { width: "100%" },

@@ -134,7 +134,7 @@ export default function DashboardUsers() {
           <Table.Tbody>
             {users.map((user) => (
               <Table.Tr key={user.username}>
-                <Table.Td>
+                <Table.Td style={{ wordBreak: 'break-all', maxWidth: 200 }}>
                   <Text fw={500}>{user.username}</Text>
                 </Table.Td>
                 <Table.Td>

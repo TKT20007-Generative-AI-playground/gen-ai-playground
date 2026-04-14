@@ -1,6 +1,7 @@
 import { useAuth } from "../context/AuthContext"
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react"
 import { Alert, Badge, Button, Checkbox, NumberInput, Paper, ScrollArea, Switch, Text, TextInput } from "@mantine/core"
+import { useMediaQuery } from "@mantine/hooks"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { useLocation, useParams, useSearchParams } from "react-router-dom"
@@ -67,6 +68,7 @@ function parseModelReply(rawReply: string): {
 }
 
 export default function SharedChat() {
+    const isMobile = useMediaQuery("(max-width: 768px)")
     const { isLoggedIn, getAccessToken } = useAuth()
     const { state } = useLocation()
     const backendUrl = import.meta.env.VITE_API_URL
@@ -96,11 +98,15 @@ export default function SharedChat() {
     const pendingIdRef = useRef<string | null>(null)
     const wsRef = useRef<WebSocket | null>(null)
     const bottomRef = useRef<HTMLDivElement>(null)
+    const scrollAreaRef = useRef<HTMLDivElement>(null)
 
     const updateMessages = useCallback((next: Message[]) => {
         messagesRef.current = next
         setMessages(next)
-        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 50)
+        setTimeout(() => {
+            const viewport = scrollAreaRef.current
+            if (viewport) viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" })
+        }, 50)
     }, [])
 
     const [inviteCode, setInviteCode] = useState(searchParams.get("invite") ?? state?.invCode ?? "")
@@ -425,10 +431,11 @@ export default function SharedChat() {
 
             {/* Message list */}
             <ScrollArea
+                viewportRef={scrollAreaRef}
                 style={{
                     flex: 1,
-                    minHeight: "300px",
-                    maxHeight: "65vh",
+                    minHeight: isMobile ? "200px" : "300px",
+                    maxHeight: isMobile ? "55vh" : "65vh",
                     border: "1px solid #ddd",
                     borderRadius: "8px",
                     padding: "12px",
