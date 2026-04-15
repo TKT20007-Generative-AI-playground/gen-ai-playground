@@ -36,8 +36,12 @@ class SGLangConfig(BaseModel):
     @model_validator(mode="after")
     # This is needed to ensure that if dp > 1, then enable_dp_attention must be True
     def check_if_dp_is_valid(self):
-        if self.dp and self.dp > 1 and not self.enable_dp_attention:
-            raise ValueError("enable_dp_attention must be True when dp > 1")
+        if self.dp and self.dp > 1:
+            # External templates may omit this; default it to the only valid setting.
+            if self.enable_dp_attention is None:
+                self.enable_dp_attention = True
+            elif self.enable_dp_attention is False:
+                raise ValueError("enable_dp_attention must be True when dp > 1")
         return self
     
     
@@ -60,6 +64,7 @@ class VLLMConfig(BaseModel):
     swap_space: Optional[int] = Field(default=None, ge=1)
     max_num_batched_tokens: Optional[int] = Field(default=None, ge=1)
     scheduling_policy: Optional[str] = None
+    reasoning_parser: Optional[str] = None
     
     
 
@@ -87,9 +92,11 @@ class TemplateConfig(BaseModel):
     # Common Fields (All Engines)
     engine: Literal["vllm", "sglang", "custom"]
     model: str
+    name: Optional[str] = None
     display_name: Optional[str] = None
     explanation: Optional[str] = None
     short_explanation: Optional[str] = None
+    model_mode: Optional[Literal["thinking", "hybrid", "instruct"]] = None
     trust_remote_code: Optional[bool] = None
     quantization: Optional[str] = None
     gpu_types: List[str] = Field(default_factory=list)

@@ -10,7 +10,10 @@ import {
   Stack,
   Alert,
   Select,
+  ScrollArea,
+  Card,
 } from "@mantine/core"
+import { useMediaQuery } from "@mantine/hooks"
 
 interface Container {
   name: string
@@ -36,6 +39,7 @@ export default function DashboardContainers() {
   const [deployOptions, setDeployOptions] = useState<DeployOption[]>([])
 
   const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
+  const isMobile = useMediaQuery("(max-width: 768px)")
 
   const getCsrfToken = () =>
     document.cookie
@@ -43,7 +47,6 @@ export default function DashboardContainers() {
       .find(c => c.startsWith("csrf_token="))
       ?.split("=")[1] ?? ""
 
-  // Fetch available models from backend
   useEffect(() => {
     const fetchModels = async () => {
       const headers = { "X-CSRF-Token": getCsrfToken() }
@@ -194,7 +197,7 @@ export default function DashboardContainers() {
         </Button>
       </Group>
 
-      <Group align="end" gap="sm">
+      <Group align="end" gap="sm" wrap="wrap">
         <Select
           label="Deploy a model"
           placeholder="Select model"
@@ -202,6 +205,8 @@ export default function DashboardContainers() {
           value={selectedModelId}
           onChange={setSelectedModelId}
           style={{ minWidth: 220 }}
+          searchable
+          clearable
         />
         <Button onClick={handleDeploy} disabled={!selectedModelId} loading={deployLoading}>
           Deploy
@@ -216,41 +221,20 @@ export default function DashboardContainers() {
 
       {containers.length === 0 ? (
         <Text c="dimmed">No deployments found.</Text>
-      ) : (
-        <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>Name</Table.Th>
-              <Table.Th>Endpoint</Table.Th>
-              <Table.Th>Status</Table.Th>
-              <Table.Th>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {containers.map(c => (
-              <Table.Tr key={c.container_id}>
-                <Table.Td>
+      ) : isMobile ? (
+        // MOBILE: cards
+        <Stack>
+          {containers.map(c => (
+            <Card key={c.container_id} withBorder radius="md" shadow="xs">
+              <Stack gap="xs">
+                <Group justify="space-between">
                   <Text fw={500}>{c.name}</Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text
-                    size="sm"
-                    c="dimmed"
-                    style={{
-                      maxWidth: 300,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {c.image || "—"}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Badge color={getStatusColor(c.status)} variant="filled">
-                    {c.status}
-                  </Badge>
-                </Table.Td>
-                <Table.Td>
+                  <Badge color={getStatusColor(c.status)}>{c.status}</Badge>
+                </Group>
+                <Text size="sm" c="dimmed" style={{ wordBreak: "break-all" }}>
+                  {c.image || "—"}
+                </Text>
+                <Group justify="flex-end">
                   <Button
                     size="xs"
                     color="red"
@@ -259,11 +243,63 @@ export default function DashboardContainers() {
                   >
                     Delete
                   </Button>
-                </Table.Td>
+                </Group>
+              </Stack>
+            </Card>
+          ))}
+        </Stack>
+      ) : (
+
+        <ScrollArea w="100%">
+          <Table striped highlightOnHover withColumnBorders>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Name</Table.Th>
+                <Table.Th>Endpoint</Table.Th>
+                <Table.Th>Status</Table.Th>
+                <Table.Th>Actions</Table.Th>
               </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+            </Table.Thead>
+            <Table.Tbody>
+              {containers.map(c => (
+                <Table.Tr key={c.container_id}>
+                  <Table.Td>
+                    <Text fw={500}>{c.name}</Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Text
+                      size="sm"
+                      c="dimmed"
+                      style={{
+                        maxWidth: 250,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {c.image || "—"}
+                    </Text>
+                  </Table.Td>
+                  <Table.Td>
+                    <Badge color={getStatusColor(c.status)} variant="filled">
+                      {c.status}
+                    </Badge>
+                  </Table.Td>
+                  <Table.Td>
+                    <Button
+                      size="xs"
+                      color="red"
+                      loading={actionLoading === c.container_id}
+                      onClick={() => handleDelete(c.container_id)}
+                    >
+                      Delete
+                    </Button>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
       )}
     </Stack>
   )

@@ -2,7 +2,21 @@ import axios from "axios"
 import { useAuth } from "../context/AuthContext"
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
 
-import { Alert, Button, MultiSelect, Paper, Text, ScrollArea, TextInput, Modal } from "@mantine/core"
+import {
+  Alert,
+  Button,
+  Group,
+  MultiSelect,
+  NumberInput,
+  Paper,
+  Switch,
+  Text,
+  ScrollArea,
+  TextInput,
+  Modal,
+} from "@mantine/core"
+
+import { useMediaQuery } from "@mantine/hooks"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { ShareConversationModal } from "./SharedConversationsModal"
@@ -11,16 +25,25 @@ import { useNavigate } from "react-router-dom"
 type ModelOption = {
   value: string
   label: string
+  supportsThinking: boolean
+  modelMode?: "thinking" | "hybrid" | "instruct" | null
 }
 
 type Message = {
   id: string
   role: "user" | "assistant"
   content: string
+  reasoning?: string | null
   modelLabel?: string
   generationTimeMs?: number
   isPending?: boolean
   pendingStartTime?: number
+}
+
+type ChatApiResponse = {
+  reply: string
+  reasoning?: string | null
+  generation_time_ms?: number | null
 }
 
 type ModelStatus = "live" | "starting" | "offline" | "unknown"
@@ -102,6 +125,9 @@ type ChatPanelProps = {
   isBusy: boolean
   modelStatus: ModelStatus
   statusMessage: string | null
+  thinkingMode?: "thinking" | "hybrid" | "instruct" | null
+  enableThinking: boolean
+  onToggleThinking: (enabled: boolean) => void
   onShare: () => void
 }
 
@@ -113,8 +139,12 @@ function ChatPanel({
   isBusy,
   modelStatus,
   statusMessage,
+  thinkingMode,
+  enableThinking,
+  onToggleThinking,
   onShare,
 }: ChatPanelProps) {
+  const isMobile = useMediaQuery("(max-width: 768px)")
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -158,10 +188,23 @@ function ChatPanel({
         </Alert>
       )}
 
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "8px", alignItems: "center" }}>
         <Button size="xs" color="orange" onClick={onClearMessages} disabled={isBusy}>
           Clear
         </Button>
+        {thinkingMode === "thinking" ? (
+          <Text size="xs" c="dimmed">
+            Thinking only
+          </Text>
+        ) : thinkingMode === "hybrid" ? (
+          <Switch
+            label="Thinking"
+            size="xs"
+            checked={enableThinking}
+            onChange={(e) => onToggleThinking(e.currentTarget.checked)}
+            disabled={isBusy}
+          />
+        ) : null}
       </div>
       <Button size="xs" variant="light" onClick={onShare}>
         Share conversation
@@ -170,8 +213,8 @@ function ChatPanel({
       <ScrollArea
         style={{
           flex: 1,
-          minHeight: "300px",
-          maxHeight: "65vh",
+          minHeight: isMobile ? "200px" : "300px",
+          maxHeight: isMobile ? "55vh" : "65vh",
           border: "1px solid #ddd",
           borderRadius: "8px",
           padding: "12px",
@@ -213,6 +256,7 @@ function ChatPanel({
                     </Text>
                   )}
                 </div>
+
                 {message.isPending ? (
                   message.pendingStartTime ? (
                     <div>
@@ -220,16 +264,38 @@ function ChatPanel({
                     </div>
                   ) : null
                 ) : (
-                  <Text
-                    size="sm"
-                    style={{
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      overflowWrap: "break-word",
-                    }}
-                  >
-                    {message.content}
-                  </Text>
+                  <>
+                    <Text
+                      size="sm"
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        wordBreak: "break-word",
+                        overflowWrap: "break-word",
+                      }}
+                    >
+                      {message.content}
+                    </Text>
+
+                    {message.role === "assistant" && message.reasoning && (
+                      <details style={{ marginTop: "8px" }}>
+                        <summary style={{ cursor: "pointer", color: "#666", fontSize: "12px" }}>
+                          Show reasoning
+                        </summary>
+                        <Text
+                          size="xs"
+                          c="dimmed"
+                          mt={6}
+                          style={{
+                            whiteSpace: "pre-wrap",
+                            wordBreak: "break-word",
+                            overflowWrap: "break-word",
+                          }}
+                        >
+                          {message.reasoning}
+                        </Text>
+                      </details>
+                    )}
+                  </>
                 )}
               </Paper>
             ))}
@@ -244,6 +310,7 @@ function ChatPanel({
 // --- Main component ---
 
 export default function TextGenerator({ opened }: { opened: boolean }) {
+  const isMobile = useMediaQuery("(max-width: 768px)")
   const { isLoggedIn } = useAuth()
   const backendUrl = import.meta.env.VITE_API_URL
   const enableTestModel = import.meta.env.DEV && import.meta.env.VITE_ENABLE_TEST_MODEL !== "false"
@@ -253,6 +320,8 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const [messagesByModel, setMessagesByModel] = useState<Record<string, Message[]>>({})
   const [loadingByModel, setLoadingByModel] = useState<Record<string, boolean>>({})
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
+  const [maxTokens, setMaxTokens] = useState<number>(256)
+  const [enableThinkingByModel, setEnableThinkingByModel] = useState<Record<string, boolean>>({})
 
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [shareTargetModel, setShareTargetModel] = useState<string | null>(null)
@@ -301,13 +370,20 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
           withCredentials: true,
         })
         const models: ModelOption[] = (res.data.available_models ?? []).map(
-          (m: { value: string; label: string }) => ({
+          (m: { value: string; label: string; supports_thinking?: boolean; model_mode?: "thinking" | "hybrid" | "instruct" | null }) => ({
             value: m.value,
             label: m.label,
-          }),
+            supportsThinking: m.supports_thinking ?? false,
+            modelMode: m.model_mode ?? null,
+          })
         )
         if (enableTestModel) {
-          models.push({ value: "test_model", label: "test_model" })
+          models.push({
+            value: "test_model",
+            label: "test_model",
+            supportsThinking: false,
+            modelMode: null,
+          })
         }
         setModelOptions(models)
       } catch {
@@ -342,8 +418,17 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     return () => clearInterval(id)
   }, [fetchStatuses, isLoggedIn])
 
-  const getModelLabel = (value: string) => modelOptions.find(m => m.value === value)?.label ?? value
-  const isAnyLoading = selectedModels.some(m => Boolean(loadingByModel[m]))
+  const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
+  const getModelOption = (value: string) => modelOptions.find((m) => m.value === value)
+  const getThinkingMode = (value: string) => getModelOption(value)?.modelMode ?? null
+  const isThinkingEnabled = (value: string) => {
+    const mode = getThinkingMode(value)
+    if (mode === "thinking") return true
+    if (mode === "instruct") return false
+    if (mode === "hybrid") return enableThinkingByModel[value] ?? false
+    return false
+  }
+  const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
 
   /**
    * Send message to a single model panel.
@@ -367,26 +452,30 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         {
           model_path: modelValue,
           messages: requestMessages,
-          max_tokens: 256,
+          max_tokens: maxTokens,
           temperature: 0.7,
           top_p: 0.9,
+          enable_thinking: isThinkingEnabled(modelValue),
         },
         { headers: getAuthHeaders(), withCredentials: true },
       )
-      const result = response.data
+
+      const result = response.data as ChatApiResponse
       const parsed = parseModelReply(result.reply)
-      if (parsed.thinking) console.log("Thinking:", parsed.thinking)
+      const reasoning = result.reasoning ?? parsed.thinking
+      if (reasoning) console.log("Thinking:", reasoning)
       const label = getModelLabel(modelValue)
       const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
         message.id === pendingMessageId
           ? {
-            ...message,
-            content: parsed.actualReply,
-            modelLabel: label,
-            generationTimeMs: result.generation_time_ms ?? undefined,
-            isPending: false,
-            pendingStartTime: undefined,
-          }
+              ...message,
+              content: parsed.actualReply,
+              reasoning,
+              modelLabel: label,
+              generationTimeMs: result.generation_time_ms ?? undefined,
+              isPending: false,
+              pendingStartTime: undefined,
+            }
           : message,
       )
       setMessagesForModel(modelValue, replaced)
@@ -522,9 +611,78 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       </Modal>
 
       {selectedModels.length > 0 && (
+        <Group gap="md">
+          <NumberInput
+            label="Max Output Tokens"
+            value={maxTokens}
+            onChange={(val) => {
+              const next = typeof val === "number" ? val : 256
+              setMaxTokens(next)
+            }}
+            min={selectedModels.some((m) => isThinkingEnabled(m)) ? 2 : 1}
+            max={32768}
+            step={64}
+            clampBehavior="strict"
+            style={{ width: 180 }}
+            disabled={isAnyLoading}
+          />
+        </Group>
+      )}
+
+      {selectedModels.length > 0 && (
         <>
           {/* Panels */}
           {isBreakout ? (
+            // 3–4 models: allow full-width layout and wrap panels instead of cramping.
+            <div style={{ width: "100vw", marginLeft: "calc(50% - 50vw)" }}>
+              <div
+                style={{
+                  maxWidth: "1800px",
+                  margin: "0 auto",
+                  padding: "0 16px",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gap: "20px",
+                    width: "100%",
+                    alignItems: "stretch",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+                  }}
+                >
+                  {selectedModels.map((modelValue) => (
+                    <ChatPanel
+                      key={modelValue}
+                      modelValue={modelValue}
+                      modelLabel={getModelLabel(modelValue)}
+                      messages={messagesByModel[modelValue] ?? []}
+                      onClearMessages={() => clearMessagesForModel(modelValue)}
+                      isLoading={loadingByModel[modelValue] ?? false}
+                      isBusy={isAnyLoading}
+                      modelStatus={modelStatuses[modelValue] ?? "unknown"}
+                      statusMessage={statusMsgs[modelValue] ?? null}
+                      thinkingMode={getThinkingMode(modelValue)}
+                      enableThinking={enableThinkingByModel[modelValue] ?? false}
+                      onToggleThinking={(enabled) => {
+                        setEnableThinkingByModel((prev) => ({ ...prev, [modelValue]: enabled }))
+                        if (enabled) {
+                          const effectiveMax = Math.max(maxTokens, 2)
+                          setMaxTokens(effectiveMax)
+                        }
+                      }}
+                      onShare={() => {
+                        setShareTargetModel(modelValue)
+                        setShareModalOpen(true)
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            // 1-2 models: keep the compact layout.
             <div
               style={{
                 display: "grid",
@@ -532,10 +690,9 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                 width: "100%",
                 alignItems: "stretch",
 
-                // If historysidebar open, show 2×2 grid
-                // Otherwise auto-fit layout
-                gridTemplateColumns:
-                  sidebarOpen && selectedModels.length >= 3
+                gridTemplateColumns: isMobile
+                  ? "1fr"
+                  : sidebarOpen && selectedModels.length >= 3
                     ? "repeat(2, 1fr)"
                     : "repeat(auto-fit, minmax(280px, 1fr))",
 
@@ -554,39 +711,15 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                   isBusy={isAnyLoading}
                   modelStatus={modelStatuses[modelValue] ?? "unknown"}
                   statusMessage={statusMsgs[modelValue] ?? null}
-                  onShare={() => {
-                    setShareTargetModel(modelValue)
-                    setShareModalOpen(true)
+                  thinkingMode={getThinkingMode(modelValue)}
+                  enableThinking={enableThinkingByModel[modelValue] ?? false}
+                  onToggleThinking={(enabled) => {
+                    setEnableThinkingByModel(prev => ({ ...prev, [modelValue]: enabled }))
+                    if (enabled) {
+                      const effectiveMax = Math.max(maxTokens, 2)
+                      setMaxTokens(effectiveMax)
+                    }
                   }}
-                />
-              ))}
-            </div>
-          ) : (
-            // 1–2 models: keep the compact layout.
-            <div
-              style={{
-                display: "grid",
-                gap: "20px",
-                gridTemplateColumns:
-                  selectedModels.length === 1
-                    ? "minmax(320px, 1fr)"
-                    : "repeat(2, minmax(320px, 1fr))",
-                width: "100%",
-                margin: "0 auto",
-                alignItems: "stretch",
-              }}
-            >
-              {selectedModels.map(modelValue => (
-                <ChatPanel
-                  key={modelValue}
-                  modelValue={modelValue}
-                  modelLabel={getModelLabel(modelValue)}
-                  messages={messagesByModel[modelValue] ?? []}
-                  onClearMessages={() => clearMessagesForModel(modelValue)}
-                  isLoading={loadingByModel[modelValue] ?? false}
-                  isBusy={isAnyLoading}
-                  modelStatus={modelStatuses[modelValue] ?? "unknown"}
-                  statusMessage={statusMsgs[modelValue] ?? null}
                   onShare={() => {
                     setShareTargetModel(modelValue)
                     setShareModalOpen(true)
@@ -624,7 +757,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         modelValue={shareTargetModel ?? ""}
         backendUrl={backendUrl}
       />
-    </div >
+    </div>
 
   )
 }

@@ -1,6 +1,7 @@
 {
   "engine": "custom",
   "model": "my-org/my-model",
+  "name": "Custom Engine",
   "explanation": "Example configuration for custom inference engines. Demonstrates how to use a custom base command with positional args and key-value arguments for non-standard inference frameworks.",
   "short_explanation": "Custom engine configuration template",
   "gpu_types": ["h100", "h200", "b200", "a100", "l40s"],

@@ -158,6 +158,7 @@ class ChatRequest(BaseModel):
     max_tokens: int = 256
     temperature: float = 0.7
     top_p: float = 0.9
+    enable_thinking: bool = False
 
 
 # ---- Invitation code models ----
@@ -200,6 +201,7 @@ class InvitationCodeDeleteResponse(BaseModel):
 class ChatResponse(BaseModel):
     """Response model for chat completions"""
     reply: str
+    reasoning: Optional[str] = None
     model: str
     usage: Dict[str, Any] = {}
     generation_time_ms: Optional[int] = None

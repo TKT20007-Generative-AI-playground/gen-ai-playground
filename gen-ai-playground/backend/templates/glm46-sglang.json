@@ -1,9 +1,11 @@
 {
   "engine": "sglang",
   "model": "zai-org/GLM-4.6-FP8",
+  "name": "GLM-4.6 · SGLang · FP8",
   "explanation": "GLM-4.6 with FP8 quantization for efficient memory usage. Supports both reasoning and tool calling with GLM-4.5 parsers across 8 GPUs.",
   "short_explanation": "GLM-4.6 FP8 with reasoning and tool calling",
   "gpu_types": ["h100", "h200", "b200"],
+  "model_mode": "hybrid",
   "model_loader_extra_config": {
     "enable_multithread_load": true,
     "num_threads": 32

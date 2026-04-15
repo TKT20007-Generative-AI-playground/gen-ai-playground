@@ -1,10 +1,12 @@
 {
   "engine": "vllm",
   "model": "casperhansen/llama-3-70b-instruct-awq",
+  "name": "Llama 3 70B AWQ · vLLM · 4-GPU",
   "explanation": "Llama 3 70B with AWQ quantization on 4-way tensor parallelism for efficient inference. Uses runai_streamer for fast model loading with 8K context length. High memory utilization (0.95) with prefix caching and chunked prefill for maximum throughput.",
   "short_explanation": "Llama 70B AWQ 4-way TP high throughput",
   "quantization": "awq",
   "gpu_types": ["h100", "h200", "b200", "a100"],
+  "model_mode": "instruct",
   "load_format": "runai_streamer",
   "model_loader_extra_config": {
     "concurrency": 8

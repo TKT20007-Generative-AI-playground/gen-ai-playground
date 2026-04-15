@@ -18,6 +18,7 @@ import {
   Input,
 } from '@mantine/core'
 import { IconPlus, IconCopy, IconCheck, IconTrash, IconPower, IconCalendarPlus } from '@tabler/icons-react'
+import { useMediaQuery } from '@mantine/hooks'
 
 interface InvitationCode {
   code: string
@@ -30,6 +31,7 @@ interface InvitationCode {
 }
 
 export default function DashboardInvitations() {
+  const isMobile = useMediaQuery('(max-width: 768px)')
   const [codes, setCodes] = useState<InvitationCode[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -286,16 +288,30 @@ export default function DashboardInvitations() {
     const isFullyUsed = code.uses_count >= code.max_uses
     const isActive = code.is_active
 
+    let color = 'green'
+    let label = 'Active'
+    let variant: 'filled' | 'outline' = 'filled'
+
     if (isExpired) {
-      return <Badge color="red" variant="filled">Expired</Badge>
+      color = 'red'
+      label = 'Expired'
+    } else if (isFullyUsed) {
+      color = 'gray'
+      label = 'Fully Used'
+    } else if (!isActive) {
+      color = 'gray'
+      label = 'Deactivated'
+      variant = 'outline'
     }
-    if (isFullyUsed) {
-      return <Badge color="gray" variant="filled">Fully Used</Badge>
+
+    if (isMobile) {
+      return (
+        <Tooltip label={label} withArrow>
+          <Badge color={color} variant={variant} circle size="sm" aria-label={label} />
+        </Tooltip>
+      )
     }
-    if (!isActive) {
-      return <Badge color="gray" variant="outline">Deactivated</Badge>
-    }
-    return <Badge color="green" variant="filled">Active</Badge>
+    return <Badge color={color} variant={variant}>{label}</Badge>
   }
 
   // Filter and sort codes
@@ -380,12 +396,16 @@ export default function DashboardInvitations() {
               <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('code')}>
                 Code {sortBy === 'code' && (sortOrder === 'asc' ? '↑' : '↓')}
               </Table.Th>
-              <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('created_at')}>
-                Created {sortBy === 'created_at' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </Table.Th>
-              <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('expires_at')}>
-                Expires {sortBy === 'expires_at' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </Table.Th>
+              {!isMobile && (
+                <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('created_at')}>
+                  Created {sortBy === 'created_at' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </Table.Th>
+              )}
+              {!isMobile && (
+                <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('expires_at')}>
+                  Expires {sortBy === 'expires_at' && (sortOrder === 'asc' ? '↑' : '↓')}
+                </Table.Th>
+              )}
               <Table.Th>Status</Table.Th>
               <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('uses_count')}>
                 Usage {sortBy === 'uses_count' && (sortOrder === 'asc' ? '↑' : '↓')}
@@ -416,16 +436,20 @@ export default function DashboardInvitations() {
                     </CopyButton>
                   </Group>
                 </Table.Td>
-                <Table.Td>
-                  <Text size="sm" c="dimmed">
-                    {formatDate(code.created_at)}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" c={new Date(code.expires_at) < new Date() ? 'red' : 'dimmed'}>
-                    {formatDate(code.expires_at)}
-                  </Text>
-                </Table.Td>
+                {!isMobile && (
+                  <Table.Td>
+                    <Text size="sm" c="dimmed">
+                      {formatDate(code.created_at)}
+                    </Text>
+                  </Table.Td>
+                )}
+                {!isMobile && (
+                  <Table.Td>
+                    <Text size="sm" c={new Date(code.expires_at) < new Date() ? 'red' : 'dimmed'}>
+                      {formatDate(code.expires_at)}
+                    </Text>
+                  </Table.Td>
+                )}
                 <Table.Td>{getStatusBadge(code)}</Table.Td>
                 <Table.Td>
                   <Text size="sm">
