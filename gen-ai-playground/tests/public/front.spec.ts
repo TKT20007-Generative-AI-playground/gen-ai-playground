@@ -94,17 +94,27 @@ test("hovering carousel cards shows button and clicking it takes to correct page
   await loginViaUI(page, user);
   await expectLoggedIn(page);
 
+  const carousel = page.getByTestId('showcase-carousel');
+  await carousel.hover();
   const slide = page.getByTestId('showcase-slide').first();
-  await slide.hover({ force: true });
-  await slide.getByRole('button', { name: 'Edit' }).click({ force: true });
+  await slide.hover();
+  const editButton = slide.getByRole('button', { name: 'Edit' });
+  await expect(editButton).toBeVisible();
+  await Promise.all([
+    page.waitForURL(/\/playground\/ImageEditor/, { timeout: 15000 }),
+    editButton.click(),
+  ]);
   await expect(page.locator('#root')).toContainText('Upload an image, select a model, and enter a prompt to enable editing.');
 }   );
 
 test("clicking showcase Edit when logged out opens login", async ({ page }) => {
   await gotoHome(page)
   const slide = page.locator('.showcase-slide').first()
-  await slide.hover({ force: true })
-  await slide.getByRole('button', { name: 'Edit' }).click({ force: true })
+  await slide.scrollIntoViewIfNeeded()
+  await slide.hover()
+  const editButton = slide.getByRole('button', { name: 'Edit' })
+  await expect(editButton).toBeVisible()
+  await editButton.click()
   await expect(page.getByRole('heading', { name: 'Login', exact: true })).toBeVisible()
 })
 
