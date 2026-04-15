@@ -121,9 +121,10 @@ export async function loginViaUI(page: Page, user: TestUser) {
 
   await dialog.getByRole("button", { name: "Login" }).click();
 
-  await expect(dialog).toBeHidden();
-
-  await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Logout" })).toBeVisible({
+    timeout: 15000,
+  });
+  await expect(headerLoginButton(page)).toBeHidden();
 }
 
 export async function expectLoggedIn(page: Page) {

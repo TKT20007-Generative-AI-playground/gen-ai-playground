@@ -27,13 +27,13 @@ test("frontpage displays correct title and elements", async ({
 
 test("clicking cards takes to login when not logged in", async ({ page }) => {
   await gotoHome(page);
-  await page.click('text=Go to image generators');
+  await page.getByRole("button", { name: "Go to image generators" }).click();
   await expect(page.getByRole('heading', { name: 'Login', exact: true })).toBeVisible();
   await gotoHome(page);
-  await page.click('text=Go to image editor');
+  await page.getByRole("button", { name: "Go to image editor" }).click();
   await expect(page.getByRole('heading', { name: 'Login', exact: true })).toBeVisible();
   await gotoHome(page);
-  await page.click('text=Go to text generators');
+  await page.getByRole("button", { name: "Go to text generators" }).click();
   await expect(page.getByRole('heading', { name: 'Login', exact: true })).toBeVisible();
 });
 
@@ -43,15 +43,15 @@ test("clicking cards takes to correct page when logged in", async ({ page, reque
   await loginViaUI(page, user);
   await expectLoggedIn(page);
 
-  await page.click('text=Go to image generators');
+  await page.getByRole("button", { name: "Go to image generators" }).click();
   await expect(page).toHaveURL(/\/playground\/ImageGenerator/)
   
   await gotoHome(page);
-  await page.click('text=Go to image editor');
+  await page.getByRole("button", { name: "Go to image editor" }).click();
   await expect(page).toHaveURL(/\/playground\/ImageEditor/)
 
   await gotoHome(page);
-  await page.click('text=Go to text generators');
+  await page.getByRole("button", { name: "Go to text generators" }).click();
   await expect(page).toHaveURL(/\/playground\/TextGenerator/)
 });
 
@@ -74,7 +74,7 @@ test("get started button takes to image generators when logged in", async ({ pag
 test("clicking a card then logging in lands on the originally requested page", async ({ page, request }) => {
   const user = await createAndRegisterUser(request)
   await gotoHome(page)
-  await page.click('text=Go to image editor')
+  await page.getByRole("button", { name: "Go to image editor" }).click()
   await expect(page.getByRole('heading', { name: 'Login', exact: true })).toBeVisible();
   await loginViaUI(page, user)  // make sure your helper works with the modal already open
   await expect(page).toHaveURL(/\/playground\/ImageEditor/)

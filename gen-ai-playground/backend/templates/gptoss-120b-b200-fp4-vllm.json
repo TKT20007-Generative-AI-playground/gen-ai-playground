@@ -3,7 +3,7 @@
   "model": "openai/gpt-oss-120b",
   "explanation": "OpenAI GPT-OSS 120B with FP4 quantization optimized for NVIDIA Blackwell B200 GPUs. Based on InferenceMAX benchmarks, this configuration leverages Blackwell's advanced architecture with 4-way tensor parallelism, achieving superior performance compared to Hopper generation. Uses async scheduling, high concurrency support (512 sequences), and aggressive memory utilization for maximum throughput on cutting-edge hardware.",
   "short_explanation": "GPT-OSS 120B FP4 on 4xB200 Blackwell optimized",
-  "quantization": "fp4",
+  "quantization": "mxfp4",
   "gpu_types": ["b200"],
   "load_format": "auto",
   "model_loader_extra_config": {

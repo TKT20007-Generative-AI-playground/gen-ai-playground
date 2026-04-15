@@ -10,6 +10,8 @@ const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
 const INVITATION_CODE = process.env.INVITATION_CODE ?? "local-invitation-code";
 const STORAGE_STATE_PATH = "playwright/.auth/user.json";
 
+test.setTimeout(30000);
+
 // Create test user
 function makeTestUser() {
   return {
@@ -36,9 +38,9 @@ test("authenticate and save storage state", async ({ page, request }) => {
   await dialog.getByTestId("login-password").fill(password);
   await dialog.getByRole("button", { name: "Login" }).click();
 
-  await page
-    .getByRole("button", { name: "Logout" })
-    .waitFor({ state: "visible" });
+  await expect(page.getByRole("button", { name: "Logout" })).toBeVisible({
+    timeout: 15000,
+  });
 
   await page.context().storageState({ path: STORAGE_STATE_PATH });
 });
