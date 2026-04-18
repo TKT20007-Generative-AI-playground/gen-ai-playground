@@ -38,11 +38,15 @@ async function enterPromptAndGenerate(page: Page, prompt: string) {
   await createBtn.click();
 }
 
-async function expectImagesVisible(
-  page: Page,
-  expectFirst = true,
-  expectSecond = false,
-) {
+function createDeferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+async function expectImagesVisible(page: Page, expectFirst = true, expectSecond = false) {
   if (expectFirst) {
     await expect(page.getByAltText("Generated image 1")).toBeVisible();
   } else {
@@ -109,7 +113,116 @@ test.describe("Generator page flows", () => {
     const alertMessage = await page.evaluate(() => (window as any)._lastAlert);
     expect(alertMessage).toBe("Please select a model");
 
-    await expect(page.getByTestId("generated-image-1")).toHaveCount(0);
-    await expect(page.getByTestId("generated-image-2")).toHaveCount(0);
+    await expectImagesVisible(page, false, false);
+  });
+
+  test('shows and clears generating timer while image request is in-flight', async ({ page }) => {
+    const responseGate = createDeferred();
+
+    await page.unroute('**/images/generate');
+    await page.route('**/images/generate', async (route) => {
+      await responseGate.promise;
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: getDummyImageBuffer(),
+      });
+    });
+
+    await selectModels(page, 'FLUX.2 [klein] 9B');
+    await enterPromptAndGenerate(page, 'A snowy mountain at blue hour');
+
+    const status = page.locator('div', { hasText: 'Generating' }).first();
+    await expect(status).toBeVisible();
+    await expect(status).toContainText(/\d+\.\ds/);
+
+    responseGate.resolve();
+
+    await expect(page.getByAltText('Generated image 1')).toBeVisible();
+    await expect(page.getByText('Generating')).toHaveCount(0);
+  });
+
+  test('shows generation time label from response header', async ({ page }) => {
+    await page.unroute('**/images/generate');
+    await page.route('**/images/generate', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        headers: {
+          'x-generation-time-ms': '2500',
+          'access-control-expose-headers': 'x-generation-time-ms',
+        },
+        body: getDummyImageBuffer(),
+      });
+    });
+
+    await selectModels(page, 'FLUX.2 [klein] 9B');
+    await enterPromptAndGenerate(page, 'Show generation time label');
+
+    await expect(page.getByAltText('Generated image 1')).toBeVisible();
+    await expect(page.getByText('Generation time: 2.50s')).toBeVisible();
+  });
+
+  test('sends correct payload and calls generate endpoint once for single model', async ({ page }) => {
+    let callCount = 0;
+    const seen: Array<{ prompt?: string; model?: string }> = [];
+
+    await page.unroute('**/images/generate');
+    await page.route('**/images/generate', async (route) => {
+      callCount += 1;
+      seen.push(route.request().postDataJSON() as { prompt?: string; model?: string });
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: getDummyImageBuffer(),
+      });
+    });
+
+    await selectModels(page, 'FLUX.2 [klein] 9B');
+    await enterPromptAndGenerate(page, 'Payload assertion prompt');
+
+    await expect(page.getByAltText('Generated image 1')).toBeVisible();
+    expect(callCount).toBe(1);
+    expect(seen[0]).toMatchObject({
+      prompt: 'Payload assertion prompt',
+      model: 'FLUX2_KLEIN_9B',
+    });
+  });
+
+  test('calls generate endpoint twice with both selected model payloads', async ({ page }) => {
+    let callCount = 0;
+    const modelsSent: string[] = [];
+
+    await page.unroute('**/images/generate');
+    await page.route('**/images/generate', async (route) => {
+      callCount += 1;
+      const body = route.request().postDataJSON() as { model?: string };
+      if (body.model) modelsSent.push(body.model);
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: getDummyImageBuffer(),
+      });
+    });
+
+    await selectModels(page, 'FLUX.2 [klein] 9B', 'FLUX.1 Krea [dev]');
+    await enterPromptAndGenerate(page, 'Dual model request assertion');
+
+    await expectImagesVisible(page, true, true);
+    expect(callCount).toBe(2);
+    expect(modelsSent.sort()).toEqual(['FLUX1_KREA_DEV', 'FLUX2_KLEIN_9B']);
+  });
+
+  test('shows an error when image generation request fails', async ({ page }) => {
+    await page.unroute('**/images/generate');
+    await page.route('**/images/generate', async (route) => {
+      await route.abort('failed');
+    });
+
+    await selectModels(page, 'FLUX.2 [klein] 9B');
+    await enterPromptAndGenerate(page, 'Failure path prompt');
+
+    await expect(page.getByText(/(Network Error|Image generation failed|Request failed)/i)).toBeVisible();
+    await expect(page.getByAltText('Generated image 1')).toHaveCount(0);
   });
 });

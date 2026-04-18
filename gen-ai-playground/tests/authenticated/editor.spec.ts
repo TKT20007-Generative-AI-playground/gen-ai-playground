@@ -10,6 +10,14 @@ function getDummyImageBuffer() {
   return Buffer.from(base64, "base64");
 }
 
+function createDeferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 test.describe("Image Editor flows", () => {
   test.beforeEach(async ({ page }) => {
     await page.route("**/images/edit-image", async (route) => {
@@ -83,5 +91,106 @@ test.describe("Image Editor flows", () => {
     );
 
     await expect(page.getByAltText("Edited result")).toHaveCount(0);
+  });
+
+  test('shows and clears editing timer while request is in-flight', async ({ page }) => {
+    const responseGate = createDeferred();
+
+    await page.unroute('**/images/edit-image');
+    await page.route('**/images/edit-image', async (route) => {
+      await responseGate.promise;
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: getDummyImageBuffer(),
+      });
+    });
+
+    await selectModel(page, 'FLUX.2 [klein] 9B');
+    await uploadImage(page);
+
+    const promptInput = page.getByTestId('prompt-input');
+    await promptInput.fill('Turn this into a watercolor painting');
+    await page.getByRole('button', { name: 'Edit image' }).click();
+
+    const statusText = page.getByText('Editing', { exact: true });
+    await expect(statusText).toBeVisible();
+    await expect(page.getByText(/\d+\.\ds/).first()).toBeVisible();
+
+    responseGate.resolve();
+
+    await expect(page.getByAltText('Edited result')).toBeVisible();
+    await expect(statusText).toHaveCount(0);
+  });
+
+  test('shows generation time label from response header', async ({ page }) => {
+    await page.unroute('**/images/edit-image');
+    await page.route('**/images/edit-image', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        headers: {
+          'x-generation-time-ms': '2500',
+          'access-control-expose-headers': 'x-generation-time-ms',
+        },
+        body: getDummyImageBuffer(),
+      });
+    });
+
+    await selectModel(page, 'FLUX.2 [klein] 9B');
+    await uploadImage(page);
+
+    const promptInput = page.getByTestId('prompt-input');
+    await promptInput.fill('Show edit generation time label');
+    await page.getByRole('button', { name: 'Edit image' }).click();
+
+    await expect(page.getByAltText('Edited result')).toBeVisible();
+    await expect(page.getByText('Generation time: 2.50s')).toBeVisible();
+  });
+
+  test('sends correct payload and calls edit endpoint once', async ({ page }) => {
+    let callCount = 0;
+    const seen: Array<{ image?: string; prompt?: string; model?: string }> = [];
+
+    await page.unroute('**/images/edit-image');
+    await page.route('**/images/edit-image', async (route) => {
+      callCount += 1;
+      seen.push(route.request().postDataJSON() as { image?: string; prompt?: string; model?: string });
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: getDummyImageBuffer(),
+      });
+    });
+
+    await selectModel(page, 'FLUX.2 [klein] 9B');
+    await uploadImage(page);
+
+    const promptInput = page.getByTestId('prompt-input');
+    await promptInput.fill('Payload assertion edit prompt');
+    await page.getByRole('button', { name: 'Edit image' }).click();
+
+    await expect(page.getByAltText('Edited result')).toBeVisible();
+    expect(callCount).toBe(1);
+    expect(seen[0].prompt).toBe('Payload assertion edit prompt');
+    expect(seen[0].model).toBe('FLUX2_KLEIN_9B');
+    expect(seen[0].image).toMatch(/^data:image\//);
+  });
+
+  test('shows an error when image editing request fails', async ({ page }) => {
+    await page.unroute('**/images/edit-image');
+    await page.route('**/images/edit-image', async (route) => {
+      await route.abort('failed');
+    });
+
+    await selectModel(page, 'FLUX.2 [klein] 9B');
+    await uploadImage(page);
+
+    const promptInput = page.getByTestId('prompt-input');
+    await promptInput.fill('Failure path edit prompt');
+    await page.getByRole('button', { name: 'Edit image' }).click();
+
+    await expect(page.getByText(/(Network Error|Image editing failed|Request failed)/i)).toBeVisible();
+    await expect(page.getByAltText('Edited result')).toHaveCount(0);
   });
 });

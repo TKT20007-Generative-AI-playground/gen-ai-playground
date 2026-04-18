@@ -393,7 +393,6 @@ async def transcribe_audio(
     )
 
     form_data: dict[str, str] = {
-        "task": "transcribe",
         "beam_size": str(beam_size),
         "vad_filter": "true" if vad_filter else "false",
     }
