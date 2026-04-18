@@ -20,6 +20,7 @@ import {
   IMAGE_REQUEST_TIMEOUT_MS,
   parseGenerationTimeMs,
 } from "../api/imageRequests"
+import { backendUrl } from "../utils/env"
 import { formatDurationMs } from "../utils/time"
 
 type SelectedModels = [string | null, string | null]
@@ -62,7 +63,6 @@ export default function ImageGenerator() {
   const model1ControllerRef = useRef<AbortController | null>(null)
   const model2ControllerRef = useRef<AbortController | null>(null)
 
-  const backendUrl = import.meta.env.VITE_API_URL
   const models = MODELS
 
   const SELECTOR_GAP = 18

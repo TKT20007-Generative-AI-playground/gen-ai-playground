@@ -2,6 +2,8 @@ import { useState } from "react"
 import { useNavigate, Navigate } from "react-router-dom"
 import axios from "axios"
 import { useAuth } from "../context/AuthContext"
+import { backendUrl } from "../utils/env"
+import { getAxiosDetailMessage } from "../utils/errors"
 import {
   Container,
   Paper,
@@ -23,12 +25,6 @@ export default function Register() {
   const [passwordError, setPasswordError] = useState("")
   const { isLoggedIn } = useAuth()
   const navigate = useNavigate()
-
-  const backendUrl = import.meta.env.VITE_API_URL
-
-  if (!backendUrl) {
-    throw new Error("VITE_API_URL is not defined")
-  }
 
   if (isLoggedIn) {
     return <Navigate to="/playground" replace />
@@ -83,10 +79,11 @@ export default function Register() {
         navigate("/", { state: { openLoginModal: true } })
       }, 1500) // timeout so that the user can see that registration was successful
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.detail || "Registration failed")
-      } else {
+      const detail = getAxiosDetailMessage(err)
+      if (!detail || detail === "Network Error") {
         setError("Registration failed")
+      } else {
+        setError(detail)
       }
     }
   }

@@ -11,6 +11,7 @@ import { useForm } from '@mantine/form'
 import { Link, useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
+import { backendUrl } from '../utils/env'
 
 interface LoginModalProps {
   opened: boolean
@@ -21,8 +22,6 @@ interface LoginModalProps {
 export default function LoginModal({ opened, onClose, redirectTo }: LoginModalProps) {
   const { login } = useAuth()
   const navigate = useNavigate()
-
-  const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
   const form = useForm({
     initialValues: {

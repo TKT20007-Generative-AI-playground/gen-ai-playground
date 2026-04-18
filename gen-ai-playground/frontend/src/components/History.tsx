@@ -36,26 +36,15 @@ import {
 } from "@mantine/core"
 import { useMediaQuery } from "@mantine/hooks"
 import { EDIT_MODELS } from "../constants/models"
+import { getJsonCsrfHeaders } from "../utils/auth"
+import { backendUrl } from "../utils/env"
 import ConversationCard from "./history-ui/ConversationCard"
-
-const getCsrfToken = (): string => {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; csrf_token=`)
-  if (parts.length === 2) return parts.pop()!.split(";").shift()!
-  return ""
-}
-
-const getAuthHeaders = () => ({
-  "Content-Type": "application/json",
-  "X-CSRF-Token": getCsrfToken(),
-})
 
 const HISTORY_PAGE_SIZE = 10
 
 
 
 export default function History() {
-  const backendUrl = import.meta.env.VITE_API_URL
   const navigate = useNavigate()
   const location = useLocation()
   const isMobile = useMediaQuery("(max-width: 600px)")
@@ -196,7 +185,7 @@ export default function History() {
       try {
         const his = await axios.get(
           `${backendUrl}/text/all-conversations`,
-          { headers: getAuthHeaders(), withCredentials: true, params }
+          { headers: getJsonCsrfHeaders(), withCredentials: true, params }
         )
 
         return {
@@ -211,7 +200,7 @@ export default function History() {
         }
       }
     },
-    [backendUrl],
+    [],
   )
 
   const fetchTextHistory = useCallback(
@@ -232,7 +221,7 @@ export default function History() {
         totalPages: res.data.total_pages || 1,
       }
     },
-    [backendUrl],
+    [],
   )
 
   const fetchImagesHistory = useCallback(
@@ -262,7 +251,7 @@ export default function History() {
         totalPages: imgRes.data.total_pages || 1,
       }
     },
-    [backendUrl],
+    [],
   )
 
   const fetchAudioHistory = useCallback(
@@ -270,7 +259,7 @@ export default function History() {
       const params = buildParams(range, pageNum)
 
       const res = await axios.get(`${backendUrl}/audio/history`, {
-        headers: getAuthHeaders(),
+        headers: getJsonCsrfHeaders(),
         params,
         withCredentials: true,
       })
@@ -280,37 +269,37 @@ export default function History() {
         totalPages: res.data.total_pages || 1,
       }
     },
-    [backendUrl],
+    [],
   )
 
   const getImagesLength = useCallback(async () => {
     try {
       const res = await axios.get(`${backendUrl}/images/history-length`, {
-        headers: getAuthHeaders(),
+        headers: getJsonCsrfHeaders(),
         withCredentials: true,
       })
       return res.data.length ?? 0
     } catch {
       return 0
     }
-  }, [backendUrl])
+  }, [])
 
   const getTextLength = useCallback(async () => {
     try {
       const res = await axios.get(`${backendUrl}/text/chat-messages-length`, {
-        headers: getAuthHeaders(),
+        headers: getJsonCsrfHeaders(),
         withCredentials: true,
       })
       return res.data.length ?? 0
     } catch {
       return 0
     }
-  }, [backendUrl])
+  }, [])
 
   const getAudioLength = useCallback(async () => {
     try {
       const res = await axios.get(`${backendUrl}/audio/history`, {
-        headers: getAuthHeaders(),
+        headers: getJsonCsrfHeaders(),
         withCredentials: true,
         params: { page: 1 },
       })
@@ -318,19 +307,19 @@ export default function History() {
     } catch {
       return 0
     }
-  }, [backendUrl])
+  }, [])
 
   const getConversationLength = useCallback(async () => {
     try {
       const res = await axios.get(`${backendUrl}/text/conversations-length`, {
-        headers: getAuthHeaders(),
+        headers: getJsonCsrfHeaders(),
         withCredentials: true,
       })
       return res.data.length ?? 0
     } catch {
       return 0
     }
-  }, [backendUrl])
+  }, [])
 
   useEffect(() => {
     const requestId = requestIdRef.current + 1

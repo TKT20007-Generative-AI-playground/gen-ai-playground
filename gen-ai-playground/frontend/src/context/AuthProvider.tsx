@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { AuthContext } from "./AuthContext"
 import axios from "axios"
-
-const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
+import { getCsrfHeaders } from "../utils/auth"
+import { backendUrl } from "../utils/env"
 
 // Separate axios instance to avoid the global interceptor catching its own 401 and triggering an infinite retry loop
 const refreshClient = axios.create({ baseURL: backendUrl, withCredentials: true })
@@ -130,18 +130,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     try {
-      const csrfToken =
-        document.cookie
-          .split("; ")
-          .find(c => c.startsWith("csrf_token="))
-          ?.split("=")[1] ?? ""
-
       await axios.post(
         `${backendUrl}/logout`,
         {},
         {
           withCredentials: true,
-          headers: { "X-CSRF-Token": csrfToken },
+          headers: getCsrfHeaders(),
         },
       )
     } finally {

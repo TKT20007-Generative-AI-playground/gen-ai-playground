@@ -11,6 +11,7 @@ import {
   IMAGE_REQUEST_TIMEOUT_MS,
   parseGenerationTimeMs,
 } from "../api/imageRequests"
+import { backendUrl } from "../utils/env"
 import { formatDurationMs } from "../utils/time"
 
 type ImageToEdit = {
@@ -41,7 +42,6 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
   const reeditControllerRef = useRef<AbortController | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const backendUrl = import.meta.env.VITE_API_URL
   const selectedModel = selectedModels[0]
 
   function setModel(value: string | null) {

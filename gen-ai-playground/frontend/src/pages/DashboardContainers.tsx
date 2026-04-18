@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from "react"
 import axios from "axios"
+import { getCsrfHeaders, getJsonCsrfHeaders } from "../utils/auth"
+import { backendUrl } from "../utils/env"
+import { getRequestErrorMessage, isAxiosUnauthorized } from "../utils/errors"
 import {
   Table,
   Badge,
@@ -38,18 +41,11 @@ export default function DashboardContainers() {
   const [deployLoading, setDeployLoading] = useState(false)
   const [deployOptions, setDeployOptions] = useState<DeployOption[]>([])
 
-  const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
   const isMobile = useMediaQuery("(max-width: 768px)")
-
-  const getCsrfToken = () =>
-    document.cookie
-      .split("; ")
-      .find(c => c.startsWith("csrf_token="))
-      ?.split("=")[1] ?? ""
 
   useEffect(() => {
     const fetchModels = async () => {
-      const headers = { "X-CSRF-Token": getCsrfToken() }
+      const headers = getCsrfHeaders()
       const options: DeployOption[] = []
 
       try {
@@ -91,24 +87,23 @@ export default function DashboardContainers() {
       setDeployOptions(options)
     }
     fetchModels()
-  }, [backendUrl])
+  }, [])
 
   const fetchContainers = useCallback(async () => {
     try {
       setError(null)
       const res = await axios.get(`${backendUrl}/dashboard/containers`, {
         withCredentials: true,
-        headers: { "X-CSRF-Token": getCsrfToken() },
+        headers: getCsrfHeaders(),
       })
       setContainers(res.data)
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 401) return
-      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
-      setError(detail || (err instanceof Error ? err.message : "Failed to fetch deployments"))
+      if (isAxiosUnauthorized(err)) return
+      setError(getRequestErrorMessage(err, "Failed to fetch deployments"))
     } finally {
       setLoading(false)
     }
-  }, [backendUrl])
+  }, [])
 
   useEffect(() => {
     fetchContainers()
@@ -122,13 +117,12 @@ export default function DashboardContainers() {
     try {
       await axios.post(`${backendUrl}/dashboard/containers/${deploymentName}/stop`, null, {
         withCredentials: true,
-        headers: { "X-CSRF-Token": getCsrfToken() },
+        headers: getCsrfHeaders(),
       })
       await fetchContainers()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 401) return
-      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
-      setError(detail || (err instanceof Error ? err.message : "Failed to delete deployment"))
+      if (isAxiosUnauthorized(err)) return
+      setError(getRequestErrorMessage(err, "Failed to delete deployment"))
     } finally {
       setActionLoading(null)
     }
@@ -148,17 +142,13 @@ export default function DashboardContainers() {
         { model_path: selectedOption.modelPath },
         {
           withCredentials: true,
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": getCsrfToken(),
-          },
+          headers: getJsonCsrfHeaders(),
         },
       )
       await fetchContainers()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 401) return
-      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
-      setError(detail || (err instanceof Error ? err.message : "Failed to deploy model"))
+      if (isAxiosUnauthorized(err)) return
+      setError(getRequestErrorMessage(err, "Failed to deploy model"))
     } finally {
       setDeployLoading(false)
     }

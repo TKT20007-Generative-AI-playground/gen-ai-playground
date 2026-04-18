@@ -2,6 +2,7 @@ import { Modal, Button, TagsInput, Text, CopyButton } from "@mantine/core"
 import { useState } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
+import { getJsonCsrfHeaders } from "../utils/auth"
 
 type Message = {
     id: string
@@ -20,15 +21,6 @@ type Props = {
     currentMessages: Message[]
     modelValue: string
     backendUrl: string
-}
-
-const getCsrfToken = (): string => {
-    return (
-        document.cookie
-            .split("; ")
-            .find(c => c.startsWith("csrf_token="))
-            ?.split("=")[1] ?? ""
-    )
 }
 
 export function ShareConversationModal({
@@ -68,10 +60,7 @@ export function ShareConversationModal({
                     model_key: modelValue,
                 },
                 {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-Token": getCsrfToken(),
-                    },
+                    headers: getJsonCsrfHeaders(),
                     withCredentials: true,
                 },
             )

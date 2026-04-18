@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import axios from 'axios'
+import { getBearerAuthHeaders } from '../utils/auth'
+import { formatDateTime } from '../utils/date'
+import { backendUrl } from '../utils/env'
+import { getRequestErrorMessage } from '../utils/errors'
 import {
   Table,
   Badge,
@@ -60,26 +64,21 @@ export default function DashboardInvitations() {
   const [sortBy, setSortBy] = useState<string>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
   const token = localStorage.getItem('token')
 
   const fetchCodes = useCallback(async () => {
     try {
       setError(null)
       const res = await axios.get(`${backendUrl}/dashboard/invitations/codes`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: getBearerAuthHeaders(token),
       })
       setCodes(res.data.codes)
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to fetch invitation codes')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to fetch invitation codes'))
     } finally {
       setLoading(false)
     }
-  }, [backendUrl, token])
+  }, [token])
 
   useEffect(() => {
     fetchCodes()
@@ -101,7 +100,7 @@ export default function DashboardInvitations() {
           expiration_days: expirationDays,
           max_uses: maxUses,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getBearerAuthHeaders(token) }
       )
       setSuccess('Invitation code created successfully')
       setCreateModalOpen(false)
@@ -110,12 +109,7 @@ export default function DashboardInvitations() {
       setMaxUses(1)
       await fetchCodes()
     } catch (err: unknown) {
-      if (axios.isAxiosError(err) && err.response) {
-        const detail = err.response.data?.detail
-        setFormError(detail || 'Failed to create invitation code')
-      } else {
-        setFormError(err instanceof Error ? err.message : 'Failed to create invitation code')
-      }
+      setFormError(getRequestErrorMessage(err, 'Failed to create invitation code'))
     } finally {
       setCreateLoading(false)
     }
@@ -129,16 +123,12 @@ export default function DashboardInvitations() {
     try {
       await axios.delete(
         `${backendUrl}/dashboard/invitations/codes/${code}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getBearerAuthHeaders(token) }
       )
       setSuccess(`Invitation code "${code}" deleted successfully`)
       await fetchCodes()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to delete invitation code')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to delete invitation code'))
     } finally {
       setActionLoading(null)
     }
@@ -153,16 +143,12 @@ export default function DashboardInvitations() {
       await axios.post(
         `${backendUrl}/dashboard/invitations/codes/${code}/deactivate`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getBearerAuthHeaders(token) }
       )
       setSuccess(`Invitation code "${code}" deactivated successfully`)
       await fetchCodes()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to deactivate invitation code')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to deactivate invitation code'))
     } finally {
       setActionLoading(null)
     }
@@ -177,16 +163,12 @@ export default function DashboardInvitations() {
       await axios.post(
         `${backendUrl}/dashboard/invitations/codes/${code}/reactivate`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getBearerAuthHeaders(token) }
       )
       setSuccess(`Invitation code "${code}" reactivated successfully`)
       await fetchCodes()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to reactivate invitation code')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to reactivate invitation code'))
     } finally {
       setActionLoading(null)
     }
@@ -210,17 +192,13 @@ export default function DashboardInvitations() {
       await axios.post(
         `${backendUrl}/dashboard/invitations/codes/${selectedCode}/add-uses`,
         { additional_uses: additionalUses },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getBearerAuthHeaders(token) }
       )
       setSuccess(`Added ${additionalUses} uses to invitation code "${selectedCode}"`)
       setAddUsesModalOpen(false)
       await fetchCodes()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to add uses to invitation code')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to add uses to invitation code'))
     } finally {
       setAddUsesLoading(false)
     }
@@ -244,17 +222,13 @@ export default function DashboardInvitations() {
       await axios.post(
         `${backendUrl}/dashboard/invitations/codes/${selectedCode}/extend`,
         { expiration_days: extendDays },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getBearerAuthHeaders(token) }
       )
       setSuccess(`Extended expiration of invitation code "${selectedCode}" by ${extendDays} days`)
       setExtendModalOpen(false)
       await fetchCodes()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to extend invitation code')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to extend invitation code'))
     } finally {
       setExtendLoading(false)
     }
@@ -264,21 +238,6 @@ export default function DashboardInvitations() {
     const now = new Date()
     const expiresAt = new Date(code.expires_at)
     return expiresAt < now
-  }
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return '—'
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return dateString
-    }
   }
 
   const getStatusBadge = (code: InvitationCode) => {
@@ -439,14 +398,14 @@ export default function DashboardInvitations() {
                 {!isMobile && (
                   <Table.Td>
                     <Text size="sm" c="dimmed">
-                      {formatDate(code.created_at)}
+                      {formatDateTime(code.created_at, { fallback: '-' })}
                     </Text>
                   </Table.Td>
                 )}
                 {!isMobile && (
                   <Table.Td>
                     <Text size="sm" c={new Date(code.expires_at) < new Date() ? 'red' : 'dimmed'}>
-                      {formatDate(code.expires_at)}
+                      {formatDateTime(code.expires_at, { fallback: '-' })}
                     </Text>
                   </Table.Td>
                 )}

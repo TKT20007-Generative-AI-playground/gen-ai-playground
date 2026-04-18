@@ -19,6 +19,8 @@ import {
 import { useMediaQuery } from "@mantine/hooks"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
+import { getJsonCsrfHeaders } from "../utils/auth"
+import { backendUrl } from "../utils/env"
 import { ShareConversationModal } from "./SharedConversationsModal"
 import { useNavigate } from "react-router-dom"
 
@@ -57,18 +59,6 @@ const makeMessageId = () => {
 }
 
 const MAX_MODELS = 4
-
-const getCsrfToken = (): string => {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; csrf_token=`)
-  if (parts.length === 2) return parts.pop()!.split(";").shift()!
-  return ""
-}
-
-const getAuthHeaders = () => ({
-  "Content-Type": "application/json",
-  "X-CSRF-Token": getCsrfToken(),
-})
 
 function parseModelReply(rawReply: string): {
   thinking: string | null
@@ -312,7 +302,6 @@ function ChatPanel({
 export default function TextGenerator({ opened }: { opened: boolean }) {
   const isMobile = useMediaQuery("(max-width: 768px)")
   const { isLoggedIn } = useAuth()
-  const backendUrl = import.meta.env.VITE_API_URL
   const enableTestModel = import.meta.env.DEV && import.meta.env.VITE_ENABLE_TEST_MODEL !== "false"
 
   const [prompt, setPrompt] = useState("")
@@ -366,7 +355,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     const fetchModels = async () => {
       try {
         const res = await axios.get(`${backendUrl}/text/models`, {
-          headers: getAuthHeaders(),
+          headers: getJsonCsrfHeaders(),
           withCredentials: true,
         })
         const models: ModelOption[] = (res.data.available_models ?? []).map(
@@ -391,13 +380,13 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       }
     }
     fetchModels()
-  }, [backendUrl, enableTestModel, isLoggedIn])
+  }, [enableTestModel, isLoggedIn])
 
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
     try {
       const res = await axios.get(`${backendUrl}/text/model-statuses`, {
-        headers: getAuthHeaders(),
+        headers: getJsonCsrfHeaders(),
         withCredentials: true,
       })
 
@@ -409,7 +398,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     } catch {
       // silent
     }
-  }, [backendUrl, enableTestModel])
+  }, [enableTestModel])
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -457,7 +446,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
           top_p: 0.9,
           enable_thinking: isThinkingEnabled(modelValue),
         },
-        { headers: getAuthHeaders(), withCredentials: true },
+        { headers: getJsonCsrfHeaders(), withCredentials: true },
       )
 
       const result = response.data as ChatApiResponse

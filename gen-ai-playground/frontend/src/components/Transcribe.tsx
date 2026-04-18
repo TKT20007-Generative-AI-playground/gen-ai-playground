@@ -4,6 +4,8 @@ import { Alert, Button, FileInput, MultiSelect, Text, Textarea } from "@mantine/
 
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
+import { getCsrfHeaders } from "../utils/auth"
+import { backendUrl } from "../utils/env"
 import { formatAudioModelName } from "./history-ui/audioHistoryUtils"
 
 type TranscriptionSegment = {
@@ -68,13 +70,6 @@ function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string,
     })
 }
 
-const getCsrfToken = (): string => {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; csrf_token=`)
-  if (parts.length === 2) return parts.pop()!.split(";").shift()!
-  return ""
-}
-
 const makeTranscriptionRunId = (): string => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID()
@@ -83,7 +78,6 @@ const makeTranscriptionRunId = (): string => {
 }
 
 export default function Transcribe() {
-  const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
   const recordingSupported =
     typeof navigator !== "undefined" &&
     !!navigator.mediaDevices?.getUserMedia &&
@@ -128,9 +122,7 @@ export default function Transcribe() {
     try {
       const response = await axios.get(`${backendUrl}/audio/models`, {
         withCredentials: true,
-        headers: {
-          "X-CSRF-Token": getCsrfToken(),
-        },
+        headers: getCsrfHeaders(),
       })
 
       const models: ModelOption[] = (response.data.available_models ?? []).map(
@@ -143,21 +135,19 @@ export default function Transcribe() {
     } catch {
       // silent
     }
-  }, [backendUrl])
+  }, [])
 
   const fetchAudioModelStatuses = useCallback(async () => {
     try {
       const response = await axios.get(`${backendUrl}/audio/model-statuses`, {
         withCredentials: true,
-        headers: {
-          "X-CSRF-Token": getCsrfToken(),
-        },
+        headers: getCsrfHeaders(),
       })
       setModelStatuses(response.data)
     } catch {
       // silent
     }
-  }, [backendUrl])
+  }, [])
 
   useEffect(() => {
     fetchAudioModels()
@@ -276,9 +266,7 @@ export default function Transcribe() {
         try {
           const response = await axios.post<TranscriptionResponse>(`${backendUrl}/audio/transcribe`, formData, {
             withCredentials: true,
-            headers: {
-              "X-CSRF-Token": getCsrfToken(),
-            },
+            headers: getCsrfHeaders(),
             timeout: 300000,
           })
 

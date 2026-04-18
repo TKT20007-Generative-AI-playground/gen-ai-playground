@@ -1,4 +1,5 @@
 import { BrushIcon, ImageIcon, SparkleIcon } from "./Icons"
+import { formatDateTimeWithDot } from "../../utils/date"
 
 export function getTypeColor(type: string | null | undefined): string {
   switch (type) {
@@ -37,10 +38,5 @@ export function getTypeIcon(type: string | null | undefined) {
   }
 }
 export function formatDate(ts: string | number | Date) {
-  const d = new Date(ts)
-  return (
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +
-    "  ·  " +
-    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-  )
+  return formatDateTimeWithDot(ts)
 }

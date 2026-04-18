@@ -15,6 +15,7 @@ import axios from "axios"
 import { useNavigate } from "react-router-dom"
 import { formatDate } from "./history-ui/ImageUtils"
 import { formatAudioModelName, getAudioInputTitle } from "./history-ui/audioHistoryUtils"
+import { backendUrl } from "../utils/env"
 
 interface ChatMessage {
   role: "user" | "assistant"
@@ -58,7 +59,6 @@ interface SharedConversationRecord {
 
 type SidebarHistoryType = "image" | "text" | "shared-chat" | "audio"
 
-const backendUrl = import.meta.env.VITE_API_URL
 const AUDIO_SIDEBAR_MAX_FETCH = 200
 const AUDIO_RECORDS_PER_SESSION = 4
 
