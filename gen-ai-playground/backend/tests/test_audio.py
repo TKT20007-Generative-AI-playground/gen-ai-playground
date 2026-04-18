@@ -159,7 +159,6 @@ class TestAudioUploadValidation:
         response = client.post(
             "/audio/transcribe",
             headers=auth_headers,
-            data={"task": "transcribe"},
             files={"file": ("audio.wav", b"x" * 2048, "audio/wav")},
         )
 
@@ -184,7 +183,6 @@ class TestAudioUploadValidation:
         response = client.post(
             "/audio/transcribe",
             headers=auth_headers,
-            data={"task": "transcribe"},
             files={"file": ("audio.wav", b"x" * 1024, "audio/wav")},
         )
 
@@ -232,7 +230,7 @@ class TestAudioFallbackUpload:
             audio_router._post_with_fallback_paths(
                 base_url="https://a.example",
                 paths=["transcribe", "predict"],
-                data={"task": "transcribe"},
+                data={},
                 file_obj=file_obj,
                 file_name="audio.wav",
                 file_content_type="audio/wav",
@@ -266,7 +264,6 @@ class TestAudioHistoryPersistence:
             "/audio/transcribe",
             headers=auth_headers,
             data={
-                "task": "transcribe",
                 "model_path": "Whisper A",
                 "source": "uploaded",
                 "run_id": "run-123",
@@ -306,7 +303,7 @@ class TestAudioHistoryPersistence:
             response = client.post(
                 "/audio/transcribe",
                 headers=auth_headers,
-                data={"task": "transcribe", "model_path": "Whisper A"},
+                data={"model_path": "Whisper A"},
                 files={"file": ("audio.wav", b"abc", "audio/wav")},
             )
 
@@ -333,7 +330,6 @@ class TestAudioHistoryPersistence:
             "/audio/transcribe",
             headers=auth_headers,
             data={
-                "task": "transcribe",
                 "model_path": "Whisper A",
                 "source": "mic-input",
             },

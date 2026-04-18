@@ -378,7 +378,6 @@ async def transcribe_audio(
     language: str | None = Form(None),
     source: str | None = Form(None),
     run_id: str | None = Form(None),
-    task: str = Form("transcribe"),
     beam_size: int = Form(5),
     vad_filter: bool = Form(True),
     current_user: UserInfo = Depends(get_current_user),
@@ -386,9 +385,6 @@ async def transcribe_audio(
     _: None = Depends(validate_csrf_token),
 ) -> dict[str, Any]:
     """Proxy file transcription to a selected deployed Verda audio container."""
-    if task not in {"transcribe", "translate"}:
-        raise HTTPException(status_code=400, detail="task must be either 'transcribe' or 'translate'")
-
     deployment_name, endpoint_url = _resolve_audio_endpoint(model_path=model_path, require_healthy=True)
     normalized_source = _normalize_transcription_source(source)
     normalized_run_id = (run_id or "").strip()[:128] or None
@@ -400,7 +396,7 @@ async def transcribe_audio(
     _validate_upload_size(file)
 
     form_data: dict[str, str] = {
-        "task": task,
+        "task": "transcribe",
         "beam_size": str(beam_size),
         "vad_filter": "true" if vad_filter else "false",
     }

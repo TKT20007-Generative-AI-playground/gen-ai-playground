@@ -41,8 +41,7 @@ The container runs as a non-root user (`appuser`) at runtime.
 
 ```bash
 curl -X POST "http://localhost:9000/transcribe" \
-  -F "file=@/absolute/path/to/audio.wav" \
-  -F "task=transcribe"
+  -F "file=@/absolute/path/to/audio.wav"
 ```
 
 Example response:

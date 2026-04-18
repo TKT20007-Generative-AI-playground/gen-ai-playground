@@ -269,7 +269,6 @@ export default function Transcribe() {
         const startedAt = Date.now()
         const formData = new FormData()
         formData.append("file", targetFile)
-        formData.append("task", "transcribe")
         formData.append("model_path", modelValue)
         formData.append("source", source)
         formData.append("run_id", runId)
