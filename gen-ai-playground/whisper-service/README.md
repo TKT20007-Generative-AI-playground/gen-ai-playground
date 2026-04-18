@@ -87,8 +87,7 @@ rebuild and publish a fresh image tag, then redeploy template:
 
 ```bash
 export GHCR_OWNER=tkt20007-generative-ai-playground
-export GHCR_REPO=gen-ai-playground
-export IMAGE=ghcr.io/${GHCR_OWNER}/${GHCR_REPO}/whisper-service:v6
+export IMAGE=ghcr.io/${GHCR_OWNER}/faster-whisper:v1
 
 # Requires a token with write:packages scope.
 echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
@@ -97,9 +96,9 @@ docker build -t "$IMAGE" ./whisper-service
 docker push "$IMAGE"
 ```
 
-Use lowercase values for `GHCR_OWNER` and `GHCR_REPO` even if your GitHub org/repo has uppercase letters.
+Use a lowercase value for `GHCR_OWNER` even if your GitHub org has uppercase letters.
 
-The backend whisper templates are pinned to `ghcr.io/tkt20007-generative-ai-playground/gen-ai-playground/whisper-service:v6`.
+The backend whisper templates are currently pinned to `ghcr.io/tkt20007-generative-ai-playground/faster-whisper:v1`.
 
 If your cluster or runtime cannot pull the image, ensure the GHCR package is visible to your deploy target:
 

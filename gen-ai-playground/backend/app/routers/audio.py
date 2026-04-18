@@ -378,7 +378,7 @@ async def transcribe_audio(
     language: str | None = Form(None),
     source: str | None = Form(None),
     run_id: str | None = Form(None),
-    beam_size: int = Form(5),
+    beam_size: int = Form(5, ge=1, le=10),
     vad_filter: bool = Form(True),
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),

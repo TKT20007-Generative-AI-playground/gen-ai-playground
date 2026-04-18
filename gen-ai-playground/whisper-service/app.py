@@ -104,7 +104,7 @@ def health() -> dict[str, Any]:
 async def transcribe_audio(
     file: UploadFile = File(...),
     language: str | None = Form(None),
-    beam_size: int = Form(5),
+    beam_size: int = Form(5, ge=1, le=10),
     vad_filter: bool = Form(True),
 ) -> dict[str, Any]:
     max_bytes = settings.max_upload_mb * 1024 * 1024
@@ -169,4 +169,7 @@ async def transcribe_audio(
     finally:
         await file.close()
         if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
+            try:
+                os.remove(temp_path)
+            except OSError:
+                logger.warning("Failed to remove temporary audio file: %s", temp_path)

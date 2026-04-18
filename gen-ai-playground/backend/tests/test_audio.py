@@ -190,6 +190,26 @@ class TestAudioUploadValidation:
         assert response.json() == {"text": "ok"}
         mock_proxy_call.assert_awaited_once()
 
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    def test_transcribe_rejects_beam_size_out_of_range(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
+            data={"beam_size": "0"},
+            files={"file": ("audio.wav", b"x", "audio/wav")},
+        )
+
+        assert response.status_code == 422
+        mock_proxy_call.assert_not_awaited()
+
 
 class TestAudioFallbackUpload:
     def test_post_with_fallback_paths_rewinds_file_between_attempts(self, monkeypatch):
