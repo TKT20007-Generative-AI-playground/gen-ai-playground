@@ -21,8 +21,20 @@ from app.verda_service import verda_service
 
 router = APIRouter(prefix="/audio", tags=["audio"])
 WHISPER_TIMEOUT_SECONDS = 300.0
-MAX_AUDIO_UPLOAD_MB = settings.MAX_AUDIO_UPLOAD_MB
-MAX_AUDIO_UPLOAD_BYTES = MAX_AUDIO_UPLOAD_MB * 1024 * 1024
+AUDIO_HISTORY_PROJECTION = {
+    "_id": 0,
+    "type": 1,
+    "transcription_text": 1,
+    "model": 1,
+    "timestamp": 1,
+    "username": 1,
+    "run_id": 1,
+    "input_name": 1,
+    "language": 1,
+    "duration": 1,
+    "transcription_time_ms": 1,
+    "source": 1,
+}
 
 
 def _inference_headers() -> dict[str, str]:
@@ -187,20 +199,6 @@ def _resolve_audio_template_name(model: str) -> str | None:
     return None
 
 
-def _validate_upload_size(file: UploadFile) -> None:
-    file_obj = file.file
-    current_pos = file_obj.tell()
-    file_obj.seek(0, os.SEEK_END)
-    size_bytes = file_obj.tell()
-    file_obj.seek(current_pos, os.SEEK_SET)
-
-    if size_bytes > MAX_AUDIO_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Max size is {MAX_AUDIO_UPLOAD_MB} MB",
-        )
-
-
 def _safe_int(value: Any) -> int | None:
     try:
         if value is None:
@@ -357,7 +355,7 @@ async def audio_health(
     try:
         whisper_payload = await _get_with_fallback_paths(
             endpoint_url,
-            ["health", ""],
+            ["health"],
         )
         return {
             "status": "ok",
@@ -393,7 +391,6 @@ async def transcribe_audio(
         "Audio transcription requested by user: "
         f"{current_user.username} (deployment: {deployment_name}, model_path: {model_path})"
     )
-    _validate_upload_size(file)
 
     form_data: dict[str, str] = {
         "task": "transcribe",
@@ -407,7 +404,7 @@ async def transcribe_audio(
     try:
         result = await _post_with_fallback_paths(
             endpoint_url,
-            ["transcribe", "predict", ""],
+            ["transcribe"],
             form_data,
             file.file,
             file.filename or "audio.bin",
@@ -472,20 +469,7 @@ def get_audio_history_sidebar(
     records = list(
         db.audio_transcriptions.find(
             {"username": current_user.username},
-            {
-                "_id": 0,
-                "type": 1,
-                "transcription_text": 1,
-                "model": 1,
-                "timestamp": 1,
-                "username": 1,
-                "run_id": 1,
-                "input_name": 1,
-                "language": 1,
-                "duration": 1,
-                "transcription_time_ms": 1,
-                "source": 1,
-            },
+            AUDIO_HISTORY_PROJECTION,
         )
         .sort("timestamp", -1)
         .limit(limit)
@@ -525,20 +509,7 @@ def get_audio_history(
         history = list(
             db.audio_transcriptions.find(
                 query,
-                {
-                    "_id": 0,
-                    "type": 1,
-                    "transcription_text": 1,
-                    "model": 1,
-                    "timestamp": 1,
-                    "username": 1,
-                    "run_id": 1,
-                    "input_name": 1,
-                    "language": 1,
-                    "duration": 1,
-                    "transcription_time_ms": 1,
-                    "source": 1,
-                },
+                AUDIO_HISTORY_PROJECTION,
             )
             .sort("timestamp", -1)
             .skip(start)

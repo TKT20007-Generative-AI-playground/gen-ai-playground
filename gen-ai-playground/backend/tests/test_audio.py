@@ -115,7 +115,7 @@ class TestAudioEndpointSelection:
         payload = response.json()
         assert payload["deployment"]["name"] == "whisper-b"
         assert payload["deployment"]["status"] == "healthy"
-        mock_whisper_health.assert_awaited_once_with("https://b.example", ["health", ""])
+        mock_whisper_health.assert_awaited_once_with("https://b.example", ["health"])
 
     @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
     @patch("app.routers.audio._get_with_fallback_paths", new_callable=AsyncMock)
@@ -146,9 +146,7 @@ class TestAudioEndpointSelection:
 class TestAudioUploadValidation:
     @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
     @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
-    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_MB", 1)
-    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_BYTES", 1024)
-    def test_transcribe_rejects_oversized_upload(
+    def test_transcribe_does_not_prevalidate_upload_size(
         self,
         mock_proxy_call,
         _mock_resolve,
@@ -156,21 +154,21 @@ class TestAudioUploadValidation:
         registered_user,
         auth_headers,
     ):
+        mock_proxy_call.return_value = {"text": "ok"}
+
         response = client.post(
             "/audio/transcribe",
             headers=auth_headers,
             files={"file": ("audio.wav", b"x" * 2048, "audio/wav")},
         )
 
-        assert response.status_code == 413
-        assert "File too large" in response.json()["detail"]
-        mock_proxy_call.assert_not_awaited()
+        assert response.status_code == 200
+        assert response.json() == {"text": "ok"}
+        mock_proxy_call.assert_awaited_once()
 
     @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
     @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
-    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_MB", 1)
-    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_BYTES", 1024)
-    def test_transcribe_accepts_upload_at_exact_size_limit(
+    def test_transcribe_accepts_upload(
         self,
         mock_proxy_call,
         _mock_resolve,
