@@ -90,11 +90,12 @@ function AppContent() {
           <div
             style={{
               width: sidebarWidth,
-              height: "100%",
+              height: "100dvh",
               overflow: "hidden",
               borderRight: "1px solid #ddd",
               background: "#f8f9fa",
-              position: "relative",
+              position: "sticky",
+              top: 0,
               padding: 16,
               boxSizing: "border-box",
             }}
