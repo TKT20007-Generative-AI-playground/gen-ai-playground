@@ -33,16 +33,12 @@ export type SharedConversationHistoryResponse = {
 }
 
 export async function fetchTextModels(): Promise<TextModelApiItem[]> {
-  const res = await apiClient.get<{ available_models?: TextModelApiItem[] }>("/text/models", {
-    headers: getJsonCsrfHeaders(),
-  })
+  const res = await apiClient.get<{ available_models?: TextModelApiItem[] }>("/text/models")
   return res.data.available_models ?? []
 }
 
 export async function fetchTextModelStatuses(): Promise<TextModelStatuses> {
-  const res = await apiClient.get<TextModelStatuses>("/text/model-statuses", {
-    headers: getJsonCsrfHeaders(),
-  })
+  const res = await apiClient.get<TextModelStatuses>("/text/model-statuses")
   return res.data
 }
 
@@ -86,9 +82,7 @@ export async function joinConversation(
 }
 
 export async function checkConversationParticipant(conversationId: string): Promise<void> {
-  await apiClient.get(`/text/conversations/${conversationId}/check-participant`, {
-    headers: getJsonCsrfHeaders(),
-  })
+  await apiClient.get(`/text/conversations/${conversationId}/check-participant`)
 }
 
 export async function fetchConversationHistory(
@@ -96,7 +90,6 @@ export async function fetchConversationHistory(
 ): Promise<SharedConversationHistoryResponse> {
   const res = await apiClient.get<SharedConversationHistoryResponse>(
     `/text/conversation-history/${conversationId}`,
-    { headers: getJsonCsrfHeaders() },
   )
   return res.data
 }

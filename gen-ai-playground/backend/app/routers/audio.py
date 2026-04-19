@@ -208,6 +208,26 @@ def _safe_int(value: Any) -> int | None:
         return None
 
 
+def _enforce_audio_upload_size_limit(file: UploadFile) -> None:
+    max_bytes = settings.MAX_AUDIO_UPLOAD_MB * 1024 * 1024
+
+    file_size = getattr(file, "size", None)
+    if not isinstance(file_size, int):
+        current_pos = file.file.tell()
+        file.file.seek(0, os.SEEK_END)
+        file_size = file.file.tell()
+        file.file.seek(current_pos, os.SEEK_SET)
+
+    if file_size > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Audio file exceeds maximum upload size of {settings.MAX_AUDIO_UPLOAD_MB} MB "
+                f"({file_size} bytes provided)."
+            ),
+        )
+
+
 def _normalize_transcription_source(source: str | None) -> str | None:
     if not isinstance(source, str):
         return None
@@ -386,6 +406,7 @@ async def transcribe_audio(
     deployment_name, endpoint_url = _resolve_audio_endpoint(model_path=model_path, require_healthy=True)
     normalized_source = _normalize_transcription_source(source)
     normalized_run_id = (run_id or "").strip()[:128] or None
+    _enforce_audio_upload_size_limit(file)
 
     print(
         "Audio transcription requested by user: "

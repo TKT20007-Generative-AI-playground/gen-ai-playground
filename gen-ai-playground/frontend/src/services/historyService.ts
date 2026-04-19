@@ -1,5 +1,4 @@
 import type { AxiosRequestConfig } from "axios"
-import { getJsonCsrfHeaders } from "../utils/auth"
 import { apiClient } from "./httpClient"
 
 export type HistoryType = "image" | "text" | "audio" | "shared-chat"
@@ -35,7 +34,6 @@ export async function fetchConversationHistoryList(
   const res = await apiClient.get<{ conversations?: unknown[]; total_pages?: number }>(
     "/text/all-conversations",
     {
-      headers: getJsonCsrfHeaders(),
       params,
     },
   )
@@ -46,9 +44,6 @@ export async function fetchTextHistoryList(
   params: URLSearchParams,
 ): Promise<{ history?: unknown[]; total_pages?: number }> {
   const res = await apiClient.get<{ history?: unknown[]; total_pages?: number }>("/text/history", {
-    headers: {
-      "Content-Type": "application/json",
-    },
     params,
   })
   return res.data
@@ -58,9 +53,6 @@ export async function fetchImagesHistoryList(
   params: URLSearchParams,
 ): Promise<{ history?: unknown[]; total_pages?: number }> {
   const res = await apiClient.get<{ history?: unknown[]; total_pages?: number }>("/images/history", {
-    headers: {
-      "Content-Type": "application/json",
-    },
     params,
   })
   return res.data
@@ -72,7 +64,6 @@ export async function fetchAudioHistoryList(
   const res = await apiClient.get<{ history?: unknown[]; total_pages?: number; total?: number }>(
     "/audio/history",
     {
-      headers: getJsonCsrfHeaders(),
       params,
     },
   )
@@ -89,21 +80,16 @@ async function fetchLength(path: string, config?: AxiosRequestConfig): Promise<n
 }
 
 export function fetchImagesLength(): Promise<number> {
-  return fetchLength("/images/history-length", {
-    headers: getJsonCsrfHeaders(),
-  })
+  return fetchLength("/images/history-length")
 }
 
 export function fetchTextLength(): Promise<number> {
-  return fetchLength("/text/chat-messages-length", {
-    headers: getJsonCsrfHeaders(),
-  })
+  return fetchLength("/text/chat-messages-length")
 }
 
 export async function fetchAudioLength(): Promise<number> {
   try {
     const res = await apiClient.get<{ total?: number }>("/audio/history", {
-      headers: getJsonCsrfHeaders(),
       params: { page: 1 },
     })
     return res.data.total ?? 0
@@ -113,7 +99,5 @@ export async function fetchAudioLength(): Promise<number> {
 }
 
 export function fetchConversationsLength(): Promise<number> {
-  return fetchLength("/text/conversations-length", {
-    headers: getJsonCsrfHeaders(),
-  })
+  return fetchLength("/text/conversations-length")
 }
