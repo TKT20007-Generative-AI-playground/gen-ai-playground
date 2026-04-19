@@ -15,6 +15,7 @@ import { useMediaQuery } from "@mantine/hooks";
 import { useAuth } from "./context/AuthContext";
 import HistoryPage from "./pages/HistoryPage"
 import SharedChat from "./components/SharedChat"
+import NotFoundPage from "./pages/PageNotFound"
 
 
 
@@ -169,6 +170,8 @@ function AppContent() {
               <Route path="users" element={<DashboardUsers />} />
               <Route path="invitations" element={<DashboardInvitations />} />
             </Route>
+
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </div>
       </div>
