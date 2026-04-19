@@ -43,7 +43,7 @@ const HoverCard = ({
       </Title>
 
       <Box className="hover-card-content" p="lg">
-        <Text size="sm" c="dimmed">
+        <Text size="sm">
           {description}
         </Text>
 
