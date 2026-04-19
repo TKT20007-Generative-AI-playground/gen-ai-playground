@@ -1,5 +1,5 @@
 import { Box, Button, Group, Stack, Title } from "@mantine/core"
-// import { useNavigate } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 
 const titleStyle = {
   c: "black",
@@ -9,6 +9,7 @@ const titleStyle = {
 }
 
 const NotFoundPage = () => {
+  const navigate = useNavigate()
 
   return (
     <>
@@ -41,7 +42,7 @@ const NotFoundPage = () => {
               </Title>
             </Stack>
             <Box>
-              <Button className="btn-primary" fullWidth mt="md" onClick={() => window.location.href = "/"}>
+              <Button className="btn-primary" fullWidth mt="md" onClick={() => navigate("/")}>
                 Go Home
               </Button>
             </Box>
@@ -49,6 +50,7 @@ const NotFoundPage = () => {
         </Box>
       </Box>
     </>
-    )}
+  )
+}
 
 export default NotFoundPage
