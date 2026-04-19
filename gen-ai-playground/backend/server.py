@@ -15,7 +15,9 @@ from app.routers import auth, images, text, dashboard, invitations, audio
 app = FastAPI(
     title="Gen AI Playground API",
     description="Image and text generation API using Verda AI models",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url=None if settings.IS_PROD else "/docs",
+    redoc_url=None if settings.IS_PROD else "/redoc",
 )
 
 # Configure CORS
