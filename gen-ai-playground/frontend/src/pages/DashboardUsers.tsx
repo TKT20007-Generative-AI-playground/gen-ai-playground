@@ -26,19 +26,17 @@ export default function DashboardUsers() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  const token = localStorage.getItem('token')
-
   const fetchUsers = useCallback(async () => {
     try {
       setError(null)
-      const usersData = await fetchDashboardUsers(token)
+      const usersData = await fetchDashboardUsers()
       setUsers(usersData)
     } catch (err) {
       setError(getRequestErrorMessage(err, 'Failed to fetch users'))
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [])
 
   useEffect(() => {
     fetchUsers()
@@ -50,7 +48,7 @@ export default function DashboardUsers() {
     setError(null)
     setSuccess(null)
     try {
-      await deleteDashboardUser(username, token)
+      await deleteDashboardUser(username)
       setSuccess(`User "${username}" deleted successfully`)
       await fetchUsers()
     } catch (err) {

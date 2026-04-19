@@ -70,19 +70,17 @@ export default function DashboardInvitations() {
   const [sortBy, setSortBy] = useState<string>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  const token = localStorage.getItem('token')
-
   const fetchCodes = useCallback(async () => {
     try {
       setError(null)
-      const codeList = await fetchInvitationCodes(token)
+      const codeList = await fetchInvitationCodes()
       setCodes(codeList)
     } catch (err) {
       setError(getRequestErrorMessage(err, 'Failed to fetch invitation codes'))
     } finally {
       setLoading(false)
     }
-  }, [token])
+  }, [])
 
   useEffect(() => {
     fetchCodes()
@@ -103,7 +101,6 @@ export default function DashboardInvitations() {
           expiration_days: expirationDays,
           max_uses: maxUses,
         },
-        token,
       )
       setSuccess('Invitation code created successfully')
       setCreateModalOpen(false)
@@ -124,7 +121,7 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await deleteInvitationCode(code, token)
+      await deleteInvitationCode(code)
       setSuccess(`Invitation code "${code}" deleted successfully`)
       await fetchCodes()
     } catch (err) {
@@ -140,7 +137,7 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await deactivateInvitationCode(code, token)
+      await deactivateInvitationCode(code)
       setSuccess(`Invitation code "${code}" deactivated successfully`)
       await fetchCodes()
     } catch (err) {
@@ -156,7 +153,7 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await reactivateInvitationCode(code, token)
+      await reactivateInvitationCode(code)
       setSuccess(`Invitation code "${code}" reactivated successfully`)
       await fetchCodes()
     } catch (err) {
@@ -181,7 +178,7 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await addInvitationCodeUses(selectedCode, additionalUses, token)
+      await addInvitationCodeUses(selectedCode, additionalUses)
       setSuccess(`Added ${additionalUses} uses to invitation code "${selectedCode}"`)
       setAddUsesModalOpen(false)
       await fetchCodes()
@@ -207,7 +204,7 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await extendInvitationCode(selectedCode, extendDays, token)
+      await extendInvitationCode(selectedCode, extendDays)
       setSuccess(`Extended expiration of invitation code "${selectedCode}" by ${extendDays} days`)
       setExtendModalOpen(false)
       await fetchCodes()

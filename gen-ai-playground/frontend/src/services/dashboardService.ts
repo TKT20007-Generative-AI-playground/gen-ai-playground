@@ -1,4 +1,4 @@
-import { getBearerAuthHeaders, getCsrfHeaders, getJsonCsrfHeaders } from "../utils/auth"
+import { getCsrfHeaders, getJsonCsrfHeaders } from "../utils/auth"
 import { apiClient } from "./httpClient"
 
 export type DashboardUser = {
@@ -17,79 +17,54 @@ export type InvitationCode = {
   used_by: string[] | null
 }
 
-export async function fetchDashboardUsers(token: string | null): Promise<DashboardUser[]> {
-  const res = await apiClient.get<{ users: DashboardUser[] }>("/dashboard/users", {
-    headers: getBearerAuthHeaders(token),
-  })
+export async function fetchDashboardUsers(): Promise<DashboardUser[]> {
+  const res = await apiClient.get<{ users: DashboardUser[] }>("/dashboard/users")
   return res.data.users
 }
 
-export async function deleteDashboardUser(username: string, token: string | null): Promise<void> {
-  await apiClient.delete(`/dashboard/users/${username}`, {
-    headers: getBearerAuthHeaders(token),
-  })
+export async function deleteDashboardUser(username: string): Promise<void> {
+  await apiClient.delete(`/dashboard/users/${username}`)
 }
 
-export async function fetchInvitationCodes(token: string | null): Promise<InvitationCode[]> {
-  const res = await apiClient.get<{ codes: InvitationCode[] }>("/dashboard/invitations/codes", {
-    headers: getBearerAuthHeaders(token),
-  })
+export async function fetchInvitationCodes(): Promise<InvitationCode[]> {
+  const res = await apiClient.get<{ codes: InvitationCode[] }>("/dashboard/invitations/codes")
   return res.data.codes
 }
 
 export async function createInvitationCode(
   payload: { code: string; expiration_days: number; max_uses: number },
-  token: string | null,
 ): Promise<void> {
-  await apiClient.post("/dashboard/invitations/codes", payload, {
-    headers: getBearerAuthHeaders(token),
-  })
+  await apiClient.post("/dashboard/invitations/codes", payload)
 }
 
-export async function deleteInvitationCode(code: string, token: string | null): Promise<void> {
-  await apiClient.delete(`/dashboard/invitations/codes/${code}`, {
-    headers: getBearerAuthHeaders(token),
-  })
+export async function deleteInvitationCode(code: string): Promise<void> {
+  await apiClient.delete(`/dashboard/invitations/codes/${code}`)
 }
 
-export async function deactivateInvitationCode(code: string, token: string | null): Promise<void> {
-  await apiClient.post(
-    `/dashboard/invitations/codes/${code}/deactivate`,
-    {},
-    { headers: getBearerAuthHeaders(token) },
-  )
+export async function deactivateInvitationCode(code: string): Promise<void> {
+  await apiClient.post(`/dashboard/invitations/codes/${code}/deactivate`, {})
 }
 
-export async function reactivateInvitationCode(code: string, token: string | null): Promise<void> {
-  await apiClient.post(
-    `/dashboard/invitations/codes/${code}/reactivate`,
-    {},
-    { headers: getBearerAuthHeaders(token) },
-  )
+export async function reactivateInvitationCode(code: string): Promise<void> {
+  await apiClient.post(`/dashboard/invitations/codes/${code}/reactivate`, {})
 }
 
 export async function addInvitationCodeUses(
   code: string,
   additionalUses: number,
-  token: string | null,
 ): Promise<void> {
-  await apiClient.post(
-    `/dashboard/invitations/codes/${code}/add-uses`,
-    { additional_uses: additionalUses },
-    { headers: getBearerAuthHeaders(token) },
-  )
+  await apiClient.post(`/dashboard/invitations/codes/${code}/add-uses`, {
+    additional_uses: additionalUses,
+  })
 }
 
 export async function extendInvitationCode(
   code: string,
   expirationDays: number,
-  token: string | null,
 ): Promise<void> {
-  await apiClient.post(
-    `/dashboard/invitations/codes/${code}/extend`,
-    { expiration_days: expirationDays },
-    { headers: getBearerAuthHeaders(token) },
-  )
+  await apiClient.post(`/dashboard/invitations/codes/${code}/extend`, {
+    expiration_days: expirationDays,
+  })
 }
 
 export type ContainerRecord = {
