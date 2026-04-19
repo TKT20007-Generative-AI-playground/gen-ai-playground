@@ -215,7 +215,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
     )
 
   return (
-    <ScrollArea h="100vh" offsetScrollbars={false} type="auto" scrollbarSize={8}>
+    <ScrollArea h="100%" offsetScrollbars={false} type="auto" scrollbarSize={8}>
       <Stack gap="lg" p={0} m={0}>
         <Group grow>
           <Select

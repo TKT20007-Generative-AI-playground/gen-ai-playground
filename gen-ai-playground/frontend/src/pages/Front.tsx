@@ -33,9 +33,10 @@ const Front = () => {
   const heroTitles = useFadeIn(0)
   const heroButton = useFadeIn(200)
   const hoverCard1 = useFadeIn(200)
-  const hoverCard2 = useFadeIn(400)
-  const hoverCard3 = useFadeIn(600)
-  const bannerFade = useFadeIn(800)
+  const hoverCard2 = useFadeIn(300)
+  const hoverCard3 = useFadeIn(400)
+  const hoverCard4 = useFadeIn(500)
+  const bannerFade = useFadeIn(600)
   const carouselFade = useFadeIn(400)
   const { isLoggedIn } = useAuth()
   const navigate = useNavigate()
@@ -176,6 +177,16 @@ const Front = () => {
             cardRef={hoverCard3.ref}
             isVisible={hoverCard3.isVisible}
             onClick={() => handleLoggedIn("TextGenerator")}
+          />
+
+          <HoverCard
+            image="/images/transcribe.png"
+            title="Transcriber"
+            description="Transcribe audio files into text with high accuracy."
+            buttonText="Go to transcriber"
+            cardRef={hoverCard4.ref}
+            isVisible={hoverCard4.isVisible}
+            onClick={() => handleLoggedIn("Transcribe")}
           />
         </Group>
       </Box>
