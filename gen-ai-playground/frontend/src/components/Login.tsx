@@ -9,9 +9,8 @@ import {
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { Link, useNavigate } from 'react-router-dom'
-import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
-import { backendUrl } from '../utils/env'
+import { loginRequest } from '../services/authService'
 
 interface LoginModalProps {
   opened: boolean
@@ -32,9 +31,9 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
 
   const handleSubmit = async (values: typeof form.values) => {
     try {
-      const res = await axios.post(`${backendUrl}/login`, values, { withCredentials: true })
+      const res = await loginRequest(values)
 
-      login(res.data.token, res.data.username, res.data.is_admin || false)
+      login(res.token, res.username, res.is_admin || false)
       onClose()
       if (redirectTo) {
         navigate(redirectTo)

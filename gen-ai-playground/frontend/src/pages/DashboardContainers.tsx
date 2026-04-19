@@ -1,8 +1,13 @@
 import { useState, useEffect, useCallback } from "react"
-import axios from "axios"
-import { getCsrfHeaders, getJsonCsrfHeaders } from "../utils/auth"
-import { backendUrl } from "../utils/env"
 import { getRequestErrorMessage, isAxiosUnauthorized } from "../utils/errors"
+import {
+  deployAudioModel,
+  deployTextModel,
+  fetchDashboardContainers,
+  fetchDeployableAudioModels,
+  fetchDeployableTextModels,
+  stopDashboardContainer,
+} from "../services/dashboardService"
 import {
   Table,
   Badge,
@@ -45,15 +50,10 @@ export default function DashboardContainers() {
 
   useEffect(() => {
     const fetchModels = async () => {
-      const headers = getCsrfHeaders()
       const options: DeployOption[] = []
 
       try {
-        const textRes = await axios.get(`${backendUrl}/text/models`, {
-          withCredentials: true,
-          headers,
-        })
-        const textModels = (textRes.data.available_models ?? []) as Array<{ value: string; label: string }>
+        const textModels = await fetchDeployableTextModels()
         for (const model of textModels) {
           options.push({
             id: `text::${model.value}`,
@@ -67,11 +67,7 @@ export default function DashboardContainers() {
       }
 
       try {
-        const audioRes = await axios.get(`${backendUrl}/audio/models`, {
-          withCredentials: true,
-          headers,
-        })
-        const audioModels = (audioRes.data.available_models ?? []) as Array<{ value: string; label: string }>
+        const audioModels = await fetchDeployableAudioModels()
         for (const model of audioModels) {
           options.push({
             id: `audio::${model.value}`,
@@ -92,11 +88,8 @@ export default function DashboardContainers() {
   const fetchContainers = useCallback(async () => {
     try {
       setError(null)
-      const res = await axios.get(`${backendUrl}/dashboard/containers`, {
-        withCredentials: true,
-        headers: getCsrfHeaders(),
-      })
-      setContainers(res.data)
+      const containerList = await fetchDashboardContainers()
+      setContainers(containerList)
     } catch (err) {
       if (isAxiosUnauthorized(err)) return
       setError(getRequestErrorMessage(err, "Failed to fetch deployments"))
@@ -115,10 +108,7 @@ export default function DashboardContainers() {
     if (!confirm(`Delete deployment "${deploymentName}"? This cannot be undone.`)) return
     setActionLoading(deploymentName)
     try {
-      await axios.post(`${backendUrl}/dashboard/containers/${deploymentName}/stop`, null, {
-        withCredentials: true,
-        headers: getCsrfHeaders(),
-      })
+      await stopDashboardContainer(deploymentName)
       await fetchContainers()
     } catch (err) {
       if (isAxiosUnauthorized(err)) return
@@ -136,15 +126,11 @@ export default function DashboardContainers() {
     setDeployLoading(true)
     setError(null)
     try {
-      const deployPath = selectedOption.kind === "audio" ? "/audio/deploy" : "/text/deploy"
-      await axios.post(
-        `${backendUrl}${deployPath}`,
-        { model_path: selectedOption.modelPath },
-        {
-          withCredentials: true,
-          headers: getJsonCsrfHeaders(),
-        },
-      )
+      if (selectedOption.kind === "audio") {
+        await deployAudioModel(selectedOption.modelPath)
+      } else {
+        await deployTextModel(selectedOption.modelPath)
+      }
       await fetchContainers()
     } catch (err) {
       if (isAxiosUnauthorized(err)) return

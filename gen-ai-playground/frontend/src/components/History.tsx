@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import axios from "axios"
 import { useNavigate, useLocation } from "react-router-dom"
 import type {
   AudioRecord,
@@ -36,9 +35,17 @@ import {
 } from "@mantine/core"
 import { useMediaQuery } from "@mantine/hooks"
 import { EDIT_MODELS } from "../constants/models"
-import { getJsonCsrfHeaders } from "../utils/auth"
-import { backendUrl } from "../utils/env"
 import ConversationCard from "./history-ui/ConversationCard"
+import {
+  fetchAudioHistoryList,
+  fetchAudioLength,
+  fetchConversationsLength,
+  fetchConversationHistoryList,
+  fetchImagesHistoryList,
+  fetchImagesLength,
+  fetchTextHistoryList,
+  fetchTextLength,
+} from "../services/historyService"
 
 const HISTORY_PAGE_SIZE = 10
 
@@ -183,14 +190,11 @@ export default function History() {
       const params = buildParams(range, pageNum)
 
       try {
-        const his = await axios.get(
-          `${backendUrl}/text/all-conversations`,
-          { headers: getJsonCsrfHeaders(), withCredentials: true, params }
-        )
+        const his = await fetchConversationHistoryList(params)
 
         return {
-          history: his.data.conversations || [],
-          totalPages: his.data.total_pages || 1,
+          history: (his.conversations || []) as ConversationRecord[],
+          totalPages: his.total_pages || 1,
         }
       } catch (e) {
         console.log("Failed to fetch conversations", e)
@@ -205,20 +209,12 @@ export default function History() {
 
   const fetchTextHistory = useCallback(
     async (range: [Date | null, Date | null], pageNum: number) => {
-      const headers = {
-        "Content-Type": "application/json",
-      }
-
       const params = buildParams(range, pageNum)
-
-      const res = await axios.get(`${backendUrl}/text/history`, {
-        headers,
-        params,
-      })
+      const res = await fetchTextHistoryList(params)
 
       return {
-        history: res.data.history || [],
-        totalPages: res.data.total_pages || 1,
+        history: (res.history || []) as TextRecord[],
+        totalPages: res.total_pages || 1,
       }
     },
     [],
@@ -226,18 +222,11 @@ export default function History() {
 
   const fetchImagesHistory = useCallback(
     async (range: [Date | null, Date | null], pageNum: number) => {
-      const headers = {
-        "Content-Type": "application/json",
-      }
       const params = buildParams(range, pageNum)
-
-      const imgRes = await axios.get(`${backendUrl}/images/history`, {
-        headers,
-        params,
-      })
+      const imgRes = await fetchImagesHistoryList(params)
 
       const groups: { [prompt: string]: ImageRecord[] } = {}
-        ; (imgRes.data.history || []).forEach((item: ImageRecord) => {
+        ; ((imgRes.history || []) as ImageRecord[]).forEach((item: ImageRecord) => {
           const key = item.prompt.trim().toLowerCase()
           if (!groups[key]) groups[key] = []
           groups[key].push(item)
@@ -248,7 +237,7 @@ export default function History() {
           prompt,
           images: groups[prompt],
         })),
-        totalPages: imgRes.data.total_pages || 1,
+        totalPages: imgRes.total_pages || 1,
       }
     },
     [],
@@ -257,68 +246,30 @@ export default function History() {
   const fetchAudioHistory = useCallback(
     async (range: [Date | null, Date | null], pageNum: number) => {
       const params = buildParams(range, pageNum)
-
-      const res = await axios.get(`${backendUrl}/audio/history`, {
-        headers: getJsonCsrfHeaders(),
-        params,
-        withCredentials: true,
-      })
+      const res = await fetchAudioHistoryList(params)
 
       return {
-        history: res.data.history || [],
-        totalPages: res.data.total_pages || 1,
+        history: (res.history || []) as AudioRecord[],
+        totalPages: res.total_pages || 1,
       }
     },
     [],
   )
 
   const getImagesLength = useCallback(async () => {
-    try {
-      const res = await axios.get(`${backendUrl}/images/history-length`, {
-        headers: getJsonCsrfHeaders(),
-        withCredentials: true,
-      })
-      return res.data.length ?? 0
-    } catch {
-      return 0
-    }
+    return fetchImagesLength()
   }, [])
 
   const getTextLength = useCallback(async () => {
-    try {
-      const res = await axios.get(`${backendUrl}/text/chat-messages-length`, {
-        headers: getJsonCsrfHeaders(),
-        withCredentials: true,
-      })
-      return res.data.length ?? 0
-    } catch {
-      return 0
-    }
+    return fetchTextLength()
   }, [])
 
   const getAudioLength = useCallback(async () => {
-    try {
-      const res = await axios.get(`${backendUrl}/audio/history`, {
-        headers: getJsonCsrfHeaders(),
-        withCredentials: true,
-        params: { page: 1 },
-      })
-      return res.data.total ?? 0
-    } catch {
-      return 0
-    }
+    return fetchAudioLength()
   }, [])
 
   const getConversationLength = useCallback(async () => {
-    try {
-      const res = await axios.get(`${backendUrl}/text/conversations-length`, {
-        headers: getJsonCsrfHeaders(),
-        withCredentials: true,
-      })
-      return res.data.length ?? 0
-    } catch {
-      return 0
-    }
+    return fetchConversationsLength()
   }, [])
 
   useEffect(() => {

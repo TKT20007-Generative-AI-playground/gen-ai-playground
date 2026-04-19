@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
-import { getBearerAuthHeaders } from '../utils/auth'
 import { formatDateTime } from '../utils/date'
-import { backendUrl } from '../utils/env'
 import { getRequestErrorMessage } from '../utils/errors'
+import { deleteDashboardUser, fetchDashboardUsers } from '../services/dashboardService'
 import {
   Table,
   Badge,
@@ -33,10 +31,8 @@ export default function DashboardUsers() {
   const fetchUsers = useCallback(async () => {
     try {
       setError(null)
-      const res = await axios.get(`${backendUrl}/dashboard/users`, {
-        headers: getBearerAuthHeaders(token),
-      })
-      setUsers(res.data.users)
+      const usersData = await fetchDashboardUsers(token)
+      setUsers(usersData)
     } catch (err) {
       setError(getRequestErrorMessage(err, 'Failed to fetch users'))
     } finally {
@@ -54,10 +50,7 @@ export default function DashboardUsers() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.delete(
-        `${backendUrl}/dashboard/users/${username}`,
-        { headers: getBearerAuthHeaders(token) }
-      )
+      await deleteDashboardUser(username, token)
       setSuccess(`User "${username}" deleted successfully`)
       await fetchUsers()
     } catch (err) {

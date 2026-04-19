@@ -1,12 +1,14 @@
-import axios from "axios"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Alert, Button, FileInput, MultiSelect, Text, Textarea } from "@mantine/core"
 
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
-import { getCsrfHeaders } from "../utils/auth"
-import { backendUrl } from "../utils/env"
 import { formatAudioModelName } from "./history-ui/audioHistoryUtils"
+import {
+  fetchAudioModels as fetchAudioModelsRequest,
+  fetchAudioModelStatuses as fetchAudioModelStatusesRequest,
+  transcribeAudio,
+} from "../services/audioService"
 
 type TranscriptionSegment = {
   start: number
@@ -120,12 +122,8 @@ export default function Transcribe() {
 
   const fetchAudioModels = useCallback(async () => {
     try {
-      const response = await axios.get(`${backendUrl}/audio/models`, {
-        withCredentials: true,
-        headers: getCsrfHeaders(),
-      })
-
-      const models: ModelOption[] = (response.data.available_models ?? []).map(
+      const availableModels = await fetchAudioModelsRequest()
+      const models: ModelOption[] = availableModels.map(
         (model: { value: string; label: string }) => ({
           value: model.value,
           label: model.label,
@@ -139,11 +137,8 @@ export default function Transcribe() {
 
   const fetchAudioModelStatuses = useCallback(async () => {
     try {
-      const response = await axios.get(`${backendUrl}/audio/model-statuses`, {
-        withCredentials: true,
-        headers: getCsrfHeaders(),
-      })
-      setModelStatuses(response.data)
+      const statuses = await fetchAudioModelStatusesRequest()
+      setModelStatuses(statuses)
     } catch {
       // silent
     }
@@ -264,11 +259,7 @@ export default function Transcribe() {
         formData.append("run_id", runId)
 
         try {
-          const response = await axios.post<TranscriptionResponse>(`${backendUrl}/audio/transcribe`, formData, {
-            withCredentials: true,
-            headers: getCsrfHeaders(),
-            timeout: 300000,
-          })
+          const response = await transcribeAudio(formData)
 
           setResultsByModel(prev => ({
             ...prev,
@@ -276,7 +267,7 @@ export default function Transcribe() {
               loading: false,
               startTime: prev[modelValue]?.startTime ?? null,
               elapsedMs: Date.now() - startedAt,
-              data: response.data,
+              data: response,
               error: null,
             },
           }))

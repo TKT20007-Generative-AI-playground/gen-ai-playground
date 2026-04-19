@@ -11,11 +11,10 @@ import {
   Button,
   Paper,
 } from "@mantine/core"
-import axios from "axios"
 import { useNavigate } from "react-router-dom"
 import { formatDate } from "./history-ui/ImageUtils"
 import { formatAudioModelName, getAudioInputTitle } from "./history-ui/audioHistoryUtils"
-import { backendUrl } from "../utils/env"
+import { fetchSidebarHistory } from "../services/historyService"
 
 interface ChatMessage {
   role: "user" | "assistant"
@@ -157,30 +156,21 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
 
     try {
       const audioFetchLimit = Math.min(AUDIO_SIDEBAR_MAX_FETCH, limit * AUDIO_RECORDS_PER_SESSION)
-      const endpointByType: Record<SidebarHistoryType, string> = {
-        image: `${backendUrl}/images/history-sidebar`,
-        text: `${backendUrl}/text/history-sidebar`,
-        audio: `${backendUrl}/audio/history-sidebar`,
-        "shared-chat": `${backendUrl}/text/shared-conversations-sidebar`,
-      }
-
-      const paramsByType: Record<SidebarHistoryType, { limit: number } | undefined> = {
-        image: { limit },
-        text: { limit },
-        audio: { limit: audioFetchLimit },
-        "shared-chat": { limit },
-      }
-
-      const res = await axios.get(endpointByType[historyType], {
-        withCredentials: true,
-        params: paramsByType[historyType],
-      })
       if (historyType === "shared-chat") {
-        setSharedConversations(res.data.history ?? [])
+        const res = await fetchSidebarHistory<SharedConversationRecord>(
+          historyType,
+          limit,
+          audioFetchLimit,
+        )
+        setSharedConversations(res.history ?? [])
         setItems([])
       } else {
-        const history: HistoryRecord[] = res.data.history
-        setItems(history)
+        const res = await fetchSidebarHistory<HistoryRecord>(
+          historyType,
+          limit,
+          audioFetchLimit,
+        )
+        setItems(res.history ?? [])
         setSharedConversations([])
       }
     } catch (err) {

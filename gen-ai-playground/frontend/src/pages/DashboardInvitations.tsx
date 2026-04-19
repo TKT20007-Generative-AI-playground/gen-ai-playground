@@ -1,9 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
-import { getBearerAuthHeaders } from '../utils/auth'
 import { formatDateTime } from '../utils/date'
-import { backendUrl } from '../utils/env'
 import { getRequestErrorMessage } from '../utils/errors'
+import {
+  addInvitationCodeUses,
+  createInvitationCode,
+  deactivateInvitationCode,
+  deleteInvitationCode,
+  extendInvitationCode,
+  fetchInvitationCodes,
+  reactivateInvitationCode,
+} from '../services/dashboardService'
 import {
   Table,
   Badge,
@@ -69,10 +75,8 @@ export default function DashboardInvitations() {
   const fetchCodes = useCallback(async () => {
     try {
       setError(null)
-      const res = await axios.get(`${backendUrl}/dashboard/invitations/codes`, {
-        headers: getBearerAuthHeaders(token),
-      })
-      setCodes(res.data.codes)
+      const codeList = await fetchInvitationCodes(token)
+      setCodes(codeList)
     } catch (err) {
       setError(getRequestErrorMessage(err, 'Failed to fetch invitation codes'))
     } finally {
@@ -93,14 +97,13 @@ export default function DashboardInvitations() {
     setFormError(null)
     setSuccess(null)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/invitations/codes`,
+      await createInvitationCode(
         {
           code: customCode,
           expiration_days: expirationDays,
           max_uses: maxUses,
         },
-        { headers: getBearerAuthHeaders(token) }
+        token,
       )
       setSuccess('Invitation code created successfully')
       setCreateModalOpen(false)
@@ -121,10 +124,7 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.delete(
-        `${backendUrl}/dashboard/invitations/codes/${code}`,
-        { headers: getBearerAuthHeaders(token) }
-      )
+      await deleteInvitationCode(code, token)
       setSuccess(`Invitation code "${code}" deleted successfully`)
       await fetchCodes()
     } catch (err) {
@@ -140,11 +140,7 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/invitations/codes/${code}/deactivate`,
-        {},
-        { headers: getBearerAuthHeaders(token) }
-      )
+      await deactivateInvitationCode(code, token)
       setSuccess(`Invitation code "${code}" deactivated successfully`)
       await fetchCodes()
     } catch (err) {
@@ -160,11 +156,7 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/invitations/codes/${code}/reactivate`,
-        {},
-        { headers: getBearerAuthHeaders(token) }
-      )
+      await reactivateInvitationCode(code, token)
       setSuccess(`Invitation code "${code}" reactivated successfully`)
       await fetchCodes()
     } catch (err) {
@@ -189,11 +181,7 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/invitations/codes/${selectedCode}/add-uses`,
-        { additional_uses: additionalUses },
-        { headers: getBearerAuthHeaders(token) }
-      )
+      await addInvitationCodeUses(selectedCode, additionalUses, token)
       setSuccess(`Added ${additionalUses} uses to invitation code "${selectedCode}"`)
       setAddUsesModalOpen(false)
       await fetchCodes()
@@ -219,11 +207,7 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/invitations/codes/${selectedCode}/extend`,
-        { expiration_days: extendDays },
-        { headers: getBearerAuthHeaders(token) }
-      )
+      await extendInvitationCode(selectedCode, extendDays, token)
       setSuccess(`Extended expiration of invitation code "${selectedCode}" by ${extendDays} days`)
       setExtendModalOpen(false)
       await fetchCodes()

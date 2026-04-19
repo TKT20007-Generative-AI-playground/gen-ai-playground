@@ -1,9 +1,8 @@
 import { useState } from "react"
 import { useNavigate, Navigate } from "react-router-dom"
-import axios from "axios"
 import { useAuth } from "../context/AuthContext"
-import { backendUrl } from "../utils/env"
 import { getAxiosDetailMessage } from "../utils/errors"
+import { registerRequest } from "../services/authService"
 import {
   Container,
   Paper,
@@ -63,7 +62,7 @@ export default function Register() {
     }
 
     try {
-      await axios.post(`${backendUrl}/register`, {
+      await registerRequest({
         username,
         password,
         invitation_code: inviteCode,

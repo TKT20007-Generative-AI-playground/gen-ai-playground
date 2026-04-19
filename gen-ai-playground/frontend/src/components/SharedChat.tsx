@@ -4,10 +4,14 @@ import { Alert, Badge, Button, Checkbox, NumberInput, Paper, ScrollArea, Switch,
 import { useMediaQuery } from "@mantine/hooks"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
-import { getJsonCsrfHeaders } from "../utils/auth"
 import { backendUrl } from "../utils/env"
 import { useLocation, useParams, useSearchParams } from "react-router-dom"
-import axios from "axios"
+import {
+    checkConversationParticipant,
+    fetchConversationHistory,
+    fetchTextModels,
+    joinConversation,
+} from "../services/textService"
 
 
 type Message = {
@@ -115,12 +119,9 @@ export default function SharedChat() {
 
         const fetchModels = async () => {
             try {
-                const res = await axios.get(`${backendUrl}/text/models`, {
-                    headers: getJsonCsrfHeaders(),
-                    withCredentials: true,
-                })
+                const availableModels = await fetchTextModels()
 
-                const models: ModelOption[] = (res.data.available_models ?? []).map(
+                const models: ModelOption[] = availableModels.map(
                     (model: {
                         value: string
                         label: string
@@ -149,11 +150,7 @@ export default function SharedChat() {
         if (!codeToUse) return
         setJoining(true)
         try {
-            await axios.post(
-                `${backendUrl}/text/conversations/${conversationId}/join`,
-                { invite_code: codeToUse },
-                { headers: getJsonCsrfHeaders(), withCredentials: true }
-            )
+            await joinConversation(conversationId, codeToUse)
             setJoined(true)
         } catch {
             setErrorMsg("Invalid invite code.")
@@ -164,10 +161,7 @@ export default function SharedChat() {
 
     useEffect(() => {
         if (!conversationId) return
-        axios.get(
-            `${backendUrl}/text/conversations/${conversationId}/check-participant`,
-            { headers: getJsonCsrfHeaders(), withCredentials: true }
-        ).then(() => {
+        checkConversationParticipant(conversationId).then(() => {
             setJoined(true)
         }).catch(() => {
             const code = searchParams.get("invite") ?? stateInviteCode
@@ -182,13 +176,10 @@ export default function SharedChat() {
 
         const connect = async () => {
             try {
-                const res = await axios.get(
-                    `${backendUrl}/text/conversation-history/${conversationId}`,
-                    { headers: getJsonCsrfHeaders(), withCredentials: true }
-                )
-                setChatTitle(res.data.title ?? "")
-                currentModelRef.current = res.data.model ?? modelValue
-                const historical: Message[] = ((res.data.messages ?? []) as ConversationHistoryMessage[]).map((m) => {
+                const conversationData = await fetchConversationHistory(conversationId)
+                setChatTitle(conversationData.title ?? "")
+                currentModelRef.current = conversationData.model ?? modelValue
+                const historical: Message[] = ((conversationData.messages ?? []) as ConversationHistoryMessage[]).map((m) => {
                     const parsed = parseModelReply(m.content)
                     const reasoning = m.reasoning ?? parsed.thinking
 

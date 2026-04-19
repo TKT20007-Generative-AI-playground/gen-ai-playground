@@ -7,7 +7,6 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from "react"
-import axios from "axios"
 import { PromptTextBox } from "./PromptTextBox"
 import { Text, SimpleGrid, Stack, Button } from "@mantine/core"
 import { MODELS, getModelDisplayName } from "../constants/models"
@@ -20,8 +19,8 @@ import {
   IMAGE_REQUEST_TIMEOUT_MS,
   parseGenerationTimeMs,
 } from "../api/imageRequests"
-import { backendUrl } from "../utils/env"
 import { formatDurationMs } from "../utils/time"
+import { generateImageRequest, isCanceledRequest } from "../services/imageService"
 
 type SelectedModels = [string | null, string | null]
 
@@ -177,16 +176,12 @@ export default function ImageGenerator() {
       controllerRef.current = controller
       setStartTime(Date.now())
 
-      axios
-        .post(
-          `${backendUrl}/images/generate`,
-          { prompt: nextPrompt, model },
-          {
-            responseType: "blob",
-            timeout: IMAGE_REQUEST_TIMEOUT_MS,
-            signal: controller.signal,
-          },
-        )
+      generateImageRequest({
+        prompt: nextPrompt,
+        model,
+        timeout: IMAGE_REQUEST_TIMEOUT_MS,
+        signal: controller.signal,
+      })
         .then(response => {
           window.dispatchEvent(new Event("history-update"))
           if (controllerRef.current !== controller) return
@@ -208,7 +203,7 @@ export default function ImageGenerator() {
         .catch(err => {
           if (controllerRef.current !== controller) return
 
-          if (axios.isCancel(err)) {
+          if (isCanceledRequest(err)) {
             return
           }
 
