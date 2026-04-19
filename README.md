@@ -39,7 +39,7 @@ For a detailed overview of the system architecture, see [architecture.md](Docume
    docker compose up --build
    ```
 
-   This will start both the frontend and backend, as well as the required database and cache services (MongoDB, Redis).
+   This will start both the frontend and backend, as well as the required database service (MongoDB).
 
    **Tip for development:**
    For easier development with hot reload enabled in both frontend and backend, you can use the development compose file:

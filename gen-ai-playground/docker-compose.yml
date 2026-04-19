@@ -14,7 +14,6 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      - redis
       - mongodb
       
   backend-tests:
@@ -51,9 +50,6 @@ services:
     profiles:
       - test
       
-  redis:
-    image: "redis:alpine"
-  
   mongodb:
     image: mongo:7
     ports:
