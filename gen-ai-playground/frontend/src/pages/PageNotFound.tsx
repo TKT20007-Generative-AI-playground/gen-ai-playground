@@ -8,8 +8,6 @@ const titleStyle = {
   m: 0,
 }
 
-const headerColor = "#000F65"
-
 const NotFoundPage = () => {
 
   return (
