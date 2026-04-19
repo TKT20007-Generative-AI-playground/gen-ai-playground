@@ -169,6 +169,7 @@ function AppContent() {
               <Route path="containers" element={<DashboardContainers />} />
               <Route path="users" element={<DashboardUsers />} />
               <Route path="invitations" element={<DashboardInvitations />} />
+              <Route path="*" element={<NotFoundPage />} />
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />

@@ -1,6 +1,6 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { Select, Group } from "@mantine/core"
-import { useEffect } from "react"
+// import { useEffect } from "react"
 import type { ReactNode } from "react"
 
 import ImageGenerator from "../components/ImageGenerator"
@@ -8,6 +8,7 @@ import ImageEditor from "../components/ImageEditor"
 import TextGenerator from "../components/TextGenerator"
 import Transcribe from "../components/Transcribe"
 import { PLAYGROUND_TABS } from "../constants/tabs"
+import NotFoundPage from "./PageNotFound"
 
 type Tab = (typeof PLAYGROUND_TABS)[number]
 
@@ -29,11 +30,9 @@ export default function Playground({ historyOpen }: { historyOpen: boolean }) {
   }
 
   // If tab is invalid, redirect to default
-  useEffect(() => {
-    if (!tab || !PLAYGROUND_TABS.includes(tab as Tab)) {
-      navigate("/playground/ImageGenerator", { replace: true })
-    }
-  }, [tab, navigate])
+  if (!tab || !PLAYGROUND_TABS.includes(tab as Tab)) {
+    return <NotFoundPage />
+  }
 
   return (
     <>
