@@ -62,6 +62,9 @@ export default function DashboardInvitations() {
   const [sortBy, setSortBy] = useState<string>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
+  // Used by collapse state (tracks expanded code IDs)
+  const [expandedCodes, setExpandedCodes] = useState<Set<string>>(new Set())
+
   const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
   const token = localStorage.getItem('token')
 
@@ -346,6 +349,18 @@ export default function DashboardInvitations() {
     }
   }
 
+  const toggleExpanded = (code: string) => {
+    setExpandedCodes(prev => {
+      const next = new Set(prev)
+      if (next.has(code)) {
+        next.delete(code)
+      } else {
+        next.add(code)
+      }
+      return next
+    })
+  }
+
   if (loading) {
     return (
       <Stack align="center" mt="xl">
@@ -404,7 +419,21 @@ export default function DashboardInvitations() {
                   Usage: {code.uses_count} / {code.max_uses}
                 </Text>
                 <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
-                  Used by: {code.used_by && code.used_by.length > 0 ? code.used_by.join(', ') : '—'}
+                  Used by: {code.used_by && code.used_by.length > 0 ? (() => {
+                    const isExpanded = expandedCodes.has(code.code)
+                    const displayed = isExpanded ? code.used_by : code.used_by.slice(0, 3)
+                    const hasMore = code.used_by.length > 3
+                    return (
+                      <>
+                        {displayed.join(', ')}
+                        {hasMore && (
+                          <Button variant="subtle" size="xs" ml="xs" onClick={() => toggleExpanded(code.code)}>
+                            {isExpanded ? 'Show less' : `+${code.used_by.length - 3} more`}
+                          </Button>
+                        )}
+                      </>
+                    )
+                  })() : '—'}
                 </Text>
                 <Group gap="xs" mt="xs" wrap="wrap">
                   {code.uses_count >= code.max_uses ? (
@@ -484,7 +513,7 @@ export default function DashboardInvitations() {
                     </Text>
                   </Table.Td>
                 )}
-                <Table.Td>{getStatusBadge(code)}</Table.Td>
+                <Table.Td style={{ minWidth: 90 }}>{getStatusBadge(code)}</Table.Td>
                 <Table.Td>
                   <Text size="sm">
                     {code.uses_count} / {code.max_uses}
@@ -492,7 +521,21 @@ export default function DashboardInvitations() {
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm" c="dimmed">
-                    {code.used_by && code.used_by.length > 0 ? code.used_by.join(', ') : '—'}
+                    {code.used_by && code.used_by.length > 0 ? (() => {
+                      const isExpanded = expandedCodes.has(code.code)
+                      const displayed = isExpanded ? code.used_by : code.used_by.slice(0, 3)
+                      const hasMore = code.used_by.length > 3
+                      return (
+                        <>
+                          {displayed.join(', ')}
+                          {hasMore && (
+                            <Button variant="subtle" size="xs" ml="xs" onClick={() => toggleExpanded(code.code)}>
+                              {isExpanded ? 'Show less' : `+${code.used_by.length - 3} more`}
+                            </Button>
+                          )}
+                        </>
+                      )
+                    })() : '—'}
                   </Text>
                 </Table.Td>
                 <Table.Td>
