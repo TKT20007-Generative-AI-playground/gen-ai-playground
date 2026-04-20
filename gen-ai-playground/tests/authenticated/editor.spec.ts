@@ -1,7 +1,7 @@
 import { test, expect, Page } from "@playwright/test";
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173/';
-const PLAYGROUND_URL = new URL('playground', FRONTEND_URL).toString();
+const PLAYGROUND_URL = new URL('playground/ImageEditor', FRONTEND_URL).toString();
 
 // Dummy image
 function getDummyImageBuffer() {
@@ -31,10 +31,6 @@ test.describe("Image Editor flows", () => {
 
     await page.goto(PLAYGROUND_URL);
     await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
-
-    const playgroundSelector = page.getByTestId("playground-select");
-    await playgroundSelector.click(); // opens dropdown
-    await page.getByRole("option", { name: "ImageEditor" }).click();
   });
 
   // Helpers
@@ -52,15 +48,12 @@ test.describe("Image Editor flows", () => {
   }
 
   async function selectModel(page: Page, modelLabel: string) {
-    const modelSelect = page.getByTestId("model-2-selector");
-    await modelSelect.click();
-
-    const option = page
-      .locator('div[role="option"][data-combobox-option="true"]', {
-        hasText: modelLabel,
-      })
-      .first();
-    await option.click();
+    const modelInput = page.getByRole("textbox", { name: "Model" });
+    await modelInput.click();
+    await modelInput.fill(modelLabel);
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await expect(modelInput).toHaveValue(modelLabel);
   }
 
   // Tests
