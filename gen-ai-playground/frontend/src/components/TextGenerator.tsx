@@ -208,7 +208,7 @@ function ChatPanel({
         ) : null}
       </div>
       <Tooltip
-        label="Create a shared link so others can join this conversation and continue chatting with the AI together."
+        label="Share this conversation so you can chat with others and the AI together."
         withArrow
         multiline
         w={280}

@@ -146,26 +146,31 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
           >
             {messages.length} messages
           </Badge>
-          <Button
-            component="a"
-            href={`/chat/conversations/${item._id}`}
-            size="compact-xs"
-            variant="subtle"
-            color="blue"
-            radius="sm"
-            style={{ fontSize: 10, padding: "0 6px", height: 18 }}
-          >
-            Open conversation
-          </Button>
+
+          <Tooltip label="Open conversation in chat view" withArrow position="top">
+            <Button
+              component="a"
+              href={`/chat/conversations/${item._id}`}
+              size="compact-xs"
+              variant="subtle"
+              color="blue"
+              radius="sm"
+              style={{ fontSize: 10, padding: "0 6px", height: 18 }}
+            >
+              Open conversation
+            </Button>
+          </Tooltip>
+
           <CopyButton value={`${window.location.origin}/chat/conversations/${item._id}`} timeout={2000}>
             {({ copied, copy }) => (
-              <Tooltip label="Copy conversation link" withArrow>
+              <Tooltip label="Copy conversation link to clipboard" withArrow>
                 <Button color={copied ? "teal" : "blue"} onClick={copy} size="compact-xs" variant="subtle" radius="sm" style={{ fontSize: 10, padding: "0 6px", height: 18 }}>
                   Copy link
                 </Button>
               </Tooltip>
             )}
           </CopyButton>
+          
           <CopyButton value={item.invite_code}>
             {({ copied, copy }) => (
               <Tooltip label="Copy invite code to clipboard" withArrow>
