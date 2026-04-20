@@ -143,17 +143,14 @@ export default function DashboardContainers() {
     }
   }
 
-  const handleDeployById = async (modelId: string) => {
-    const selectedOption = deployOptions.find(option => option.id === modelId)
-    if (!selectedOption) return
-
+  const deployByOption = async (option: DeployOption) => {
     setDeployLoading(true)
     setError(null)
     try {
-      const deployPath = selectedOption.kind === "audio" ? "/audio/deploy" : "/text/deploy"
+      const deployPath = option.kind === "audio" ? "/audio/deploy" : "/text/deploy"
       await axios.post(
         `${backendUrl}${deployPath}`,
-        { model_path: selectedOption.modelPath },
+        { model_path: option.modelPath },
         {
           withCredentials: true,
           headers: {
@@ -172,34 +169,17 @@ export default function DashboardContainers() {
     }
   }
 
+  const handleDeployById = async (modelId: string) => {
+    const selectedOption = deployOptions.find(option => option.id === modelId)
+    if (!selectedOption) return
+    await deployByOption(selectedOption)
+  }
+
   const handleDeploy = async () => {
     if (!selectedModelId) return
     const selectedOption = deployOptions.find(option => option.id === selectedModelId)
     if (!selectedOption) return
-
-    setDeployLoading(true)
-    setError(null)
-    try {
-      const deployPath = selectedOption.kind === "audio" ? "/audio/deploy" : "/text/deploy"
-      await axios.post(
-        `${backendUrl}${deployPath}`,
-        { model_path: selectedOption.modelPath },
-        {
-          withCredentials: true,
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": getCsrfToken(),
-          },
-        },
-      )
-      await fetchContainers()
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.status === 401) return
-      const detail = axios.isAxiosError(err) ? err.response?.data?.detail : undefined
-      setError(detail || (err instanceof Error ? err.message : "Failed to deploy model"))
-    } finally {
-      setDeployLoading(false)
-    }
+    await deployByOption(selectedOption)
   }
 
   const getStatusColor = (status: string) => {
@@ -361,6 +341,8 @@ export default function DashboardContainers() {
                       <Button
                         size="xs"
                         variant="light"
+                        loading={deployLoading}
+                        disabled={deployLoading}
                         onClick={e => {
                           e.stopPropagation()
                           handleDeployById(m.id)
@@ -401,6 +383,8 @@ export default function DashboardContainers() {
                       <Button
                         size="xs"
                         variant="light"
+                        loading={deployLoading}
+                        disabled={deployLoading}
                         onClick={e => {
                           e.stopPropagation()
                           handleDeployById(m.id)

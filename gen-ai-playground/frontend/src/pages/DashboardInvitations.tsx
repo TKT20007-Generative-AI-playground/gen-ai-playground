@@ -406,17 +406,17 @@ export default function DashboardInvitations() {
                 <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
                   Used by: {code.used_by && code.used_by.length > 0 ? code.used_by.join(', ') : '—'}
                 </Text>
-                <Group gap="xs" mt="xs">
+                <Group gap="xs" mt="xs" wrap="wrap">
                   {code.uses_count >= code.max_uses ? (
-                    <Button size="xs" variant="light" onClick={() => handleAddUses(code.code)}>Add Uses</Button>
+                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleAddUses(code.code)}>Add Uses</Button>
                   ) : isCodeExpired(code) ? (
-                    <Button size="xs" variant="light" onClick={() => handleExtend(code.code)}>Extend</Button>
+                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleExtend(code.code)}>Extend</Button>
                   ) : !code.is_active ? (
-                    <Button size="xs" variant="light" onClick={() => handleReactivate(code.code)}>Reactivate</Button>
+                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleReactivate(code.code)}>Reactivate</Button>
                   ) : (
-                    <Button size="xs" variant="light" color="yellow" onClick={() => handleDeactivate(code.code)}>Deactivate</Button>
+                    <Button size="xs" variant="light" color="yellow" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleDeactivate(code.code)}>Deactivate</Button>
                   )}
-                  <Button size="xs" color="red" variant="light" onClick={() => handleDelete(code.code)}>Delete</Button>
+                  <Button size="xs" color="red" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleDelete(code.code)}>Delete</Button>
                 </Group>
               </Stack>
             </Card>
