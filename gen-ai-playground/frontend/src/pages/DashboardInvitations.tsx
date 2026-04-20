@@ -4,6 +4,7 @@ import {
   Table,
   Badge,
   Button,
+  Card,
   Group,
   Loader,
   Text,
@@ -16,6 +17,7 @@ import {
   ActionIcon,
   Tooltip,
   Input,
+  ScrollArea,
 } from '@mantine/core'
 import { IconPlus, IconCopy, IconCheck, IconTrash, IconPower, IconCalendarPlus } from '@tabler/icons-react'
 import { useMediaQuery } from '@mantine/hooks'
@@ -389,8 +391,40 @@ export default function DashboardInvitations() {
 
       {filteredCodes.length === 0 ? (
         <Text c="dimmed">No invitation codes found.</Text>
+      ) : isMobile ? (
+        <Stack>
+          {filteredCodes.map((code) => (
+            <Card key={code.code} withBorder radius="md" shadow="xs">
+              <Stack gap="xs">
+                <Group justify="space-between">
+                  <Text fw={500} style={{ fontFamily: 'monospace' }}>{code.code}</Text>
+                  {getStatusBadge(code)}
+                </Group>
+                <Text size="sm" c="dimmed">
+                  Usage: {code.uses_count} / {code.max_uses}
+                </Text>
+                <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
+                  Used by: {code.used_by && code.used_by.length > 0 ? code.used_by.join(', ') : '—'}
+                </Text>
+                <Group gap="xs" mt="xs">
+                  {code.uses_count >= code.max_uses ? (
+                    <Button size="xs" variant="light" onClick={() => handleAddUses(code.code)}>Add Uses</Button>
+                  ) : isCodeExpired(code) ? (
+                    <Button size="xs" variant="light" onClick={() => handleExtend(code.code)}>Extend</Button>
+                  ) : !code.is_active ? (
+                    <Button size="xs" variant="light" onClick={() => handleReactivate(code.code)}>Reactivate</Button>
+                  ) : (
+                    <Button size="xs" variant="light" color="yellow" onClick={() => handleDeactivate(code.code)}>Deactivate</Button>
+                  )}
+                  <Button size="xs" color="red" variant="light" onClick={() => handleDelete(code.code)}>Delete</Button>
+                </Group>
+              </Stack>
+            </Card>
+          ))}
+        </Stack>
       ) : (
-        <Table striped highlightOnHover>
+        <ScrollArea>
+          <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
               <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('code')}>
@@ -527,6 +561,7 @@ export default function DashboardInvitations() {
             ))}
           </Table.Tbody>
         </Table>
+        </ScrollArea>
       )}
 
       {/* Create Code Modal */}

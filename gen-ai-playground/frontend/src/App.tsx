@@ -63,7 +63,7 @@ function AppContent() {
       {!isDashboardRoute && <Header />}
 
       {/* Sidebar toggle button */}
-      {auth.isLoggedIn && !isMobile && (
+      {auth.isLoggedIn && !isMobile && !isDashboardRoute && location.pathname !== '/' && (
         <button
           type="button"
           aria-label="Toggle history sidebar"
