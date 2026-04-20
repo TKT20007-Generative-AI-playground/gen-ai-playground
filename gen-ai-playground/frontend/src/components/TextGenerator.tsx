@@ -596,7 +596,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         clearable
         disabled={isAnyLoading}
       />
-      <Tooltip label="Join an existing conversation. You will need a conversation link and an invite code from the person who created it." withArrow multiline w={280}>
+      <Tooltip label="Join an existing conversation. You will need a conversation link and an invite code (If they didn't add you as a participant) from the person who created it." withArrow multiline w={280}>
         <Button variant="light" onClick={() => setJoinModalOpen(true)}>
           Join conversation
         </Button>
