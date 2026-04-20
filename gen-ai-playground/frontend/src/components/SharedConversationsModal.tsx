@@ -1,4 +1,4 @@
-import { Modal, Button, TagsInput, Text, CopyButton } from "@mantine/core"
+import { Modal, Button, TagsInput, Text, CopyButton, Tooltip } from "@mantine/core"
 import { useState } from "react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
@@ -119,18 +119,26 @@ export function ShareConversationModal({
                     <Text size="sm" mb="xs">
                         Conversation created! Share this link with participants:
                     </Text>
-                      <CopyButton value={shareableLink!}>
+
+                    <CopyButton value={shareableLink!}>
                         {({ copied, copy }) => (
-                            <Button color={copied ? "teal" : "blue"} onClick={copy} fullWidth mb="md">
-                                {copied ? "Copied!" : shareableLink}
-                            </Button>
+                            <Tooltip label="Copy shareable link to clipboard" withArrow>
+                                <Button color={copied ? "teal" : "blue"} onClick={copy} fullWidth mb="md">
+                                    {copied ? "Copied!" : shareableLink}
+                                </Button>
+                            </Tooltip>
                         )}
                     </CopyButton>
+                    <Text size="sm" mb="xs">
+                        And share this invite code with them (If you did not add them as participants) so they can join the conversation:
+                    </Text>
                     <CopyButton value={invCode!}>
                         {({ copied, copy }) => (
-                            <Button color={copied ? "teal" : "blue"} onClick={copy} fullWidth mb="md">
-                                {copied ? "Copied!" : invCode}
-                            </Button>
+                            <Tooltip label="Copy invite code to clipboard" withArrow>
+                                <Button color={copied ? "teal" : "blue"} onClick={copy} fullWidth mb="md">
+                                    {copied ? "Copied!" : invCode}
+                                </Button>
+                            </Tooltip>
                         )}
                     </CopyButton>
 
