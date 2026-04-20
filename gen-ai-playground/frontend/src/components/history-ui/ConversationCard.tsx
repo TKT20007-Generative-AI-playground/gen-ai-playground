@@ -3,6 +3,7 @@ import {
   Badge,
   Box,
   Button,
+  CopyButton,
   Divider,
   Group,
   Paper,
@@ -150,12 +151,30 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
             href={`/chat/conversations/${item._id}`}
             size="compact-xs"
             variant="subtle"
-            color="gray"
+            color="blue"
             radius="sm"
             style={{ fontSize: 10, padding: "0 6px", height: 18 }}
           >
             Open conversation
           </Button>
+          <CopyButton value={`${window.location.origin}/chat/conversations/${item._id}`} timeout={2000}>
+            {({ copied, copy }) => (
+              <Tooltip label="Copy conversation link" withArrow>
+                <Button color={copied ? "teal" : "blue"} onClick={copy} size="compact-xs" variant="subtle" radius="sm" style={{ fontSize: 10, padding: "0 6px", height: 18 }}>
+                  Copy link
+                </Button>
+              </Tooltip>
+            )}
+          </CopyButton>
+          <CopyButton value={item.invite_code}>
+            {({ copied, copy }) => (
+              <Tooltip label="Copy invite code to clipboard" withArrow>
+                <Button color={copied ? "teal" : "blue"} onClick={copy} size="compact-xs" variant="subtle" radius="sm" style={{ fontSize: 10, padding: "0 6px", height: 18 }}>
+                  Copy invite code
+                </Button>
+              </Tooltip>
+            )}
+          </CopyButton>
 
           <Group gap={4} align="center">
             <Box c="dimmed" style={{ display: "flex" }}>
