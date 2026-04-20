@@ -400,7 +400,7 @@ test.describe("History page flows", () => {
     await expect(page).toHaveURL(/\/playground\/ImageEditor$/);
   });
 
-  test("shows count badges on tabs using length endpoints", async ({ page }) => {
+  test("shows count badges on tabs from mocked history totals", async ({ page }) => {
     await mockHistoryPageEndpoints(page, {
       imagesLength: 5,
       textLength: 3,
@@ -429,7 +429,7 @@ test.describe("History page flows", () => {
             {
               _id: "conv-1",
               title: "Test Conversation",
-              model: "deepseek-1 ",
+              model: "deepseek-1",
               created_at: new Date().toISOString(),
               messages: [
                 { role: "user", content: "tests are important", sender: "michael jordan" },
