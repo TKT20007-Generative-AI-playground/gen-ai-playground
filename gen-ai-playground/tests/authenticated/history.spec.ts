@@ -1,112 +1,40 @@
 import { test, expect, Page } from "@playwright/test";
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173/";
+const DUMMY_BASE64_IMAGE =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
 
-// Dummy history data
-const dummyHistory = [
-  {
-    prompt: "Futuristic cityscape",
-    images: [
-      {
-        prompt: "Futuristic cityscape",
-        model: "FLUX.2 [klein] 9B",
-        timestamp: new Date().toISOString(),
-        image_data:
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=",
-        image_type: "png",
-      },
-    ],
-  },
-  {
-    prompt: "Serene mountain lake",
-    images: [
-      {
-        prompt: "Serene mountain lake",
-        model: "FLUX.1 Krea [dev]",
-        timestamp: new Date().toISOString(),
-        image_data:
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=",
-        image_type: "png",
-      },
-      {
-        prompt: "Serene mountain lake",
-        model: "FLUX.2 [klein] 9B",
-        timestamp: new Date().toISOString(),
-        image_data:
-          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=",
-        image_type: "png",
-      },
-    ],
-  },
-];
-
-// Helper function
-async function openHistoryDrawer(page: Page) {
-  await page.getByRole("button", { name: "History" }).click();
-  await expect(page.getByRole("dialog", { name: "History" })).toBeVisible();
+async function openHistorySidebar(page: Page) {
+  await page.getByRole("button", { name: "Toggle history sidebar" }).click();
+  await expect(page.getByRole("textbox", { name: "Type:" })).toBeVisible();
 }
 
-test.describe("History drawer flows", () => {
+async function selectHistoryType(page: Page, label: "Generated images" | "Generated text" | "Shared conversations" | "Transcriptions") {
+  await page.getByRole("textbox", { name: "Type:" }).click();
+  await page.getByRole("option", { name: label }).click();
+}
+
+test.describe("History sidebar flows", () => {
   test.beforeEach(async ({ page }) => {
-    await page.route("**/images/history", async (route) => {
+    await page.route("**/images/history-sidebar*", async route => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          history: dummyHistory.flatMap((g) => g.images),
+          history: [
+            {
+              prompt: "Futuristic cityscape",
+              model: "FLUX.2 [klein] 9B",
+              timestamp: new Date().toISOString(),
+              image_data: DUMMY_BASE64_IMAGE,
+              image_type: "generated",
+            },
+          ],
         }),
       });
     });
 
-    await page.goto(FRONTEND_URL);
-    await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
-  });
-
-  // Tests
-  test("opens history drawer and displays grouped prompts", async ({
-    page,
-  }) => {
-    await openHistoryDrawer(page);
-
-    const drawer = page.getByRole("dialog", { name: "History" });
-    await expect(drawer).toBeVisible();
-
-    for (const group of dummyHistory) {
-      await expect(drawer.getByTestId(`prompt-${group.prompt}`)).toBeVisible();
-
-      for (const image of group.images) {
-        const id = `-${image.prompt}-${image.model}`;
-        await expect(drawer.getByTestId(`image${id}`)).toBeVisible();
-        await expect(drawer.getByTestId(`model${id}`)).toBeVisible();
-        await expect(drawer.getByTestId(`type${id}`)).toBeVisible();
-        await expect(drawer.getByTestId(`timestamp${id}`)).toBeVisible();
-      }
-    }
-  });
-
-  test("opens image modal when clicking on an image", async ({ page }) => {
-    await openHistoryDrawer(page);
-    const firstImage = page.getByTestId(
-      "image-Futuristic cityscape-FLUX.2 [klein] 9B",
-    );
-    await expect(firstImage).toBeVisible({ timeout: 5000 });
-
-    await firstImage.click();
-
-    const modalImg = page.getByTestId("modal-image");
-    await expect(modalImg).toBeVisible({ timeout: 5000 });
-
-    const src = await firstImage.getAttribute("src");
-    expect(src).not.toBeNull();
-    const base64 = src!.split(",")[1];
-    await expect(modalImg).toHaveAttribute(
-      "src",
-      `data:image/png;base64,${base64}`,
-    );
-  });
-
-  test("handles empty history gracefully", async ({ page }) => {
-    await page.route("**/images/history", async (route) => {
+    await page.route("**/text/history-sidebar*", async route => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -114,29 +42,70 @@ test.describe("History drawer flows", () => {
       });
     });
 
-    await openHistoryDrawer(page);
-    await expect(page.getByText("No history to show.")).toBeVisible();
+    await page.route("**/text/shared-conversations-sidebar*", async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ history: [] }),
+      });
+    });
+
+    await page.route("**/audio/history-sidebar*", async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ history: [] }),
+      });
+    });
+
+    await page.goto(FRONTEND_URL);
+    await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
   });
 
-  test("shows loader while fetching history", async ({ page }) => {
-    let resolveRoute: (value?: any) => void;
-    const routePromise = new Promise((res) => (resolveRoute = res));
+  test("shows image history item in sidebar", async ({ page }) => {
+    await openHistorySidebar(page);
 
-    await page.route("**/images/history", async (route) => {
-      await routePromise;
+    await expect(page.getByText("Futuristic cityscape")).toBeVisible();
+    await expect(page.getByText("FLUX.2 [klein] 9B")).toBeVisible();
+    await expect(page.getByRole("button", { name: "View in History" })).toBeVisible();
+  });
+
+  test("keeps selectors usable when selected type is empty", async ({ page }) => {
+    await page.route("**/images/history-sidebar*", async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ history: [] }),
+      });
+    });
+
+    await page.route("**/audio/history-sidebar*", async route => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          history: dummyHistory.flatMap((g) => g.images),
+          history: [
+            {
+              model: "openai/whisper-small",
+              timestamp: new Date().toISOString(),
+              transcription_text: "Daily standup notes",
+              input_name: "meeting.wav",
+              source: "uploaded",
+              transcription_time_ms: 1234,
+              type: "transcription",
+            },
+          ],
         }),
       });
     });
 
-    await page.getByRole("button", { name: "History" }).click();
+    await openHistorySidebar(page);
+    await expect(page.getByText("No recent image history.")).toBeVisible();
 
-    await expect(page.getByTestId("history-loader")).toBeVisible();
+    await selectHistoryType(page, "Transcriptions");
 
-    resolveRoute!();
+    await expect(page.getByRole("textbox", { name: "Type:" })).toBeVisible();
+    await expect(page.getByText("meeting.wav")).toBeVisible();
+    await expect(page.getByText("Daily standup notes")).toBeVisible();
   });
 });
