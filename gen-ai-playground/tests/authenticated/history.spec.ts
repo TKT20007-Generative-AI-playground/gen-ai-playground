@@ -19,7 +19,9 @@ type HistoryPageMocks = {
 };
 
 async function openHistorySidebar(page: Page) {
-  await page.getByRole("button", { name: "Toggle history sidebar" }).click();
+  const toggleSidebarButton = page.locator('button[aria-label="Toggle history sidebar"]');
+  await expect(toggleSidebarButton).toBeVisible({ timeout: 15000 });
+  await toggleSidebarButton.click();
   await expect(page.getByRole("textbox", { name: "Type:" })).toBeVisible();
 }
 
@@ -135,6 +137,8 @@ test.describe("History sidebar flows", () => {
   test.use({ viewport: { width: 1280, height: 720 } });
 
   test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+
     await page.route("**/images/history-sidebar*", async route => {
       await route.fulfill({
         status: 200,
