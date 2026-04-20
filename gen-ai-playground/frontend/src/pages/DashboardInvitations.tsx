@@ -4,6 +4,7 @@ import {
   Table,
   Badge,
   Button,
+  Card,
   Group,
   Loader,
   Text,
@@ -16,6 +17,7 @@ import {
   ActionIcon,
   Tooltip,
   Input,
+  ScrollArea,
 } from '@mantine/core'
 import { IconPlus, IconCopy, IconCheck, IconTrash, IconPower, IconCalendarPlus } from '@tabler/icons-react'
 import { useMediaQuery } from '@mantine/hooks'
@@ -59,6 +61,9 @@ export default function DashboardInvitations() {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<string>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
+  // Used by collapse state (tracks expanded code IDs)
+  const [expandedCodes, setExpandedCodes] = useState<Set<string>>(new Set())
 
   const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
   const token = localStorage.getItem('token')
@@ -344,6 +349,18 @@ export default function DashboardInvitations() {
     }
   }
 
+  const toggleExpanded = (code: string) => {
+    setExpandedCodes(prev => {
+      const next = new Set(prev)
+      if (next.has(code)) {
+        next.delete(code)
+      } else {
+        next.add(code)
+      }
+      return next
+    })
+  }
+
   if (loading) {
     return (
       <Stack align="center" mt="xl">
@@ -389,8 +406,54 @@ export default function DashboardInvitations() {
 
       {filteredCodes.length === 0 ? (
         <Text c="dimmed">No invitation codes found.</Text>
+      ) : isMobile ? (
+        <Stack>
+          {filteredCodes.map((code) => (
+            <Card key={code.code} withBorder radius="md" shadow="xs">
+              <Stack gap="xs">
+                <Group justify="space-between">
+                  <Text fw={500} style={{ fontFamily: 'monospace' }}>{code.code}</Text>
+                  {getStatusBadge(code)}
+                </Group>
+                <Text size="sm" c="dimmed">
+                  Usage: {code.uses_count} / {code.max_uses}
+                </Text>
+                <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
+                  Used by: {code.used_by && code.used_by.length > 0 ? (() => {
+                    const isExpanded = expandedCodes.has(code.code)
+                    const displayed = isExpanded ? code.used_by : code.used_by.slice(0, 3)
+                    const hasMore = code.used_by.length > 3
+                    return (
+                      <>
+                        {displayed.join(', ')}
+                        {hasMore && (
+                          <Button variant="subtle" size="xs" ml="xs" onClick={() => toggleExpanded(code.code)}>
+                            {isExpanded ? 'Show less' : `+${code.used_by.length - 3} more`}
+                          </Button>
+                        )}
+                      </>
+                    )
+                  })() : '—'}
+                </Text>
+                <Group gap="xs" mt="xs" wrap="wrap">
+                  {code.uses_count >= code.max_uses ? (
+                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleAddUses(code.code)}>Add Uses</Button>
+                  ) : isCodeExpired(code) ? (
+                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleExtend(code.code)}>Extend</Button>
+                  ) : !code.is_active ? (
+                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleReactivate(code.code)}>Reactivate</Button>
+                  ) : (
+                    <Button size="xs" variant="light" color="yellow" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleDeactivate(code.code)}>Deactivate</Button>
+                  )}
+                  <Button size="xs" color="red" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleDelete(code.code)}>Delete</Button>
+                </Group>
+              </Stack>
+            </Card>
+          ))}
+        </Stack>
       ) : (
-        <Table striped highlightOnHover>
+        <ScrollArea>
+          <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
               <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('code')}>
@@ -450,7 +513,7 @@ export default function DashboardInvitations() {
                     </Text>
                   </Table.Td>
                 )}
-                <Table.Td>{getStatusBadge(code)}</Table.Td>
+                <Table.Td style={{ minWidth: 90 }}>{getStatusBadge(code)}</Table.Td>
                 <Table.Td>
                   <Text size="sm">
                     {code.uses_count} / {code.max_uses}
@@ -458,7 +521,21 @@ export default function DashboardInvitations() {
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm" c="dimmed">
-                    {code.used_by && code.used_by.length > 0 ? code.used_by.join(', ') : '—'}
+                    {code.used_by && code.used_by.length > 0 ? (() => {
+                      const isExpanded = expandedCodes.has(code.code)
+                      const displayed = isExpanded ? code.used_by : code.used_by.slice(0, 3)
+                      const hasMore = code.used_by.length > 3
+                      return (
+                        <>
+                          {displayed.join(', ')}
+                          {hasMore && (
+                            <Button variant="subtle" size="xs" ml="xs" onClick={() => toggleExpanded(code.code)}>
+                              {isExpanded ? 'Show less' : `+${code.used_by.length - 3} more`}
+                            </Button>
+                          )}
+                        </>
+                      )
+                    })() : '—'}
                   </Text>
                 </Table.Td>
                 <Table.Td>
@@ -527,6 +604,7 @@ export default function DashboardInvitations() {
             ))}
           </Table.Tbody>
         </Table>
+        </ScrollArea>
       )}
 
       {/* Create Code Modal */}
