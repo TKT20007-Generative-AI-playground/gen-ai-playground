@@ -132,6 +132,8 @@ async function mockHistoryPageEndpoints(page: Page, config: HistoryPageMocks = {
 }
 
 test.describe("History sidebar flows", () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+
   test.beforeEach(async ({ page }) => {
     await page.route("**/images/history-sidebar*", async route => {
       await route.fulfill({
