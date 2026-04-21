@@ -5,6 +5,7 @@ import LoginModal from './Login';
 import { Group, Divider, Text, Button, Burger, Drawer, Stack } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import { getTargetTab, saveCurrentTab, getDashboardTab, type PlaygroundTab, PLAYGROUND_TABS } from '../constants/tabs';
+import { formatUserGreeting } from "../utils/greeting";
 
 
 export default function Header() {
@@ -76,7 +77,7 @@ export default function Header() {
           isLoggedIn ? (
             <Group gap="md">
               <Text fw={500} c="white">
-                Hello {username}!
+                {formatUserGreeting(username)}
               </Text>
               <Button variant="white" color="dark" onClick={logout} style={{ flexShrink: 0 }}>Logout</Button>
             </Group>
@@ -89,7 +90,7 @@ export default function Header() {
           <Group gap="md">
             {isLoggedIn && (
               <Text fw={500} c="white">
-                Hello {username}!
+                {formatUserGreeting(username)}
               </Text>
             )}
             <Burger

@@ -115,7 +115,7 @@ class TestAudioEndpointSelection:
         payload = response.json()
         assert payload["deployment"]["name"] == "whisper-b"
         assert payload["deployment"]["status"] == "healthy"
-        mock_whisper_health.assert_awaited_once_with("https://b.example", ["health", ""])
+        mock_whisper_health.assert_awaited_once_with("https://b.example", ["health"])
 
     @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
     @patch("app.routers.audio._get_with_fallback_paths", new_callable=AsyncMock)
@@ -146,32 +146,8 @@ class TestAudioEndpointSelection:
 class TestAudioUploadValidation:
     @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
     @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
-    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_MB", 1)
-    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_BYTES", 1024)
-    def test_transcribe_rejects_oversized_upload(
-        self,
-        mock_proxy_call,
-        _mock_resolve,
-        client,
-        registered_user,
-        auth_headers,
-    ):
-        response = client.post(
-            "/audio/transcribe",
-            headers=auth_headers,
-            data={"task": "transcribe"},
-            files={"file": ("audio.wav", b"x" * 2048, "audio/wav")},
-        )
-
-        assert response.status_code == 413
-        assert "File too large" in response.json()["detail"]
-        mock_proxy_call.assert_not_awaited()
-
-    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
-    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
-    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_MB", 1)
-    @patch("app.routers.audio.MAX_AUDIO_UPLOAD_BYTES", 1024)
-    def test_transcribe_accepts_upload_at_exact_size_limit(
+    @patch("app.routers.audio.settings.MAX_AUDIO_UPLOAD_MB", 1)
+    def test_transcribe_rejects_upload_over_size_limit(
         self,
         mock_proxy_call,
         _mock_resolve,
@@ -184,13 +160,54 @@ class TestAudioUploadValidation:
         response = client.post(
             "/audio/transcribe",
             headers=auth_headers,
-            data={"task": "transcribe"},
+            files={"file": ("audio.wav", b"x" * (1024 * 1024 + 1), "audio/wav")},
+        )
+
+        assert response.status_code == 413
+        assert "maximum upload size" in response.json()["detail"]
+        mock_proxy_call.assert_not_awaited()
+
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    def test_transcribe_accepts_upload(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_proxy_call.return_value = {"text": "ok"}
+
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
             files={"file": ("audio.wav", b"x" * 1024, "audio/wav")},
         )
 
         assert response.status_code == 200
         assert response.json() == {"text": "ok"}
         mock_proxy_call.assert_awaited_once()
+
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    def test_transcribe_rejects_beam_size_out_of_range(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
+            data={"beam_size": "0"},
+            files={"file": ("audio.wav", b"x", "audio/wav")},
+        )
+
+        assert response.status_code == 422
+        mock_proxy_call.assert_not_awaited()
 
 
 class TestAudioFallbackUpload:
@@ -232,7 +249,7 @@ class TestAudioFallbackUpload:
             audio_router._post_with_fallback_paths(
                 base_url="https://a.example",
                 paths=["transcribe", "predict"],
-                data={"task": "transcribe"},
+                data={},
                 file_obj=file_obj,
                 file_name="audio.wav",
                 file_content_type="audio/wav",
@@ -266,7 +283,6 @@ class TestAudioHistoryPersistence:
             "/audio/transcribe",
             headers=auth_headers,
             data={
-                "task": "transcribe",
                 "model_path": "Whisper A",
                 "source": "uploaded",
                 "run_id": "run-123",
@@ -306,7 +322,7 @@ class TestAudioHistoryPersistence:
             response = client.post(
                 "/audio/transcribe",
                 headers=auth_headers,
-                data={"task": "transcribe", "model_path": "Whisper A"},
+                data={"model_path": "Whisper A"},
                 files={"file": ("audio.wav", b"abc", "audio/wav")},
             )
 
@@ -333,7 +349,6 @@ class TestAudioHistoryPersistence:
             "/audio/transcribe",
             headers=auth_headers,
             data={
-                "task": "transcribe",
                 "model_path": "Whisper A",
                 "source": "mic-input",
             },

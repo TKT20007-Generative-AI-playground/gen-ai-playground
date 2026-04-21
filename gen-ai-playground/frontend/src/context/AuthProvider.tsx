@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { AuthContext } from "./AuthContext"
-import axios from "axios"
-
-const backendUrl = import.meta.env.VITE_API_URL || "http://localhost:8000"
-
-// Separate axios instance to avoid the global interceptor catching its own 401 and triggering an infinite retry loop
-const refreshClient = axios.create({ baseURL: backendUrl, withCredentials: true })
+import {
+  apiClient,
+  fetchMe,
+  logoutRequest,
+  refreshAccessToken,
+  setAuthHeader,
+} from "../services/authService"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [username, setUsername] = useState<string | null>(null)
@@ -19,7 +20,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const clearSession = useCallback(() => {
     accessTokenRef.current = null
-    delete axios.defaults.headers.common["Authorization"]
+    setAuthHeader(null)
     setUsername(null)
     setIsAdmin(false)
   }, [])
@@ -34,16 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function rehydrate() {
       try {
-        const res = await refreshClient.post("/refresh")
-        accessTokenRef.current = res.data.token
-        axios.defaults.headers.common["Authorization"] = `Bearer ${res.data.token}`
+        const token = await refreshAccessToken()
+        accessTokenRef.current = token
+        setAuthHeader(token)
 
-        const me = await axios.get(`${backendUrl}/me`, {
-          withCredentials: true,
-          headers: { Authorization: `Bearer ${accessTokenRef.current}` },
-        })
-        setUsername(me.data.username || null)
-        setIsAdmin(me.data.is_admin || false)
+        const me = await fetchMe(token)
+        setUsername(me.username || null)
+        setIsAdmin(me.is_admin || false)
       } catch {
         clearSession()
       } finally {
@@ -66,10 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Global axios interceptor: silently refresh on 401, then retry original request
   const interceptorId = useRef<number | null>(null)
   useEffect(() => {
-    interceptorId.current = axios.interceptors.response.use(
+    interceptorId.current = apiClient.interceptors.response.use(
       response => response,
       async error => {
-        const original = error.config
+        const original = error.config as (typeof error.config & { _retried?: boolean }) | undefined
         if (!original) {
           return Promise.reject(error)
         }
@@ -86,7 +84,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (!token) return reject(error)
               original.headers = original.headers ?? {}
               original.headers["Authorization"] = `Bearer ${token}`
-              resolve(axios(original))
+              resolve(apiClient(original))
             })
           })
         }
@@ -95,14 +93,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isRefreshing.current = true
 
         try {
-          const res = await refreshClient.post("/refresh")
-          const newToken = res.data.token
+          const newToken = await refreshAccessToken()
           accessTokenRef.current = newToken
-          axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`
+          setAuthHeader(newToken)
           flushQueue(newToken)
           original.headers = original.headers ?? {}
           original.headers["Authorization"] = `Bearer ${newToken}`
-          return axios(original) // retry original request
+          return apiClient(original) // retry original request
         } catch {
           flushQueue(null)
           clearSession()
@@ -115,7 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       if (interceptorId.current !== null) {
-        axios.interceptors.response.eject(interceptorId.current)
+        apiClient.interceptors.response.eject(interceptorId.current)
       }
     }
   }, [clearSession])
@@ -123,27 +120,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (token: string, newUsername: string, newIsAdmin: boolean) => {
     // Login page receives the access token in the response body — store in memory
     accessTokenRef.current = token
-    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`
+    setAuthHeader(token)
     setUsername(newUsername)
     setIsAdmin(newIsAdmin)
   }, [])
 
   const logout = useCallback(async () => {
     try {
-      const csrfToken =
-        document.cookie
-          .split("; ")
-          .find(c => c.startsWith("csrf_token="))
-          ?.split("=")[1] ?? ""
-
-      await axios.post(
-        `${backendUrl}/logout`,
-        {},
-        {
-          withCredentials: true,
-          headers: { "X-CSRF-Token": csrfToken },
-        },
-      )
+      await logoutRequest()
     } finally {
       clearSession()
     }
