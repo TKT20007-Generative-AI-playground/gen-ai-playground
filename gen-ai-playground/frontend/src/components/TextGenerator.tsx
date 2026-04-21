@@ -13,6 +13,7 @@ import {
   ScrollArea,
   TextInput,
   Modal,
+  Tooltip,
 } from "@mantine/core"
 
 import { useMediaQuery } from "@mantine/hooks"
@@ -194,9 +195,16 @@ function ChatPanel({
           />
         ) : null}
       </div>
-      <Button size="xs" variant="light" onClick={onShare}>
-        Share conversation
-      </Button>
+      <Tooltip
+        label="Share this conversation so you can chat with others and the AI together."
+        withArrow
+        multiline
+        w={280}
+      >
+        <Button size="xs" variant="light" onClick={onShare}>
+          Share conversation
+        </Button>
+      </Tooltip>
 
       <ScrollArea
         style={{
@@ -443,14 +451,14 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
         message.id === pendingMessageId
           ? {
-              ...message,
-              content: parsed.actualReply,
-              reasoning,
-              modelLabel: label,
-              generationTimeMs: result.generation_time_ms ?? undefined,
-              isPending: false,
-              pendingStartTime: undefined,
-            }
+            ...message,
+            content: parsed.actualReply,
+            reasoning,
+            modelLabel: label,
+            generationTimeMs: result.generation_time_ms ?? undefined,
+            isPending: false,
+            pendingStartTime: undefined,
+          }
           : message,
       )
       setMessagesForModel(modelValue, replaced)
@@ -563,9 +571,11 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         clearable
         disabled={isAnyLoading}
       />
-      <Button variant="light" onClick={() => setJoinModalOpen(true)}>
-        Join conversation
-      </Button>
+      <Tooltip label="Join an existing conversation. You will need a conversation link and an invite code (If they didn't add you as a participant) from the person who created it." withArrow multiline w={280}>
+        <Button variant="light" onClick={() => setJoinModalOpen(true)}>
+          Join conversation
+        </Button>
+      </Tooltip>
 
       <Modal
         opened={joinModalOpen}

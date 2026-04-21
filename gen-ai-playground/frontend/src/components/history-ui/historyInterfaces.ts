@@ -61,5 +61,6 @@ export interface ConversationRecord {
     participants: string[]
     model: string
     messages: ConversationMessage[]
+    invite_code: string
     created_at: string
 }
