@@ -141,23 +141,7 @@ def _setup_deployment_discovery(mock_vs, healthy=True):
 # ===========================================================================
 
 class TestHealthGating:
-    """POST /text/generate and /text/chat must reject when deployment is unhealthy."""
-
-    @patch("app.routers.text.verda_service")
-    def test_generate_returns_503_when_unhealthy(
-        self, mock_vs, client, registered_user, auth_headers
-    ):
-        _setup_deployment_discovery(mock_vs, healthy=False)
-
-        response = client.post(
-            "/text/generate",
-            json={"prompt": "Hello", "model_path": TEST_DISPLAY_NAME},
-            headers=auth_headers,
-        )
-
-        assert response.status_code == 503
-        assert "not healthy" in response.json()["detail"].lower()
-        mock_vs.generate_text.assert_not_called()
+    """POST /text/chat must reject when deployment is unhealthy."""
 
     @patch("app.routers.text.verda_service")
     def test_chat_returns_503_when_unhealthy(
@@ -174,27 +158,6 @@ class TestHealthGating:
         assert response.status_code == 503
         assert "not healthy" in response.json()["detail"].lower()
         mock_vs.chat.assert_not_called()
-
-    @patch("app.routers.text.verda_service")
-    def test_generate_proceeds_when_healthy(
-        self, mock_vs, client, registered_user, auth_headers
-    ):
-        _setup_deployment_discovery(mock_vs, healthy=True)
-        mock_vs.generate_text.return_value = {
-            "generated_text": "world",
-            "model": "deepseek-ai/deepseek-llm-7b-chat",
-            "usage": {},
-        }
-
-        response = client.post(
-            "/text/generate",
-            json={"prompt": "Hello", "model_path": TEST_DISPLAY_NAME},
-            headers=auth_headers,
-        )
-
-        assert response.status_code == 200
-        assert response.json()["generated_text"] == "world"
-        mock_vs.generate_text.assert_called_once()
 
     @patch("app.routers.text.verda_service")
     def test_chat_proceeds_when_healthy(
@@ -343,90 +306,12 @@ class TestConnectErrors:
         assert response.json()["healthy"] is True
 
 
-class TestDeleteErrors:
-    """DELETE /text/deploy error paths."""
-
-    @patch("app.routers.text.verda_service")
-    def test_delete_error_returns_500(
-        self, mock_vs, client, admin_registered_user, auth_headers
-    ):
-        mock_vs.delete_deployment.return_value = {
-            "status": "error",
-            "name": "deploy-1",
-            "message": "api failure",
-        }
-
-        response = client.delete("/text/deploy?deployment_name=deploy-1", headers=auth_headers)
-
-        assert response.status_code == 500
-        assert "api failure" in response.json()["detail"]
-
-    @patch("app.routers.text.verda_service")
-    def test_delete_no_deployment_returns_200(
-        self, mock_vs, client, admin_registered_user, auth_headers
-    ):
-        mock_vs.delete_deployment.return_value = {
-            "status": "no_deployment",
-            "message": "No active deployment to delete",
-        }
-
-        response = client.delete("/text/deploy?deployment_name=deploy-1", headers=auth_headers)
-
-        assert response.status_code == 200
-        assert response.json()["status"] == "no_deployment"
-
-    @patch("app.routers.text.verda_service")
-    def test_delete_success_returns_200(
-        self, mock_vs, client, admin_registered_user, auth_headers
-    ):
-        mock_vs.delete_deployment.return_value = {
-            "status": "deleted",
-            "name": "deploy-1",
-        }
-
-        response = client.delete("/text/deploy?deployment_name=deploy-1", headers=auth_headers)
-
-        assert response.status_code == 200
-        assert response.json()["status"] == "deleted"
-
-
 # ===========================================================================
-# 3. MongoDB history inserts for text/generate and text/chat
+# 3. MongoDB history inserts for text/chat
 # ===========================================================================
 
 class TestTextHistoryInserts:
-    """Verify that successful /generate and /chat calls save to MongoDB."""
-
-    @patch("app.routers.text.verda_service")
-    def test_generate_inserts_history_record(
-        self, mock_vs, client, mock_db, registered_user, auth_headers
-    ):
-        _setup_deployment_discovery(mock_vs, healthy=True)
-        mock_vs.generate_text.return_value = {
-            "generated_text": "once upon a time",
-            "model": "deepseek-ai/deepseek-llm-7b-chat",
-            "usage": {"prompt_tokens": 3, "completion_tokens": 5},
-        }
-
-        response = client.post(
-            "/text/generate",
-            json={"prompt": "Tell me a story", "model_path": TEST_DISPLAY_NAME},
-            headers=auth_headers,
-        )
-
-        assert response.status_code == 200
-
-        # Verify MongoDB insert
-        records = list(mock_db.text_generations.find({"type": "text"}))
-        assert len(records) == 1
-
-        rec = records[0]
-        assert rec["prompt"] == "Tell me a story"
-        assert rec["generated_text"] == "once upon a time"
-        assert rec["model"] == "deepseek-ai/deepseek-llm-7b-chat"
-        assert rec["username"] == "testuser"
-        assert "timestamp" in rec
-        assert rec["usage"] == {"prompt_tokens": 3, "completion_tokens": 5}
+    """Verify that successful /chat calls save to MongoDB."""
 
     @patch("app.routers.text.verda_service")
     def test_chat_inserts_history_record(
@@ -457,29 +342,6 @@ class TestTextHistoryInserts:
         assert rec["messages"] == [{"role": "user", "content": "How are you?"}]
         assert "timestamp" in rec
         assert rec["usage"] == {"prompt_tokens": 4, "completion_tokens": 6}
-
-    @patch("app.routers.text.verda_service")
-    def test_generate_still_returns_on_db_failure(
-        self, mock_vs, client, mock_db, registered_user, auth_headers
-    ):
-        """Even if MongoDB insert fails, the endpoint should still return generated text."""
-        _setup_deployment_discovery(mock_vs, healthy=True)
-        mock_vs.generate_text.return_value = {
-            "generated_text": "result",
-            "model": "deepseek-ai/deepseek-llm-7b-chat",
-            "usage": {},
-        }
-
-        # Make the insert blow up
-        with patch.object(mock_db.text_generations, "insert_one", side_effect=Exception("db down")):
-            response = client.post(
-                "/text/generate",
-                json={"prompt": "go", "model_path": TEST_DISPLAY_NAME},
-                headers=auth_headers,
-            )
-
-        assert response.status_code == 200
-        assert response.json()["generated_text"] == "result"
 
     @patch("app.routers.text.verda_service")
     def test_chat_still_returns_on_db_failure(
@@ -557,19 +419,11 @@ class TestAuthRequired:
         response = client.get("/text/status?deployment_name=x")
         assert response.status_code == 401
 
-    def test_generate_requires_auth(self, client):
-        response = client.post("/text/generate", json={"prompt": "hi", "model_path": "deepseek-llm-7b"})
-        assert response.status_code == 401
-
     def test_chat_requires_auth(self, client):
         response = client.post(
             "/text/chat",
             json={"model_path": "deepseek-llm-7b", "messages": [{"role": "user", "content": "hi"}]},
         )
-        assert response.status_code == 401
-
-    def test_delete_requires_auth(self, client):
-        response = client.delete("/text/deploy?deployment_name=x")
         assert response.status_code == 401
 
 
