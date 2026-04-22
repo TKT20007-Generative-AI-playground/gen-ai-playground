@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react"
 import { PromptTextBox } from "./PromptTextBox"
-import axios from "axios"
 import { Button, FileButton, SimpleGrid, Text, Stack } from "@mantine/core"
 import { EDIT_MODELS, getModelDisplayName } from "../constants/models"
 import ModelSelector from "./ModelSelector"
@@ -12,6 +11,7 @@ import {
   parseGenerationTimeMs,
 } from "../api/imageRequests"
 import { formatDurationMs } from "../utils/time"
+import { editImageRequest, fetchBlobByUrl, isCanceledRequest } from "../services/imageService"
 
 type ImageToEdit = {
   id?: string
@@ -41,7 +41,6 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
   const reeditControllerRef = useRef<AbortController | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const backendUrl = import.meta.env.VITE_API_URL
   const selectedModel = selectedModels[0]
 
   function setModel(value: string | null) {
@@ -143,26 +142,16 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
           .find(c => c.startsWith("csrf_token="))
           ?.split("=")[1] ?? ""
 
-      const response = await axios.post(
-        `${backendUrl}/images/edit-image`,
-        {
-          image: base64,
-          prompt: nextPrompt,
-          model: selectedModel,
-          // If the user started from a history image, its id (from db) is passed as parent.
-          parent_image_id: parentImageId ?? undefined,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRF-Token": csrfToken,
-          },
-          withCredentials: true,
-          responseType: "blob",
-          timeout: IMAGE_REQUEST_TIMEOUT_MS,
-          signal: controller.signal,
-        },
-      )
+      const response = await editImageRequest({
+        image: base64,
+        prompt: nextPrompt,
+        model: selectedModel,
+        // If the user started from a history image, its id (from db) is passed as parent.
+        parentImageId: parentImageId ?? undefined,
+        csrfToken,
+        timeout: IMAGE_REQUEST_TIMEOUT_MS,
+        signal: controller.signal,
+      })
 
       if (editControllerRef.current !== controller) return
 
@@ -175,7 +164,7 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
     } catch (err) {
       if (editControllerRef.current !== controller) return
 
-      if (axios.isCancel(err)) {
+      if (isCanceledRequest(err)) {
         return
       }
 
@@ -227,12 +216,11 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
     setParentImageId(null)
     setError(null)
 
-    axios
-      .get(sourceUrl, {
-        responseType: "blob",
-        timeout: IMAGE_REQUEST_TIMEOUT_MS,
-        signal: controller.signal,
-      })
+    fetchBlobByUrl({
+      url: sourceUrl,
+      timeout: IMAGE_REQUEST_TIMEOUT_MS,
+      signal: controller.signal,
+    })
       .then(response => {
         if (reeditControllerRef.current !== controller) return
 
@@ -265,7 +253,7 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
       .catch(err => {
         if (reeditControllerRef.current !== controller) return
 
-        if (axios.isCancel(err)) {
+        if (isCanceledRequest(err)) {
           return
         }
 

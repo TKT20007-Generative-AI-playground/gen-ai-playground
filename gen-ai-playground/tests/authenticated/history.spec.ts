@@ -2,6 +2,7 @@ import { test, expect, Page } from "@playwright/test";
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173/";
 const HISTORY_URL = new URL("history", FRONTEND_URL).toString();
+const HISTORY_URL = new URL("history", FRONTEND_URL).toString();
 const DUMMY_BASE64_IMAGE =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
 
@@ -18,8 +19,23 @@ type HistoryPageMocks = {
   conversationsByPage?: Record<string, { conversations: any[]; total_pages: number }>;
 };
 
+type HistoryTab = "Images" | "Text" | "Conversations" | "Transcribe";
+
+type HistoryPageMocks = {
+  imagesLength?: number;
+  textLength?: number;
+  audioLength?: number;
+  conversationsLength?: number;
+  imagesByPage?: Record<string, { history: any[]; total_pages: number }>;
+  textByPage?: Record<string, { history: any[]; total_pages: number }>;
+  audioByPage?: Record<string, { history: any[]; total_pages: number }>;
+  conversationsByPage?: Record<string, { conversations: any[]; total_pages: number }>;
+};
+
 async function openHistorySidebar(page: Page) {
-  await page.getByRole("button", { name: "Toggle history sidebar" }).click();
+  const toggleSidebarButton = page.locator('button[aria-label="Toggle history sidebar"]');
+  await expect(toggleSidebarButton).toBeVisible({ timeout: 15000 });
+  await toggleSidebarButton.click();
   await expect(page.getByRole("textbox", { name: "Type:" })).toBeVisible();
 }
 
@@ -131,8 +147,115 @@ async function mockHistoryPageEndpoints(page: Page, config: HistoryPageMocks = {
   });
 }
 
+async function selectHistoryTab(page: Page, tab: HistoryTab) {
+  await page.getByRole("tab", { name: new RegExp(tab, "i") }).click();
+}
+
+async function mockHistoryPageEndpoints(page: Page, config: HistoryPageMocks = {}) {
+  const {
+    imagesLength = 1,
+    textLength = 0,
+    audioLength = 0,
+    conversationsLength = 0,
+    imagesByPage = {
+      "1": {
+        history: [
+          {
+            id: "img-1",
+            prompt: "Aurora over snowy mountains",
+            model: "FLUX.2 [klein] 9B",
+            timestamp: new Date().toISOString(),
+            image_data: DUMMY_BASE64_IMAGE,
+            image_type: "generated",
+          },
+        ],
+        total_pages: 1,
+      },
+    },
+    textByPage = { "1": { history: [], total_pages: 1 } },
+    audioByPage = { "1": { history: [], total_pages: 1 } },
+    conversationsByPage = { "1": { conversations: [], total_pages: 1 } },
+  } = config;
+
+  await page.route("**/images/history-length*", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ length: imagesLength }),
+    });
+  });
+
+  await page.route("**/text/chat-messages-length*", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ length: textLength }),
+    });
+  });
+
+  await page.route("**/text/conversations-length*", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ length: conversationsLength }),
+    });
+  });
+
+  await page.route(/\/images\/history(?:\?.*)?$/, async route => {
+    const url = new URL(route.request().url());
+    const pageParam = url.searchParams.get("page") ?? "1";
+    const payload = imagesByPage[pageParam] ?? { history: [], total_pages: 1 };
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(payload),
+    });
+  });
+
+  await page.route(/\/text\/history(?:\?.*)?$/, async route => {
+    const url = new URL(route.request().url());
+    const pageParam = url.searchParams.get("page") ?? "1";
+    const payload = textByPage[pageParam] ?? { history: [], total_pages: 1 };
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(payload),
+    });
+  });
+
+  await page.route(/\/audio\/history(?:\?.*)?$/, async route => {
+    const url = new URL(route.request().url());
+    const pageParam = url.searchParams.get("page") ?? "1";
+    const payload = audioByPage[pageParam] ?? { history: [], total_pages: 1 };
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ...payload, total: audioLength }),
+    });
+  });
+
+  await page.route(/\/text\/all-conversations(?:\?.*)?$/, async route => {
+    const url = new URL(route.request().url());
+    const pageParam = url.searchParams.get("page") ?? "1";
+    const payload = conversationsByPage[pageParam] ?? { conversations: [], total_pages: 1 };
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(payload),
+    });
+  });
+}
+
 test.describe("History sidebar flows", () => {
+  test.use({ viewport: { width: 1280, height: 720 } });
+
   test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+
     await page.route("**/images/history-sidebar*", async route => {
       await route.fulfill({
         status: 200,

@@ -4,8 +4,14 @@ import { Alert, Badge, Button, Checkbox, NumberInput, Paper, ScrollArea, Switch,
 import { useMediaQuery } from "@mantine/hooks"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
+import { backendUrl } from "../utils/env"
 import { useLocation, useParams, useSearchParams } from "react-router-dom"
-import axios from "axios"
+import {
+    checkConversationParticipant,
+    fetchConversationHistory,
+    fetchTextModels,
+    joinConversation,
+} from "../services/textService"
 
 
 type Message = {
@@ -35,18 +41,6 @@ type ModelOption = {
     modelMode?: "thinking" | "hybrid" | "instruct" | null
 }
 
-const getCsrfToken = (): string => {
-    const value = `; ${document.cookie}`
-    const parts = value.split(`; csrf_token=`)
-    if (parts.length === 2) return parts.pop()!.split(";").shift()!
-    return ""
-}
-
-const getAuthHeaders = () => ({
-    "Content-Type": "application/json",
-    "X-CSRF-Token": getCsrfToken(),
-})
-
 const makeMessageId = () => {
     if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
         return (crypto as Crypto).randomUUID()
@@ -71,8 +65,6 @@ export default function SharedChat() {
     const isMobile = useMediaQuery("(max-width: 768px)")
     const { isLoggedIn, getAccessToken } = useAuth()
     const { state } = useLocation()
-    const backendUrl = import.meta.env.VITE_API_URL
-
     const { conversationId: paramId } = useParams()
     const [searchParams] = useSearchParams()
     const modelValue: string = state?.modelValue ?? ""
@@ -127,12 +119,9 @@ export default function SharedChat() {
 
         const fetchModels = async () => {
             try {
-                const res = await axios.get(`${backendUrl}/text/models`, {
-                    headers: getAuthHeaders(),
-                    withCredentials: true,
-                })
+                const availableModels = await fetchTextModels()
 
-                const models: ModelOption[] = (res.data.available_models ?? []).map(
+                const models: ModelOption[] = availableModels.map(
                     (model: {
                         value: string
                         label: string
@@ -153,7 +142,7 @@ export default function SharedChat() {
         }
 
         fetchModels()
-    }, [backendUrl, isLoggedIn])
+    }, [isLoggedIn])
 
 
     const handleJoin = useCallback(async (code?: string) => {
@@ -161,31 +150,24 @@ export default function SharedChat() {
         if (!codeToUse) return
         setJoining(true)
         try {
-            await axios.post(
-                `${backendUrl}/text/conversations/${conversationId}/join`,
-                { invite_code: codeToUse },
-                { headers: getAuthHeaders(), withCredentials: true }
-            )
+            await joinConversation(conversationId, codeToUse)
             setJoined(true)
         } catch {
             setErrorMsg("Invalid invite code.")
         } finally {
             setJoining(false)
         }
-    }, [inviteCode, conversationId, backendUrl])
+    }, [inviteCode, conversationId])
 
     useEffect(() => {
         if (!conversationId) return
-        axios.get(
-            `${backendUrl}/text/conversations/${conversationId}/check-participant`,
-            { headers: getAuthHeaders(), withCredentials: true }
-        ).then(() => {
+        checkConversationParticipant(conversationId).then(() => {
             setJoined(true)
         }).catch(() => {
             const code = searchParams.get("invite") ?? stateInviteCode
             if (code) handleJoin(code)
         })
-    }, [backendUrl, conversationId, handleJoin, searchParams, stateInviteCode])
+    }, [conversationId, handleJoin, searchParams, stateInviteCode])
 
     // WebSocket conn
     useEffect(() => {
@@ -194,13 +176,10 @@ export default function SharedChat() {
 
         const connect = async () => {
             try {
-                const res = await axios.get(
-                    `${backendUrl}/text/conversation-history/${conversationId}`,
-                    { headers: getAuthHeaders(), withCredentials: true }
-                )
-                setChatTitle(res.data.title ?? "")
-                currentModelRef.current = res.data.model ?? modelValue
-                const historical: Message[] = ((res.data.messages ?? []) as ConversationHistoryMessage[]).map((m) => {
+                const conversationData = await fetchConversationHistory(conversationId)
+                setChatTitle(conversationData.title ?? "")
+                currentModelRef.current = conversationData.model ?? modelValue
+                const historical: Message[] = ((conversationData.messages ?? []) as ConversationHistoryMessage[]).map((m) => {
                     const parsed = parseModelReply(m.content)
                     const reasoning = m.reasoning ?? parsed.thinking
 
@@ -304,7 +283,7 @@ export default function SharedChat() {
         connect()
 
         return () => ws?.close()
-    }, [conversationId, backendUrl, modelLabel, joined, updateMessages, getAccessToken, modelValue])
+    }, [conversationId, modelLabel, joined, updateMessages, getAccessToken, modelValue])
 
     if (!joined) {
         return (

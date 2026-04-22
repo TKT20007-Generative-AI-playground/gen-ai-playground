@@ -1,9 +1,20 @@
 import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import { formatDateTime } from '../utils/date'
+import { getRequestErrorMessage } from '../utils/errors'
+import {
+  addInvitationCodeUses,
+  createInvitationCode,
+  deactivateInvitationCode,
+  deleteInvitationCode,
+  extendInvitationCode,
+  fetchInvitationCodes,
+  reactivateInvitationCode,
+} from '../services/dashboardService'
 import {
   Table,
   Badge,
   Button,
+  Card,
   Group,
   Loader,
   Text,
@@ -16,6 +27,7 @@ import {
   ActionIcon,
   Tooltip,
   Input,
+  ScrollArea,
 } from '@mantine/core'
 import { IconPlus, IconCopy, IconCheck, IconTrash, IconPower, IconCalendarPlus } from '@tabler/icons-react'
 import { useMediaQuery } from '@mantine/hooks'
@@ -60,26 +72,20 @@ export default function DashboardInvitations() {
   const [sortBy, setSortBy] = useState<string>('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
 
-  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-  const token = localStorage.getItem('token')
+  // Used by collapse state (tracks expanded code IDs)
+  const [expandedCodes, setExpandedCodes] = useState<Set<string>>(new Set())
 
   const fetchCodes = useCallback(async () => {
     try {
       setError(null)
-      const res = await axios.get(`${backendUrl}/dashboard/invitations/codes`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setCodes(res.data.codes)
+      const codeList = await fetchInvitationCodes()
+      setCodes(codeList)
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to fetch invitation codes')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to fetch invitation codes'))
     } finally {
       setLoading(false)
     }
-  }, [backendUrl, token])
+  }, [])
 
   useEffect(() => {
     fetchCodes()
@@ -94,14 +100,12 @@ export default function DashboardInvitations() {
     setFormError(null)
     setSuccess(null)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/invitations/codes`,
+      await createInvitationCode(
         {
           code: customCode,
           expiration_days: expirationDays,
           max_uses: maxUses,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
       )
       setSuccess('Invitation code created successfully')
       setCreateModalOpen(false)
@@ -110,12 +114,7 @@ export default function DashboardInvitations() {
       setMaxUses(1)
       await fetchCodes()
     } catch (err: unknown) {
-      if (axios.isAxiosError(err) && err.response) {
-        const detail = err.response.data?.detail
-        setFormError(detail || 'Failed to create invitation code')
-      } else {
-        setFormError(err instanceof Error ? err.message : 'Failed to create invitation code')
-      }
+      setFormError(getRequestErrorMessage(err, 'Failed to create invitation code'))
     } finally {
       setCreateLoading(false)
     }
@@ -127,18 +126,11 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.delete(
-        `${backendUrl}/dashboard/invitations/codes/${code}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      await deleteInvitationCode(code)
       setSuccess(`Invitation code "${code}" deleted successfully`)
       await fetchCodes()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to delete invitation code')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to delete invitation code'))
     } finally {
       setActionLoading(null)
     }
@@ -150,19 +142,11 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/invitations/codes/${code}/deactivate`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      await deactivateInvitationCode(code)
       setSuccess(`Invitation code "${code}" deactivated successfully`)
       await fetchCodes()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to deactivate invitation code')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to deactivate invitation code'))
     } finally {
       setActionLoading(null)
     }
@@ -174,19 +158,11 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/invitations/codes/${code}/reactivate`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      await reactivateInvitationCode(code)
       setSuccess(`Invitation code "${code}" reactivated successfully`)
       await fetchCodes()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to reactivate invitation code')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to reactivate invitation code'))
     } finally {
       setActionLoading(null)
     }
@@ -207,20 +183,12 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/invitations/codes/${selectedCode}/add-uses`,
-        { additional_uses: additionalUses },
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      await addInvitationCodeUses(selectedCode, additionalUses)
       setSuccess(`Added ${additionalUses} uses to invitation code "${selectedCode}"`)
       setAddUsesModalOpen(false)
       await fetchCodes()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to add uses to invitation code')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to add uses to invitation code'))
     } finally {
       setAddUsesLoading(false)
     }
@@ -241,20 +209,12 @@ export default function DashboardInvitations() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.post(
-        `${backendUrl}/dashboard/invitations/codes/${selectedCode}/extend`,
-        { expiration_days: extendDays },
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      await extendInvitationCode(selectedCode, extendDays)
       setSuccess(`Extended expiration of invitation code "${selectedCode}" by ${extendDays} days`)
       setExtendModalOpen(false)
       await fetchCodes()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to extend invitation code')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to extend invitation code'))
     } finally {
       setExtendLoading(false)
     }
@@ -264,21 +224,6 @@ export default function DashboardInvitations() {
     const now = new Date()
     const expiresAt = new Date(code.expires_at)
     return expiresAt < now
-  }
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return '—'
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return dateString
-    }
   }
 
   const getStatusBadge = (code: InvitationCode) => {
@@ -344,6 +289,18 @@ export default function DashboardInvitations() {
     }
   }
 
+  const toggleExpanded = (code: string) => {
+    setExpandedCodes(prev => {
+      const next = new Set(prev)
+      if (next.has(code)) {
+        next.delete(code)
+      } else {
+        next.add(code)
+      }
+      return next
+    })
+  }
+
   if (loading) {
     return (
       <Stack align="center" mt="xl">
@@ -389,8 +346,54 @@ export default function DashboardInvitations() {
 
       {filteredCodes.length === 0 ? (
         <Text c="dimmed">No invitation codes found.</Text>
+      ) : isMobile ? (
+        <Stack>
+          {filteredCodes.map((code) => (
+            <Card key={code.code} withBorder radius="md" shadow="xs">
+              <Stack gap="xs">
+                <Group justify="space-between">
+                  <Text fw={500} style={{ fontFamily: 'monospace' }}>{code.code}</Text>
+                  {getStatusBadge(code)}
+                </Group>
+                <Text size="sm" c="dimmed">
+                  Usage: {code.uses_count} / {code.max_uses}
+                </Text>
+                <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
+                  Used by: {code.used_by && code.used_by.length > 0 ? (() => {
+                    const isExpanded = expandedCodes.has(code.code)
+                    const displayed = isExpanded ? code.used_by : code.used_by.slice(0, 3)
+                    const hasMore = code.used_by.length > 3
+                    return (
+                      <>
+                        {displayed.join(', ')}
+                        {hasMore && (
+                          <Button variant="subtle" size="xs" ml="xs" onClick={() => toggleExpanded(code.code)}>
+                            {isExpanded ? 'Show less' : `+${code.used_by.length - 3} more`}
+                          </Button>
+                        )}
+                      </>
+                    )
+                  })() : '—'}
+                </Text>
+                <Group gap="xs" mt="xs" wrap="wrap">
+                  {code.uses_count >= code.max_uses ? (
+                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleAddUses(code.code)}>Add Uses</Button>
+                  ) : isCodeExpired(code) ? (
+                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleExtend(code.code)}>Extend</Button>
+                  ) : !code.is_active ? (
+                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleReactivate(code.code)}>Reactivate</Button>
+                  ) : (
+                    <Button size="xs" variant="light" color="yellow" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleDeactivate(code.code)}>Deactivate</Button>
+                  )}
+                  <Button size="xs" color="red" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleDelete(code.code)}>Delete</Button>
+                </Group>
+              </Stack>
+            </Card>
+          ))}
+        </Stack>
       ) : (
-        <Table striped highlightOnHover>
+        <ScrollArea>
+          <Table striped highlightOnHover>
           <Table.Thead>
             <Table.Tr>
               <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('code')}>
@@ -439,18 +442,18 @@ export default function DashboardInvitations() {
                 {!isMobile && (
                   <Table.Td>
                     <Text size="sm" c="dimmed">
-                      {formatDate(code.created_at)}
+                      {formatDateTime(code.created_at, { fallback: '-' })}
                     </Text>
                   </Table.Td>
                 )}
                 {!isMobile && (
                   <Table.Td>
                     <Text size="sm" c={new Date(code.expires_at) < new Date() ? 'red' : 'dimmed'}>
-                      {formatDate(code.expires_at)}
+                      {formatDateTime(code.expires_at, { fallback: '-' })}
                     </Text>
                   </Table.Td>
                 )}
-                <Table.Td>{getStatusBadge(code)}</Table.Td>
+                <Table.Td style={{ minWidth: 90 }}>{getStatusBadge(code)}</Table.Td>
                 <Table.Td>
                   <Text size="sm">
                     {code.uses_count} / {code.max_uses}
@@ -458,7 +461,21 @@ export default function DashboardInvitations() {
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm" c="dimmed">
-                    {code.used_by && code.used_by.length > 0 ? code.used_by.join(', ') : '—'}
+                    {code.used_by && code.used_by.length > 0 ? (() => {
+                      const isExpanded = expandedCodes.has(code.code)
+                      const displayed = isExpanded ? code.used_by : code.used_by.slice(0, 3)
+                      const hasMore = code.used_by.length > 3
+                      return (
+                        <>
+                          {displayed.join(', ')}
+                          {hasMore && (
+                            <Button variant="subtle" size="xs" ml="xs" onClick={() => toggleExpanded(code.code)}>
+                              {isExpanded ? 'Show less' : `+${code.used_by.length - 3} more`}
+                            </Button>
+                          )}
+                        </>
+                      )
+                    })() : '—'}
                   </Text>
                 </Table.Td>
                 <Table.Td>
@@ -527,6 +544,7 @@ export default function DashboardInvitations() {
             ))}
           </Table.Tbody>
         </Table>
+        </ScrollArea>
       )}
 
       {/* Create Code Modal */}

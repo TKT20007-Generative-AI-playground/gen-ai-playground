@@ -1,4 +1,3 @@
-import axios from "axios"
 import { useAuth } from "../context/AuthContext"
 import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
 
@@ -14,6 +13,7 @@ import {
   ScrollArea,
   TextInput,
   Modal,
+  Tooltip,
 } from "@mantine/core"
 
 import { useMediaQuery } from "@mantine/hooks"
@@ -21,6 +21,7 @@ import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { ShareConversationModal } from "./SharedConversationsModal"
 import { useNavigate } from "react-router-dom"
+import { chatWithTextModel, fetchTextModels, fetchTextModelStatuses } from "../services/textService"
 
 type ModelOption = {
   value: string
@@ -57,18 +58,6 @@ const makeMessageId = () => {
 }
 
 const MAX_MODELS = 4
-
-const getCsrfToken = (): string => {
-  const value = `; ${document.cookie}`
-  const parts = value.split(`; csrf_token=`)
-  if (parts.length === 2) return parts.pop()!.split(";").shift()!
-  return ""
-}
-
-const getAuthHeaders = () => ({
-  "Content-Type": "application/json",
-  "X-CSRF-Token": getCsrfToken(),
-})
 
 function parseModelReply(rawReply: string): {
   thinking: string | null
@@ -206,9 +195,16 @@ function ChatPanel({
           />
         ) : null}
       </div>
-      <Button size="xs" variant="light" onClick={onShare}>
-        Share conversation
-      </Button>
+      <Tooltip
+        label="Share this conversation so you can chat with others and the AI together."
+        withArrow
+        multiline
+        w={280}
+      >
+        <Button size="xs" variant="light" onClick={onShare}>
+          Share conversation
+        </Button>
+      </Tooltip>
 
       <ScrollArea
         style={{
@@ -312,7 +308,6 @@ function ChatPanel({
 export default function TextGenerator({ opened }: { opened: boolean }) {
   const isMobile = useMediaQuery("(max-width: 768px)")
   const { isLoggedIn } = useAuth()
-  const backendUrl = import.meta.env.VITE_API_URL
   const enableTestModel = import.meta.env.DEV && import.meta.env.VITE_ENABLE_TEST_MODEL !== "false"
 
   const [prompt, setPrompt] = useState("")
@@ -365,11 +360,8 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     if (!isLoggedIn) return
     const fetchModels = async () => {
       try {
-        const res = await axios.get(`${backendUrl}/text/models`, {
-          headers: getAuthHeaders(),
-          withCredentials: true,
-        })
-        const models: ModelOption[] = (res.data.available_models ?? []).map(
+        const availableModels = await fetchTextModels()
+        const models: ModelOption[] = availableModels.map(
           (m: { value: string; label: string; supports_thinking?: boolean; model_mode?: "thinking" | "hybrid" | "instruct" | null }) => ({
             value: m.value,
             label: m.label,
@@ -391,25 +383,22 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       }
     }
     fetchModels()
-  }, [backendUrl, enableTestModel, isLoggedIn])
+  }, [enableTestModel, isLoggedIn])
 
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
     try {
-      const res = await axios.get(`${backendUrl}/text/model-statuses`, {
-        headers: getAuthHeaders(),
-        withCredentials: true,
-      })
+      const statuses = await fetchTextModelStatuses()
 
       if (enableTestModel) {
-        setModelStatuses({ ...res.data, test_model: "live" })
+        setModelStatuses({ ...statuses, test_model: "live" })
       } else {
-        setModelStatuses({ ...res.data })
+        setModelStatuses({ ...statuses })
       }
     } catch {
       // silent
     }
-  }, [backendUrl, enableTestModel])
+  }, [enableTestModel])
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -447,20 +436,14 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         .filter(message => !message.isPending)
         .map(message => ({ role: message.role, content: message.content }))
 
-      const response = await axios.post(
-        `${backendUrl}/text/chat`,
-        {
-          model_path: modelValue,
-          messages: requestMessages,
-          max_tokens: maxTokens,
-          temperature: 0.7,
-          top_p: 0.9,
-          enable_thinking: isThinkingEnabled(modelValue),
-        },
-        { headers: getAuthHeaders(), withCredentials: true },
-      )
-
-      const result = response.data as ChatApiResponse
+      const result = await chatWithTextModel({
+        model_path: modelValue,
+        messages: requestMessages,
+        max_tokens: maxTokens,
+        temperature: 0.7,
+        top_p: 0.9,
+        enable_thinking: isThinkingEnabled(modelValue),
+      }) as ChatApiResponse
       const parsed = parseModelReply(result.reply)
       const reasoning = result.reasoning ?? parsed.thinking
       if (reasoning) console.log("Thinking:", reasoning)
@@ -468,14 +451,14 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
         message.id === pendingMessageId
           ? {
-              ...message,
-              content: parsed.actualReply,
-              reasoning,
-              modelLabel: label,
-              generationTimeMs: result.generation_time_ms ?? undefined,
-              isPending: false,
-              pendingStartTime: undefined,
-            }
+            ...message,
+            content: parsed.actualReply,
+            reasoning,
+            modelLabel: label,
+            generationTimeMs: result.generation_time_ms ?? undefined,
+            isPending: false,
+            pendingStartTime: undefined,
+          }
           : message,
       )
       setMessagesForModel(modelValue, replaced)
@@ -588,9 +571,11 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         clearable
         disabled={isAnyLoading}
       />
-      <Button variant="light" onClick={() => setJoinModalOpen(true)}>
-        Join conversation
-      </Button>
+      <Tooltip label="Join an existing conversation. You will need a conversation link and an invite code (If they didn't add you as a participant) from the person who created it." withArrow multiline w={280}>
+        <Button variant="light" onClick={() => setJoinModalOpen(true)}>
+          Join conversation
+        </Button>
+      </Tooltip>
 
       <Modal
         opened={joinModalOpen}
@@ -755,7 +740,6 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         onClose={() => setShareModalOpen(false)}
         currentMessages={shareTargetModel ? (messagesByModel[shareTargetModel] ?? []) : []}
         modelValue={shareTargetModel ?? ""}
-        backendUrl={backendUrl}
       />
     </div>
 

@@ -21,8 +21,20 @@ from app.verda_service import verda_service
 
 router = APIRouter(prefix="/audio", tags=["audio"])
 WHISPER_TIMEOUT_SECONDS = 300.0
-MAX_AUDIO_UPLOAD_MB = settings.MAX_AUDIO_UPLOAD_MB
-MAX_AUDIO_UPLOAD_BYTES = MAX_AUDIO_UPLOAD_MB * 1024 * 1024
+AUDIO_HISTORY_PROJECTION = {
+    "_id": 0,
+    "type": 1,
+    "transcription_text": 1,
+    "model": 1,
+    "timestamp": 1,
+    "username": 1,
+    "run_id": 1,
+    "input_name": 1,
+    "language": 1,
+    "duration": 1,
+    "transcription_time_ms": 1,
+    "source": 1,
+}
 
 
 def _inference_headers() -> dict[str, str]:
@@ -187,20 +199,6 @@ def _resolve_audio_template_name(model: str) -> str | None:
     return None
 
 
-def _validate_upload_size(file: UploadFile) -> None:
-    file_obj = file.file
-    current_pos = file_obj.tell()
-    file_obj.seek(0, os.SEEK_END)
-    size_bytes = file_obj.tell()
-    file_obj.seek(current_pos, os.SEEK_SET)
-
-    if size_bytes > MAX_AUDIO_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Max size is {MAX_AUDIO_UPLOAD_MB} MB",
-        )
-
-
 def _safe_int(value: Any) -> int | None:
     try:
         if value is None:
@@ -208,6 +206,26 @@ def _safe_int(value: Any) -> int | None:
         return int(float(value))
     except (TypeError, ValueError):
         return None
+
+
+def _enforce_audio_upload_size_limit(file: UploadFile) -> None:
+    max_bytes = settings.MAX_AUDIO_UPLOAD_MB * 1024 * 1024
+
+    file_size = getattr(file, "size", None)
+    if not isinstance(file_size, int):
+        current_pos = file.file.tell()
+        file.file.seek(0, os.SEEK_END)
+        file_size = file.file.tell()
+        file.file.seek(current_pos, os.SEEK_SET)
+
+    if file_size > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Audio file exceeds maximum upload size of {settings.MAX_AUDIO_UPLOAD_MB} MB "
+                f"({file_size} bytes provided)."
+            ),
+        )
 
 
 def _normalize_transcription_source(source: str | None) -> str | None:
@@ -357,7 +375,7 @@ async def audio_health(
     try:
         whisper_payload = await _get_with_fallback_paths(
             endpoint_url,
-            ["health", ""],
+            ["health"],
         )
         return {
             "status": "ok",
@@ -378,29 +396,24 @@ async def transcribe_audio(
     language: str | None = Form(None),
     source: str | None = Form(None),
     run_id: str | None = Form(None),
-    task: str = Form("transcribe"),
-    beam_size: int = Form(5),
+    beam_size: int = Form(5, ge=1, le=10),
     vad_filter: bool = Form(True),
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
     _: None = Depends(validate_csrf_token),
 ) -> dict[str, Any]:
     """Proxy file transcription to a selected deployed Verda audio container."""
-    if task not in {"transcribe", "translate"}:
-        raise HTTPException(status_code=400, detail="task must be either 'transcribe' or 'translate'")
-
     deployment_name, endpoint_url = _resolve_audio_endpoint(model_path=model_path, require_healthy=True)
     normalized_source = _normalize_transcription_source(source)
     normalized_run_id = (run_id or "").strip()[:128] or None
+    _enforce_audio_upload_size_limit(file)
 
     print(
         "Audio transcription requested by user: "
         f"{current_user.username} (deployment: {deployment_name}, model_path: {model_path})"
     )
-    _validate_upload_size(file)
 
     form_data: dict[str, str] = {
-        "task": task,
         "beam_size": str(beam_size),
         "vad_filter": "true" if vad_filter else "false",
     }
@@ -411,7 +424,7 @@ async def transcribe_audio(
     try:
         result = await _post_with_fallback_paths(
             endpoint_url,
-            ["transcribe", "predict", ""],
+            ["transcribe"],
             form_data,
             file.file,
             file.filename or "audio.bin",
@@ -476,20 +489,7 @@ def get_audio_history_sidebar(
     records = list(
         db.audio_transcriptions.find(
             {"username": current_user.username},
-            {
-                "_id": 0,
-                "type": 1,
-                "transcription_text": 1,
-                "model": 1,
-                "timestamp": 1,
-                "username": 1,
-                "run_id": 1,
-                "input_name": 1,
-                "language": 1,
-                "duration": 1,
-                "transcription_time_ms": 1,
-                "source": 1,
-            },
+            AUDIO_HISTORY_PROJECTION,
         )
         .sort("timestamp", -1)
         .limit(limit)
@@ -529,20 +529,7 @@ def get_audio_history(
         history = list(
             db.audio_transcriptions.find(
                 query,
-                {
-                    "_id": 0,
-                    "type": 1,
-                    "transcription_text": 1,
-                    "model": 1,
-                    "timestamp": 1,
-                    "username": 1,
-                    "run_id": 1,
-                    "input_name": 1,
-                    "language": 1,
-                    "duration": 1,
-                    "transcription_time_ms": 1,
-                    "source": 1,
-                },
+                AUDIO_HISTORY_PROJECTION,
             )
             .sort("timestamp", -1)
             .skip(start)

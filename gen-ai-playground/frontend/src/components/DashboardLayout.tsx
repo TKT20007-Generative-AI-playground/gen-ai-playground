@@ -4,11 +4,12 @@ import { useAuth } from "../context/AuthContext"
 import { getTargetTab, type DashboardTab, saveDashboardTab } from "../constants/tabs"
 import { useState } from "react"
 import { useMediaQuery } from "@mantine/hooks"
+import { formatUserGreeting } from "../utils/greeting"
 
 export default function DashboardLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { username, logout } = useAuth()
 
   const [opened, setOpened] = useState(false)
 
@@ -74,16 +75,26 @@ export default function DashboardLayout() {
         </Group>
 
         {!isMobile && (
-          <Button variant="white" color="dark" onClick={logout}>Logout</Button>
+          <Group gap="md">
+            <Text fw={500} c="white">
+              {formatUserGreeting(username)}
+            </Text>
+            <Button variant="white" color="dark" onClick={logout}>Logout</Button>
+          </Group>
         )}
 
         {isMobile && (
-          <Burger
-            opened={opened}
-            onClick={() => setOpened(prev => !prev)}
-            color="white"
-            aria-label="Toggle menu"
-          />
+          <Group gap="md">
+            <Text fw={500} c="white">
+              {formatUserGreeting(username)}
+            </Text>
+            <Burger
+              opened={opened}
+              onClick={() => setOpened(prev => !prev)}
+              color="white"
+              aria-label="Toggle menu"
+            />
+          </Group>
         )}
       </Group>
 

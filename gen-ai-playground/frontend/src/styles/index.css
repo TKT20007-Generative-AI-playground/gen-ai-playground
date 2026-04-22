@@ -1,7 +1,7 @@
 body {
   margin: 0;
-  min-width: 320px;
   min-height: 100dvh;
+  overflow-x: hidden;
 }
 
 /* Prevent iOS Safari from auto-zooming when focusing form fields.

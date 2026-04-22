@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from faster_whisper import WhisperModel
 
 logger = logging.getLogger(__name__)
@@ -103,14 +103,10 @@ def health() -> dict[str, Any]:
 @app.post("/transcribe")
 async def transcribe_audio(
     file: UploadFile = File(...),
-    language: str | None = None,
-    task: str = "transcribe",
-    beam_size: int = 5,
-    vad_filter: bool = True,
+    language: str | None = Form(None),
+    beam_size: int = Form(5, ge=1, le=10),
+    vad_filter: bool = Form(True),
 ) -> dict[str, Any]:
-    if task not in {"transcribe", "translate"}:
-        raise HTTPException(status_code=400, detail="task must be either 'transcribe' or 'translate'")
-
     max_bytes = settings.max_upload_mb * 1024 * 1024
 
     suffix = os.path.splitext(file.filename or "audio.bin")[1]
@@ -137,7 +133,7 @@ async def transcribe_audio(
         segments, info = model.transcribe(
             temp_path,
             language=language,
-            task=task,
+            task="transcribe",
             beam_size=beam_size,
             vad_filter=vad_filter,
         )
@@ -173,4 +169,7 @@ async def transcribe_audio(
     finally:
         await file.close()
         if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
+            try:
+                os.remove(temp_path)
+            except OSError:
+                logger.warning("Failed to remove temporary audio file: %s", temp_path)

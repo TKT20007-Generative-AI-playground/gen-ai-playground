@@ -2,8 +2,8 @@
   "engine": "custom",
   "display_name": "Whisper Large v3 Turbo",
   "model": "whisper-large-v3-turbo",
-  "explanation": "Deploy a custom Faster-Whisper HTTP service container for transcription.",
-  "short_explanation": "Whisper Faster-Whisper custom container",
+  "explanation": "Deploy Faster-Whisper custom container pinned to Whisper Large v3 Turbo for high-accuracy transcription.",
+  "short_explanation": "Whisper Faster-Whisper large-v3-turbo custom container",
   "gpu_types": ["b200", "h100", "h200", "a100", "l40s"],
   "custom": {
     "image": "ghcr.io/tkt20007-generative-ai-playground/faster-whisper:v1",

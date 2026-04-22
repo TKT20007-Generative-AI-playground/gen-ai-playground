@@ -1,7 +1,8 @@
-import { Modal, Button, TagsInput, Text, CopyButton } from "@mantine/core"
+import { Modal, Button, TagsInput, Text, CopyButton, Tooltip } from "@mantine/core"
 import { useState } from "react"
-import axios from "axios"
 import { useNavigate } from "react-router-dom"
+import { getAxiosDetailMessage } from "../utils/errors"
+import { createSharedConversation } from "../services/textService"
 
 type Message = {
     id: string
@@ -19,16 +20,6 @@ type Props = {
     onClose: () => void
     currentMessages: Message[]
     modelValue: string
-    backendUrl: string
-}
-
-const getCsrfToken = (): string => {
-    return (
-        document.cookie
-            .split("; ")
-            .find(c => c.startsWith("csrf_token="))
-            ?.split("=")[1] ?? ""
-    )
 }
 
 export function ShareConversationModal({
@@ -36,7 +27,6 @@ export function ShareConversationModal({
     onClose,
     currentMessages,
     modelValue,
-    backendUrl,
 }: Props) {
     const [participants, setParticipants] = useState<string[]>([])
     const [conversationId, setConversationId] = useState<string | null>(null)
@@ -55,34 +45,20 @@ export function ShareConversationModal({
         setLoading(true)
         setError(null)
         try {
-            const res = await axios.post(
-                `${backendUrl}/text/conversations`,
-                {
-                    participants,
-                    title: `Shared – ${modelValue}`,
-                    initial_messages: currentMessages.map(m => ({
-                        role: m.role,
-                        content: m.content,
-                        reasoning: m.reasoning ?? null,
-                    })),
-                    model_key: modelValue,
-                },
-                {
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRF-Token": getCsrfToken(),
-                    },
-                    withCredentials: true,
-                },
-            )
-            setConversationId(res.data.conversation_id)
-            setInviteCode(res.data.invite_code)
+            const res = await createSharedConversation({
+                participants,
+                title: `Shared – ${modelValue}`,
+                initial_messages: currentMessages.map(m => ({
+                    role: m.role,
+                    content: m.content,
+                    reasoning: m.reasoning ?? null,
+                })),
+                model_key: modelValue,
+            })
+            setConversationId(res.conversation_id)
+            setInviteCode(res.invite_code)
         } catch (e: unknown) {
-            if (axios.isAxiosError<{ detail?: string }>(e)) {
-                setError(e.response?.data?.detail ?? e.message)
-            } else {
-                setError("Failed to create shared conversation")
-            }
+            setError(getAxiosDetailMessage(e) ?? "Failed to create shared conversation")
         } finally {
             setLoading(false)
         }
@@ -119,18 +95,26 @@ export function ShareConversationModal({
                     <Text size="sm" mb="xs">
                         Conversation created! Share this link with participants:
                     </Text>
-                      <CopyButton value={shareableLink!}>
+
+                    <CopyButton value={shareableLink!}>
                         {({ copied, copy }) => (
-                            <Button color={copied ? "teal" : "blue"} onClick={copy} fullWidth mb="md">
-                                {copied ? "Copied!" : shareableLink}
-                            </Button>
+                            <Tooltip label="Copy shareable link to clipboard" withArrow>
+                                <Button color={copied ? "teal" : "blue"} onClick={copy} fullWidth mb="md">
+                                    {copied ? "Copied!" : shareableLink}
+                                </Button>
+                            </Tooltip>
                         )}
                     </CopyButton>
+                    <Text size="sm" mb="xs">
+                        And share this invite code with them (If you did not add them as participants) so they can join the conversation:
+                    </Text>
                     <CopyButton value={invCode!}>
                         {({ copied, copy }) => (
-                            <Button color={copied ? "teal" : "blue"} onClick={copy} fullWidth mb="md">
-                                {copied ? "Copied!" : invCode}
-                            </Button>
+                            <Tooltip label="Copy invite code to clipboard" withArrow>
+                                <Button color={copied ? "teal" : "blue"} onClick={copy} fullWidth mb="md">
+                                    {copied ? "Copied!" : invCode}
+                                </Button>
+                            </Tooltip>
                         )}
                     </CopyButton>
 

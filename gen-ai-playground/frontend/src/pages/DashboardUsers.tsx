@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import { formatDateTime } from '../utils/date'
+import { getRequestErrorMessage } from '../utils/errors'
+import { deleteDashboardUser, fetchDashboardUsers } from '../services/dashboardService'
 import {
   Table,
   Badge,
@@ -24,26 +26,17 @@ export default function DashboardUsers() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
 
-  const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-  const token = localStorage.getItem('token')
-
   const fetchUsers = useCallback(async () => {
     try {
       setError(null)
-      const res = await axios.get(`${backendUrl}/dashboard/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      setUsers(res.data.users)
+      const usersData = await fetchDashboardUsers()
+      setUsers(usersData)
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to fetch users')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to fetch users'))
     } finally {
       setLoading(false)
     }
-  }, [backendUrl, token])
+  }, [])
 
   useEffect(() => {
     fetchUsers()
@@ -55,37 +48,13 @@ export default function DashboardUsers() {
     setError(null)
     setSuccess(null)
     try {
-      await axios.delete(
-        `${backendUrl}/dashboard/users/${username}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      )
+      await deleteDashboardUser(username)
       setSuccess(`User "${username}" deleted successfully`)
       await fetchUsers()
     } catch (err) {
-      if (axios.isAxiosError(err) && err.response?.data?.detail) {
-        setError(err.response.data.detail)
-      } else if (err instanceof Error) {
-        setError(err.message)
-      } else {
-        setError('Failed to delete user')
-      }
+      setError(getRequestErrorMessage(err, 'Failed to delete user'))
     } finally {
       setActionLoading(null)
-    }
-  }
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return '—'
-    try {
-      return new Date(dateString).toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return dateString
     }
   }
 
@@ -144,7 +113,7 @@ export default function DashboardUsers() {
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm" c="dimmed">
-                    {formatDate(user.created_at)}
+                    {formatDateTime(user.created_at, { fallback: '-' })}
                   </Text>
                 </Table.Td>
                 <Table.Td>
