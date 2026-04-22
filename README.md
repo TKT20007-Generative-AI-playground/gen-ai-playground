@@ -1,5 +1,6 @@
-[![Docker Build](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/workflows/Build%20and%20Push%20Docker%20image%20(main%20branch%20only)/badge.svg)](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/actions)
-[![Tests](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/workflows/Test%20with%20Docker%20compose/badge.svg)](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/actions)
+[![Docker Build](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/actions/workflows/publish.yml/badge.svg)](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/actions)
+[![Tests](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/actions/workflows/test.yml/badge.svg)](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/actions)
+[![Lint](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/actions/workflows/lint.yml/badge.svg)](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/actions)
 [![License](https://img.shields.io/github/license/TKT20007-Generative-AI-playground/gen-ai-playground)](https://github.com/TKT20007-Generative-AI-playground/gen-ai-playground/blob/main/LICENSE)
 ![Last Commit](https://img.shields.io/github/last-commit/TKT20007-Generative-AI-playground/gen-ai-playground)
 ![Contributors](https://img.shields.io/github/contributors/TKT20007-Generative-AI-playground/gen-ai-playground)

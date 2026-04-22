@@ -1,4 +1,4 @@
-name: Test with Docker compose
+name: Tests
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ permissions:
   packages: write
 
 jobs:
-  test-playwright-eslint:
+  tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -43,10 +43,6 @@ jobs:
         if: failure()
         working-directory: ./gen-ai-playground/
         run: docker compose logs backend
-
-      - name: Run eslint
-        working-directory: ./gen-ai-playground/
-        run: docker compose --profile test run --rm frontend-tests
 
       - name: Install dependencies
         working-directory: ./gen-ai-playground/
