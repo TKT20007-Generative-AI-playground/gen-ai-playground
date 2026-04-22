@@ -722,4 +722,302 @@ class TestConversations:
 
         assert response.status_code == 400
         assert "invalid conversation id" in response.json()["detail"].lower()
+
+    def test_check_participant_not_found(self, client, registered_user, auth_headers):
+        response = client.get(
+            f"/text/conversations/{ObjectId()}/check-participant",
+            headers=auth_headers,
+        )
+        assert response.status_code == 404
+
+    def test_check_participant_forbidden(self, client, mock_db, registered_user):
+        self._insert_user(mock_db, "outsider")
+        conv_id = mock_db.conversations.insert_one(
+            {
+                "title": "Shared",
+                "participants": ["testuser"],
+                "messages": [],
+                "invite_code": "abc",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
+        ).inserted_id
+
+        response = client.get(
+            f"/text/conversations/{conv_id}/check-participant",
+            headers=self._auth_headers_for("outsider"),
+        )
+        assert response.status_code == 403
+
+    def test_check_participant_success(self, client, mock_db, registered_user, auth_headers):
+        conv_id = mock_db.conversations.insert_one(
+            {
+                "title": "Shared",
+                "participants": ["testuser"],
+                "messages": [],
+                "invite_code": "abc",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
+        ).inserted_id
+
+        response = client.get(
+            f"/text/conversations/{conv_id}/check-participant",
+            headers=auth_headers,
+        )
+        assert response.status_code == 200
+        assert response.json()["ok"] is True
+
+    def test_join_conversation_not_found(self, client, registered_user, auth_headers):
+        response = client.post(
+            f"/text/conversations/{ObjectId()}/join",
+            json={"invite_code": "x"},
+            headers=auth_headers,
+        )
+        assert response.status_code == 404
+
+    def test_conversation_history_not_found(self, client, registered_user, auth_headers):
+        response = client.get(
+            f"/text/conversation-history/{ObjectId()}",
+            headers=auth_headers,
+        )
+        assert response.status_code == 404
+
+    def test_conversation_history_success(self, client, mock_db, registered_user, auth_headers):
+        conv_id = mock_db.conversations.insert_one(
+            {
+                "title": "Project chat",
+                "participants": ["testuser"],
+                "messages": [{"role": "user", "content": "hello"}],
+                "model": "Deepseek-7b-sglang",
+                "invite_code": "abc123",
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            }
+        ).inserted_id
+
+        response = client.get(
+            f"/text/conversation-history/{conv_id}",
+            headers=auth_headers,
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["title"] == "Project chat"
+        assert payload["model"] == "Deepseek-7b-sglang"
+        assert payload["messages"][0]["content"] == "hello"
+
+    def test_shared_conversations_sidebar_limit_validation(self, client, registered_user, auth_headers):
+        response = client.get("/text/shared-conversations-sidebar?limit=7", headers=auth_headers)
+        assert response.status_code == 400
+
+    def test_shared_conversations_sidebar_success(self, client, mock_db, registered_user, auth_headers):
+        now = datetime.utcnow()
+        mock_db.conversations.insert_many(
+            [
+                {
+                    "title": "First",
+                    "participants": ["testuser"],
+                    "messages": [],
+                    "model": "m",
+                    "created_at": now - timedelta(minutes=1),
+                    "updated_at": now - timedelta(minutes=1),
+                },
+                {
+                    "title": "Second",
+                    "participants": ["testuser"],
+                    "messages": [],
+                    "model": "m",
+                    "created_at": now,
+                    "updated_at": now,
+                },
+            ]
+        )
+
+        response = client.get("/text/shared-conversations-sidebar?limit=5", headers=auth_headers)
+        assert response.status_code == 200
+        history = response.json()["history"]
+        assert len(history) == 2
+        assert history[0]["title"] == "Second"
+
+    def test_all_conversations_empty(self, client, registered_user, auth_headers):
+        response = client.get("/text/all-conversations", headers=auth_headers)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total"] == 0
+        assert payload["conversations"] == []
+
+    def test_conversations_length_endpoint(self, client, mock_db, registered_user, auth_headers):
+        mock_db.conversations.insert_many(
+            [
+                {"participants": ["testuser"], "created_at": datetime.utcnow()},
+                {"participants": ["testuser"], "created_at": datetime.utcnow()},
+                {"participants": ["other"], "created_at": datetime.utcnow()},
+            ]
+        )
+
+        response = client.get("/text/conversations-length", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json()["length"] == 2
+
+    def test_chat_messages_length_endpoint(self, client, mock_db, registered_user, auth_headers):
+        mock_db.text_generations.insert_many(
+            [
+                {"username": "testuser", "timestamp": datetime.utcnow()},
+                {"username": "testuser", "timestamp": datetime.utcnow()},
+                {"username": "other", "timestamp": datetime.utcnow()},
+            ]
+        )
+
+        response = client.get("/text/chat-messages-length", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json()["length"] == 2
+
+
+class TestTextExtraEndpoints:
+    @patch("app.routers.text.verda_service")
+    def test_list_deployments_success(self, mock_vs, client, registered_user, auth_headers):
+        mock_vs.list_deployments.return_value = [{"name": "dep-a"}]
+        response = client.get("/text/deployments", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json() == [{"name": "dep-a"}]
+
+    @patch("app.routers.text.verda_service")
+    def test_list_deployments_error_returns_500(self, mock_vs, client, registered_user, auth_headers):
+        mock_vs.list_deployments.side_effect = RuntimeError("boom")
+        response = client.get("/text/deployments", headers=auth_headers)
+        assert response.status_code == 500
+        assert "boom" in response.json()["detail"]
+
+    @patch("app.routers.text.verda_service")
+    def test_text_models_endpoint(self, mock_vs, client, registered_user, auth_headers):
+        mock_vs.available_models.return_value = [{"value": "m"}]
+        response = client.get("/text/models", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json()["available_models"] == [{"value": "m"}]
+
+    @patch("app.routers.text.get_template_map", return_value={"a.json": "Model A", "b.json": "Model B"})
+    @patch("app.routers.text.verda_service")
+    def test_model_statuses_offline_on_client_error(
+        self,
+        mock_vs,
+        _mock_template_map,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_vs._get_client.side_effect = RuntimeError("down")
+        response = client.get("/text/model-statuses", headers=auth_headers)
+        assert response.status_code == 200
+        assert response.json() == {"Model A": "offline", "Model B": "offline"}
+
+    @patch("app.routers.text.get_template_map", return_value={"a.json": "Model A", "b.json": "Model B", "c.json": "Model C"})
+    @patch("app.routers.text.verda_service")
+    def test_model_statuses_maps_live_starting_offline(
+        self,
+        mock_vs,
+        _mock_template_map,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        dep_a = MagicMock()
+        dep_a.name = "a"
+        dep_b = MagicMock()
+        dep_b.name = "b"
+
+        mock_client = MagicMock()
+        mock_client.containers.get_deployments.return_value = [dep_a, dep_b]
+
+        def _status(name):
+            status = MagicMock()
+            if name == "a":
+                status.value = "healthy"
+            else:
+                status.value = "deploying"
+            return status
+
+        mock_client.containers.get_deployment_status.side_effect = _status
+        mock_vs._get_client.return_value = mock_client
+
+        response = client.get("/text/model-statuses", headers=auth_headers)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["Model A"] == "live"
+        assert payload["Model B"] == "starting"
+        assert payload["Model C"] == "offline"
+
+    def test_text_history_sidebar_limit_validation(self, client, registered_user, auth_headers):
+        response = client.get("/text/history-sidebar?limit=7", headers=auth_headers)
+        assert response.status_code == 400
+
+    def test_text_history_sidebar_serializes_ids(self, client, mock_db, registered_user, auth_headers):
+        now = datetime.utcnow()
+        mock_db.text_generations.insert_many(
+            [
+                {"username": "testuser", "timestamp": now - timedelta(minutes=1), "reply": "old"},
+                {"username": "testuser", "timestamp": now, "reply": "new"},
+            ]
+        )
+
+        response = client.get("/text/history-sidebar?limit=5", headers=auth_headers)
+        assert response.status_code == 200
+        history = response.json()["history"]
+        assert len(history) == 2
+        assert isinstance(history[0]["_id"], str)
+
+    def test_text_history_empty(self, client, registered_user, auth_headers):
+        response = client.get("/text/history", headers=auth_headers)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total"] == 0
+        assert payload["history"] == []
+
+    def test_text_history_date_filter(self, client, mock_db, registered_user, auth_headers):
+        now = datetime.now(timezone.utc)
+        old = now - timedelta(days=10)
+        mock_db.text_generations.insert_many(
+            [
+                {
+                    "username": "testuser",
+                    "timestamp": now,
+                    "reply": "recent",
+                    "type": "chat",
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "model": "m",
+                },
+                {
+                    "username": "testuser",
+                    "timestamp": old,
+                    "reply": "old",
+                    "type": "chat",
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "model": "m",
+                },
+            ]
+        )
+
+        from_ts = int((now - timedelta(days=1)).timestamp() * 1000)
+        to_ts = int((now + timedelta(days=1)).timestamp() * 1000)
+        response = client.get(f"/text/history?from={from_ts}&to={to_ts}", headers=auth_headers)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total"] == 1
+        assert payload["history"][0]["reply"] == "recent"
+
+    def test_text_history_db_error(self, client, mock_db, registered_user, auth_headers):
+        mock_db.text_generations.insert_one(
+            {
+                "username": "testuser",
+                "timestamp": datetime.now(timezone.utc),
+                "reply": "seed",
+                "type": "chat",
+                "messages": [{"role": "user", "content": "hi"}],
+                "model": "m",
+            }
+        )
+        with patch.object(mock_db.text_generations, "find", side_effect=Exception("db fail")):
+            response = client.get("/text/history", headers=auth_headers)
+        assert response.status_code == 500
+        assert "error getting history" in response.json()["detail"].lower()
     
