@@ -2,6 +2,7 @@ import { test, expect, Page } from "@playwright/test";
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173/";
 const HISTORY_URL = new URL("history", FRONTEND_URL).toString();
+const PLAYGROUND_URL = new URL("playground/ImageGenerator", FRONTEND_URL).toString();
 
 const DUMMY_BASE64_IMAGE =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
@@ -21,7 +22,15 @@ type HistoryPageMocks = {
 };
 
 async function openHistorySidebar(page: Page) {
-  const toggleSidebarButton = page.locator('button[aria-label="Toggle history sidebar"]');
+  let toggleSidebarButton = page.locator('button[aria-label="Toggle history sidebar"]');
+
+  if (await toggleSidebarButton.count() === 0) {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
+    toggleSidebarButton = page.locator('button[aria-label="Toggle history sidebar"]');
+  }
+
   await expect(toggleSidebarButton).toBeVisible({ timeout: 15000 });
   await toggleSidebarButton.click();
   await expect(page.getByRole("textbox", { name: "Type:" })).toBeVisible();
@@ -185,7 +194,7 @@ test.describe("History sidebar flows", () => {
       });
     });
 
-    await page.goto(FRONTEND_URL);
+    await page.goto(PLAYGROUND_URL);
     await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
   });
 
@@ -193,7 +202,7 @@ test.describe("History sidebar flows", () => {
     await openHistorySidebar(page);
 
     await expect(page.getByText("Futuristic cityscape")).toBeVisible();
-    await expect(page.getByText("FLUX.2 [klein] 9B")).toBeVisible();
+    await expect(page.getByText("FLUX.2 [klein] 9B").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "View in History" })).toBeVisible();
   });
 
