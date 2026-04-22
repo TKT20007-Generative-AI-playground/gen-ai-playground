@@ -433,6 +433,7 @@ class TestDeployFromTemplateEngines:
             patch.object(service, "_parse_and_validate_template", return_value=cfg),
             patch.object(service, "_get_client", return_value=mock_client),
             patch.object(service, "_resolve_gpu", return_value=("not available", 8)),
+            patch.object(service, "_ensure_hf_secret"),
             patch("app.verda_service.EnvVar", side_effect=_ns_factory),
             patch("app.verda_service.EntrypointOverridesSettings", side_effect=_ns_factory),
             patch("app.verda_service.HealthcheckSettings", side_effect=_ns_factory),
