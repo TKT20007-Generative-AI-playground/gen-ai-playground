@@ -1,4 +1,4 @@
-name: Sync templates from Verdas repository
+name: Sync Templates
 permissions:
     contents: write
 on:
