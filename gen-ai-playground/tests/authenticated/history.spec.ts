@@ -2,8 +2,11 @@ import { test, expect, Page } from "@playwright/test";
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173/";
 const HISTORY_URL = new URL("history", FRONTEND_URL).toString();
+const PLAYGROUND_URL = new URL("playground/ImageGenerator", FRONTEND_URL).toString();
+
 const DUMMY_BASE64_IMAGE =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+
 
 type HistoryTab = "Images" | "Text" | "Conversations" | "Transcribe";
 
@@ -19,7 +22,15 @@ type HistoryPageMocks = {
 };
 
 async function openHistorySidebar(page: Page) {
-  const toggleSidebarButton = page.locator('button[aria-label="Toggle history sidebar"]');
+  let toggleSidebarButton = page.locator('button[aria-label="Toggle history sidebar"]');
+
+  if (await toggleSidebarButton.count() === 0) {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.reload();
+    await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
+    toggleSidebarButton = page.locator('button[aria-label="Toggle history sidebar"]');
+  }
+
   await expect(toggleSidebarButton).toBeVisible({ timeout: 15000 });
   await toggleSidebarButton.click();
   await expect(page.getByRole("textbox", { name: "Type:" })).toBeVisible();
@@ -133,6 +144,8 @@ async function mockHistoryPageEndpoints(page: Page, config: HistoryPageMocks = {
   });
 }
 
+
+
 test.describe("History sidebar flows", () => {
   test.use({ viewport: { width: 1280, height: 720 } });
 
@@ -181,7 +194,7 @@ test.describe("History sidebar flows", () => {
       });
     });
 
-    await page.goto(FRONTEND_URL);
+    await page.goto(PLAYGROUND_URL);
     await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
   });
 
@@ -189,7 +202,7 @@ test.describe("History sidebar flows", () => {
     await openHistorySidebar(page);
 
     await expect(page.getByText("Futuristic cityscape")).toBeVisible();
-    await expect(page.getByText("FLUX.2 [klein] 9B")).toBeVisible();
+    await expect(page.getByText("FLUX.2 [klein] 9B").first()).toBeVisible();
     await expect(page.getByRole("button", { name: "View in History" })).toBeVisible();
   });
 
@@ -406,7 +419,7 @@ test.describe("History page flows", () => {
     await expect(page).toHaveURL(/\/playground\/ImageEditor$/);
   });
 
-  test("shows count badges on tabs using length endpoints", async ({ page }) => {
+  test("shows count badges on tabs from mocked history totals", async ({ page }) => {
     await mockHistoryPageEndpoints(page, {
       imagesLength: 5,
       textLength: 3,
@@ -435,7 +448,7 @@ test.describe("History page flows", () => {
             {
               _id: "conv-1",
               title: "Test Conversation",
-              model: "deepseek-1 ",
+              model: "deepseek-1",
               created_at: new Date().toISOString(),
               messages: [
                 { role: "user", content: "tests are important", sender: "michael jordan" },
