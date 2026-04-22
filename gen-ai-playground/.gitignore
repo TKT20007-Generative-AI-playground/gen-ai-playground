@@ -33,6 +33,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 backend/.env
+backend/.coverage
+backend/coverage/
 
 .env
 
