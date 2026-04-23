@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import auth, images, text, dashboard, invitations, audio, stream
+from app.routers import auth, images, text, dashboard, invitations, audio
 
 
 # Initialize FastAPI app
@@ -37,7 +37,6 @@ app.include_router(text.router)
 app.include_router(dashboard.router)
 app.include_router(invitations.router)
 app.include_router(audio.router)
-app.include_router(stream.router)
 
 
 @app.get("/")

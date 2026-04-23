@@ -7,13 +7,14 @@ generate text completions, chat with the model, and clean up.
 import math
 import secrets
 from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from pymongo.database import Database
 from datetime import datetime, timezone
 from typing import Optional
 import time
 from bson import ObjectId
 import asyncio
-
+import httpx
 
 from app.database import get_database
 from app.dependencies import get_current_user, verify_token, get_admin_user, validate_csrf_token
@@ -53,6 +54,8 @@ router = APIRouter(
     prefix="/text",
     tags=["text"],
 )
+
+last_request = None
 
 @router.get("/models")
 def list_available_models(current_user: UserInfo = Depends(get_current_user)):
@@ -1076,3 +1079,45 @@ def chat_messages_length(
 ):
     length = db.text_generations.count_documents({"username": cur_user.username})
     return {"length": length}
+
+@router.get("/stream")
+async def stream(prompt: str, deployment_name: str, model_path: str):
+    client = verda_service._get_client()
+    deployment = client.containers.get_deployment_by_name(deployment_name)
+
+    url = f"{deployment.endpoint_base_url}/v1/chat/completions"
+
+    async def event_generator():
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream(
+                "POST",
+                url,
+                json={
+                    "model": model_path,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 512,
+                    "temperature": 0.7,
+                    "stream": True,
+                },
+            ) as response:
+
+                async for line in response.aiter_lines():
+                    if not line:
+                        continue
+
+                    if line.startswith("data: "):
+                        payload = line[len("data: "):]
+
+                        if payload == "[DONE]":
+                            yield "data: [DONE]\n\n"
+                            break
+
+                        try:
+                            obj = json.loads(payload)
+                            delta = obj["choices"][0]["delta"].get("content", "")
+                            if delta:
+                                yield f"data: {delta}\n\n"
+                        except:
+                            continue
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

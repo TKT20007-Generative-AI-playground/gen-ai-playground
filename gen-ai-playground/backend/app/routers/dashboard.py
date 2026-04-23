@@ -36,12 +36,17 @@ def list_containers(
             except Exception:
                 status_str = "unknown"
             
-            results.append(ContainerInfo(
-                name=d.name,
-                status=status_str,
-                image=getattr(d, 'endpoint_base_url', '') or '',
-                container_id=d.name
-            ))
+        derived_model_path = None
+        if "qwen3" in d.name.lower():
+            derived_model_path = "Qwen/Qwen3-8B"
+
+        results.append(ContainerInfo(
+            name=d.name,
+            status=status_str,
+            image=getattr(d, 'endpoint_base_url', '') or '',
+            container_id=d.name,
+            model_path=derived_model_path
+        ))
         return results
     except Exception as e:
         raise HTTPException(

@@ -118,6 +118,7 @@ class ContainerInfo(BaseModel):
     status: str
     image: str = ""
     container_id: str
+    model_path: str | None = None
 
 
 class ContainerActionResponse(BaseModel):

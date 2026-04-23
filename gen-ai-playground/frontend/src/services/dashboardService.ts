@@ -94,8 +94,8 @@ export async function fetchDeployableAudioModels(): Promise<Array<{ value: strin
   return res.data.available_models ?? []
 }
 
-export async function fetchDashboardContainers(): Promise<ContainerRecord[]> {
-  const res = await apiClient.get<ContainerRecord[]>("/dashboard/containers", {
+export async function fetchDashboardContainers(): Promise<any[]> {
+  const res = await apiClient.get("/dashboard/containers", {
     headers: getCsrfHeaders(),
   })
   return res.data
@@ -107,14 +107,15 @@ export async function stopDashboardContainer(containerId: string): Promise<void>
   })
 }
 
-export async function deployTextModel(modelPath: string): Promise<void> {
-  await apiClient.post(
+export async function deployTextModel(modelPath: string): Promise<{ name: string; model: string }> {
+  const res = await apiClient.post(
     "/text/deploy",
     { model_path: modelPath },
     {
       headers: getJsonCsrfHeaders(),
     },
   )
+  return res.data
 }
 
 export async function deployAudioModel(modelPath: string): Promise<void> {
