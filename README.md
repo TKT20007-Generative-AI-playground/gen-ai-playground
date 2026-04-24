@@ -66,6 +66,9 @@ docker compose run --rm backend-tests
 
 ## Environment variables
 
+> **Important:** Some Hugging Face models used in this project are gated or restricted.
+> In addition to setting `HF_TOKEN`, you may need to request access to specific models directly on Hugging Face before they can be used.
+
 There are two ways to provide environment variables, depending on how you run the application:
 
 
@@ -190,3 +193,5 @@ See detailed instructions and documentation: [Verda](https://verda.com/)
 ## Links
 
 - [Backlog](https://github.com/orgs/TKT20007-Generative-AI-playground/projects/4)
+- [Definition of Done](./Documents/Definition%20of%20Done.md)
+- [Future Development Ideas](./Documents/future_development_ideas.md)
