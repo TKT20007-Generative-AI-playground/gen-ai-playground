@@ -1,25 +1,56 @@
 import { ActionIcon, Badge, Box, Button, Group, Paper, Stack, Text, Tooltip } from "@mantine/core"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { AudioRecord } from "./historyInterfaces"
 import { formatDate } from "./ImageUtils"
 import { ClockIcon, CopyIcon } from "./Icons"
 import { formatAudioModelName, getAudioInputTitle } from "./audioHistoryUtils"
 
 export default function AudioCard({ item }: { item: AudioRecord }) {
-  const [copied, setCopied] = useState(false)
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle")
   const [expanded, setExpanded] = useState(false)
+  const copyResetTimeoutRef = useRef<number | null>(null)
   const title = getAudioInputTitle(item)
   const modelLabel = formatAudioModelName(item.model)
   const transcript = item.transcription_text ?? ""
   const isLong = transcript.length > 320
   const displayText = isLong && !expanded ? `${transcript.slice(0, 320)}…` : transcript
 
-  const handleCopy = () => {
+  const scheduleCopyStateReset = () => {
+    if (copyResetTimeoutRef.current !== null) {
+      window.clearTimeout(copyResetTimeoutRef.current)
+    }
+    copyResetTimeoutRef.current = window.setTimeout(() => {
+      setCopyState("idle")
+      copyResetTimeoutRef.current = null
+    }, 1800)
+  }
+
+  useEffect(
+    () => () => {
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current)
+      }
+    },
+    [],
+  )
+
+  const handleCopy = async () => {
     if (!transcript) return
-    navigator.clipboard.writeText(transcript).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1800)
-    })
+
+    if (!navigator?.clipboard?.writeText) {
+      setCopyState("error")
+      scheduleCopyStateReset()
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(transcript)
+      setCopyState("copied")
+      scheduleCopyStateReset()
+    } catch {
+      setCopyState("error")
+      scheduleCopyStateReset()
+    }
   }
 
   return (
@@ -45,11 +76,15 @@ export default function AudioCard({ item }: { item: AudioRecord }) {
             {title}
           </Text>
 
-          <Tooltip label={copied ? "Copied!" : "Copy transcription"} withArrow position="left">
+          <Tooltip
+            label={copyState === "copied" ? "Copied!" : copyState === "error" ? "Copy failed" : "Copy transcription"}
+            withArrow
+            position="left"
+          >
             <ActionIcon
               size="sm"
               variant="subtle"
-              color={copied ? "teal" : "gray"}
+              color={copyState === "copied" ? "teal" : copyState === "error" ? "red" : "gray"}
               onClick={handleCopy}
               disabled={!transcript}
               style={{ flexShrink: 0, transition: "color 0.15s" }}
