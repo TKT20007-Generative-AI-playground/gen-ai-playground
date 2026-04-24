@@ -12,6 +12,7 @@ import {
 } from "../api/imageRequests"
 import { formatDurationMs } from "../utils/time"
 import { editImageRequest, fetchBlobByUrl, isCanceledRequest } from "../services/imageService"
+import { notifications } from '@mantine/notifications'
 
 type ImageToEdit = {
   id?: string
@@ -118,7 +119,11 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
 
   async function editImage(nextPrompt: string) {
     if (!userImage || !nextPrompt.trim() || !selectedModel) {
-      alert("Please provide an image, a prompt, and select a model")
+      notifications.show({
+        title: "Edit failed",
+        message: "Please provide an image, a prompt, and select a model",
+        color: "red",
+      })
       return
     }
 
@@ -175,6 +180,11 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
         "Image editing failed",
       )
       setError(message)
+      notifications.show({
+        title: "Image editing failed",
+        message,
+        color: "red",
+      })
     } finally {
       if (editControllerRef.current === controller) {
         editControllerRef.current = null
@@ -264,6 +274,11 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
           "Failed to prepare image for re-edit",
         )
         setError(message)
+        notifications.show({
+          title: "Couldn't prepare image",
+          message,
+          color: "red",
+        })
       })
       .finally(() => {
         if (reeditControllerRef.current === controller) {
