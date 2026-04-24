@@ -460,3 +460,85 @@ class TestCSRFProtection:
         finally:
             client.cookies.clear()
             app.dependency_overrides[validate_csrf_token] = lambda: None
+
+
+class TestRefreshEndpoint:
+    def test_refresh_requires_cookie(self, client):
+        response = client.post("/refresh")
+        assert response.status_code == 401
+        assert "no refresh token" in response.json()["detail"].lower()
+
+    def test_refresh_expired_token(self, client):
+        token = jwt.encode(
+            {
+                "username": "testuser",
+                "type": "refresh",
+                "exp": datetime.utcnow() - timedelta(minutes=1),
+            },
+            settings.JWT_REFRESH_SECRET_KEY,
+            algorithm="HS256",
+        )
+        client.cookies.set("refresh_token", token, path="/refresh")
+
+        response = client.post("/refresh")
+        assert response.status_code == 401
+        assert "expired" in response.json()["detail"].lower()
+
+    def test_refresh_invalid_token(self, client):
+        client.cookies.set("refresh_token", "bad-token", path="/refresh")
+
+        response = client.post("/refresh")
+        assert response.status_code == 401
+        assert "invalid refresh token" in response.json()["detail"].lower()
+
+    def test_refresh_wrong_token_type(self, client):
+        token = jwt.encode(
+            {
+                "username": "testuser",
+                "type": "access",
+                "exp": datetime.utcnow() + timedelta(hours=1),
+            },
+            settings.JWT_REFRESH_SECRET_KEY,
+            algorithm="HS256",
+        )
+        client.cookies.set("refresh_token", token, path="/refresh")
+
+        response = client.post("/refresh")
+        assert response.status_code == 401
+        assert "wrong token type" in response.json()["detail"].lower()
+
+    def test_refresh_user_not_found(self, client):
+        token = jwt.encode(
+            {
+                "username": "ghost",
+                "type": "refresh",
+                "exp": datetime.utcnow() + timedelta(hours=1),
+            },
+            settings.JWT_REFRESH_SECRET_KEY,
+            algorithm="HS256",
+        )
+        client.cookies.set("refresh_token", token, path="/refresh")
+
+        response = client.post("/refresh")
+        assert response.status_code == 401
+        assert "user not found" in response.json()["detail"].lower()
+
+    def test_refresh_success(self, client, registered_user):
+        token = jwt.encode(
+            {
+                "username": registered_user["username"],
+                "type": "refresh",
+                "exp": datetime.utcnow() + timedelta(hours=1),
+            },
+            settings.JWT_REFRESH_SECRET_KEY,
+            algorithm="HS256",
+        )
+        client.cookies.set("refresh_token", token, path="/refresh")
+
+        response = client.post("/refresh")
+        assert response.status_code == 200
+        payload = response.json()
+        assert "token" in payload
+        decoded = jwt.decode(payload["token"], settings.JWT_SECRET_KEY, algorithms=["HS256"])
+        assert decoded["username"] == registered_user["username"]
+        assert decoded["type"] == "access"
