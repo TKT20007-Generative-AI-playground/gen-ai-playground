@@ -1104,8 +1104,6 @@ async def stream(
     messages = stream_req.messages
     enable_thinking = stream_req.enable_thinking or False
     
-    print(f"Stream request for deployment: {deployment_name}, model_path: {model_path}, max_tokens: {max_tokens}, enable_thinking: {enable_thinking}")
-    
     if not model_path:
         deployment_to_model_path = {
             _deployment_name_from_filename(template_name): cfg.model
@@ -1148,7 +1146,6 @@ async def stream(
         "enable_thinking": enable_thinking,
     }
     
-    print(f"Sending request with messages: {messages}")
 
     def _extract_token(payload: str) -> str:
         obj = json.loads(payload)
