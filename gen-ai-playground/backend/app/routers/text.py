@@ -1143,7 +1143,9 @@ async def stream(
         "messages": messages,
         "max_tokens": max_tokens,
         "temperature": 0.7,
+        "top_p": 0.9,
         "stream": True,
+        "enable_thinking": enable_thinking,
     }
     
     print(f"Sending request with messages: {messages}")
