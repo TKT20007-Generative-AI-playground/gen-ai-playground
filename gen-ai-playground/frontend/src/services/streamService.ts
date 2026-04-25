@@ -64,7 +64,8 @@ export function streamText(
       }
 
       if (!settled) {
-        onToken(data)
+        const decoded = data.replace(/\\n/g, "\n")
+        onToken(decoded)
         await sleep(30) // how fast tokens come
       }
     }

@@ -1221,8 +1221,8 @@ async def stream(
                             if before_think:
                                 yield f"data: {before_think}\n\n"
                             continue
-                        
-                        yield f"data: {token}\n\n"
+                        encoded_token = token.replace("\n", "\\n")
+                        yield f"data: {encoded_token}\n\n"
                         full_text = ""
 
                     except Exception:
