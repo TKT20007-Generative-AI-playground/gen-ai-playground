@@ -940,7 +940,6 @@ async def handle_llm_reply(
     db: Database = Depends(get_database),
     cur_user: UserInfo = Depends(get_current_user),
 ):
-
     try:
         try:
             conversation_oid = _parse_conversation_object_id(conversation_id)
@@ -962,7 +961,7 @@ async def handle_llm_reply(
 
         try:
             deployments = verda_service.list_deployments()
-        except Exception as e:
+        except Exception:
             await manager.broadcast(conversation_id, {"type": "error", "message": "Could not reach deployment service."})
             return
 
@@ -993,30 +992,103 @@ async def handle_llm_reply(
 
         await manager.broadcast(conversation_id, {"type": "assistant_typing"})
 
-        # chat
         try:
-            model_path = choose_text_model_path(model_key)
-            result = await asyncio.to_thread(
-                verda_service.chat,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=0.7,
-                top_p=0.9,
-                enable_thinking=effective_enable_thinking,
-                supports_thinking=supports_thinking,
-                deployment_name=deployment_name,
-                model_path=model_path,
-            )
-            assistant_text = result["reply"]
-            assistant_reasoning = result.get("reasoning")
+            verda_client = verda_service._get_client()
+            deployment_obj = verda_client.containers.get_deployment_by_name(deployment_name)
+            base_url = (deployment_obj.endpoint_base_url or "").rstrip("/")
         except Exception as e:
-            await manager.broadcast(conversation_id, {"type": "error", "message": str(e)})
+            await manager.broadcast(conversation_id, {"type": "error", "message": f"Could not get deployment URL: {str(e)}"})
             return
+        normalized = base_url[:-3] if base_url.endswith("/v1") else base_url
+        target_url = f"{normalized}/v1/chat/completions"
 
+        model_path = choose_text_model_path(model_key)
+
+        request_payload = {
+            "model": model_path,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": 0.7,
+            "stream": True,
+        }
+
+        if effective_enable_thinking:
+            request_payload["chat_template_kwargs"] = {"enable_thinking": True}
+
+        assistant_text = ""
+        assistant_reasoning = ""
+        inside_think = False
+
+        async with httpx.AsyncClient(timeout=None) as http_client:
+            async with http_client.stream(
+                "POST",
+                target_url,
+                json=request_payload,
+                headers={
+                    **_inference_headers(),
+                    "Accept": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                },
+            ) as response:
+                if response.status_code >= 400:
+                    detail = (await response.aread()).decode("utf-8", errors="replace")
+                    await manager.broadcast(conversation_id, {"type": "error", "message": detail[:200]})
+                    return
+
+                async for line in response.aiter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+
+                    payload = line[len("data: "):]
+                    if payload == "[DONE]":
+                        break
+
+                    try:
+                        obj = json.loads(payload)
+                        token = obj.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                        if not token:
+                            continue
+                        
+                        if inside_think:
+                            assistant_reasoning += token
+                            if "</think>" in assistant_reasoning:
+                                parts = assistant_reasoning.split("</think>", 1)
+                                assistant_reasoning = parts[0]
+                                leftover = parts[1]
+                                inside_think = False
+                                if leftover:
+                                    assistant_text += leftover
+                                    await manager.broadcast(conversation_id, {
+                                        "type": "assistant_token",
+                                        "token": leftover.replace("\n", "\\n"),
+                                    })
+                            continue
+
+                        if "<think>" in token:
+                            parts = token.split("<think>", 1)
+                            before = parts[0]
+                            inside_think = True
+                            if before:
+                                assistant_text += before
+                                await manager.broadcast(conversation_id, {
+                                    "type": "assistant_token",
+                                    "token": before.replace("\n", "\\n"),
+                                })
+                            continue
+
+                        assistant_text += token
+                        await manager.broadcast(conversation_id, {
+                            "type": "assistant_token",
+                            "token": token.replace("\n", "\\n"),
+                        })
+
+                    except Exception:
+                        continue
+                    
         assistant_message = {
             "role": "assistant",
             "content": assistant_text,
-            "reasoning": assistant_reasoning,
+            "reasoning": assistant_reasoning if assistant_reasoning else None,
         }
         db.conversations.update_one(
             {"_id": conversation_oid},

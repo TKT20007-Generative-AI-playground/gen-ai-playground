@@ -264,6 +264,16 @@ export default function SharedChat() {
                     updateMessages(resolved)
                     pendingIdRef.current = null
 
+                } else if (data.type === "assistant_token") {
+                    const decoded = data.token.replace(/\\n/g, "\n")
+                    pendingContentRef.current += decoded
+                    const updated = messagesRef.current.map(m =>
+                        m.id === pendingIdRef.current
+                            ? { ...m, content: pendingContentRef.current }
+                            : m
+                    )
+                    updateMessages(updated)
+
                 } else if (data.type === "error") {
                     setIsTyping(false)
                     setErrorMsg(data.message ?? "Something went wrong.")
@@ -458,9 +468,20 @@ export default function SharedChat() {
                             </div>
 
                             {message.isPending ? (
-                                message.pendingStartTime ? (
-                                    <ActionStatus actionText="Generating" startTime={message.pendingStartTime} />
-                                ) : null
+                                <>
+                                    {message.content ? (
+                                        <Text
+                                            size="sm"
+                                            style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", overflowWrap: "break-word" }}
+                                        >
+                                            {message.content}
+                                        </Text>
+                                    ) : (
+                                        message.pendingStartTime ? (
+                                            <ActionStatus actionText="Generating" startTime={message.pendingStartTime} />
+                                        ) : null
+                                    )}
+                                </>
                             ) : (
                                 <>
                                     <Text
