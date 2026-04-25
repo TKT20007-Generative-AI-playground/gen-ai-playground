@@ -258,3 +258,4 @@ class StreamRequest(BaseModel):
     deployment_name: str
     max_tokens: int | None = 256
     model_path: Optional[str] = None
+    enable_thinking: Optional[bool] = False

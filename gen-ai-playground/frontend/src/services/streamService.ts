@@ -11,6 +11,7 @@ type StreamRequestBody = {
   deployment_name: string
   model_path?: string
   max_tokens?: number
+  enable_thinking?: boolean
 }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -20,6 +21,7 @@ export function streamText(
   deploymentName: string,
   modelPath: string,
   maxTokens: number,
+  enableThinking: boolean,
   onToken: (token: string) => void,
   onDone?: () => void,
   onError?: (err: unknown) => void
@@ -91,6 +93,7 @@ export function streamText(
         deployment_name: deploymentName,
         model_path: modelPath || undefined,
         max_tokens: maxTokens || undefined,
+        enable_thinking: enableThinking || undefined,
       }
 
       const authFromAxiosDefaults =

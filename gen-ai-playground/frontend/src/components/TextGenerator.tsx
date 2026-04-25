@@ -462,6 +462,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     modelPath?: string,
     history?: { role: string; content: string }[],
     maxTokens?: number,
+    enableThinking?: boolean,
   ) => {
     setLoadingByModel(prev => ({ ...prev, [modelValue]: true }))
 
@@ -476,6 +477,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         deploymentName,
         modelPath ?? "",
         maxTokens ?? 256,
+        enableThinking ?? false,
         (token: string) => {
           setMessagesForModel(modelValue, prevMessages =>
             prevMessages.map(msg =>
@@ -570,6 +572,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
           info.modelPath,
           historyForApi,
           maxTokens,
+          enableThinkingByModel[modelValue] ?? false
         )
       )
     }

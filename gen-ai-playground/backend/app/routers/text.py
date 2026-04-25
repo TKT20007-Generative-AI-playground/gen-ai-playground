@@ -1102,6 +1102,9 @@ async def stream(
     max_tokens = stream_req.max_tokens
     model_path = stream_req.model_path
     messages = stream_req.messages
+    enable_thinking = stream_req.enable_thinking or False
+    
+    print(f"Stream request for deployment: {deployment_name}, model_path: {model_path}, max_tokens: {max_tokens}, enable_thinking: {enable_thinking}")
     
     if not model_path:
         deployment_to_model_path = {
@@ -1217,7 +1220,6 @@ async def stream(
                                 yield f"data: {before_think}\n\n"
                             continue
                         
-                        print(f"Streaming token: {token}")
                         yield f"data: {token}\n\n"
                         full_text = ""
 
