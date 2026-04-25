@@ -232,7 +232,7 @@ function ChatPanel({
                 {message.isPending ? (
                   <>
                     {message.content ? (
-                      
+
                       <Text
                         size="sm"
                         style={{
@@ -267,7 +267,7 @@ function ChatPanel({
                     {message.role === "assistant" && message.reasoning && (
                       <details style={{ marginTop: "8px" }}>
                         <summary style={{ cursor: "pointer", color: "#666", fontSize: "12px" }}>
-                        Show reasoning
+                          Show reasoning
                         </summary>
                         <Text
                           size="xs"
@@ -460,19 +460,19 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     pendingMessageId: string,
     deploymentName: string,
     modelPath?: string,
-    userPrompt?: string,
+    history?: { role: string; content: string }[],
     maxTokens?: number,
   ) => {
     setLoadingByModel(prev => ({ ...prev, [modelValue]: true }))
 
     try {
-      const promptForStream = (userPrompt ?? "").trim()
-      if (!promptForStream) {
-        throw new Error("Cannot stream empty prompt")
+      if (!history || history.length === 0) {
+        throw new Error("Cannot stream empty history")
       }
 
+
       const stream = streamText(
-        promptForStream,
+        history ?? [],
         deploymentName,
         modelPath ?? "",
         maxTokens ?? 256,
@@ -538,11 +538,16 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     setPrompt("")
     const userMessage: Message = { id: makeMessageId(), role: "user", content: currentPrompt }
 
-    // Launch all selected panels in parallel
     const promises: Promise<void>[] = []
 
     for (const modelValue of selectedModels) {
       const existingMessages = messagesByModelRef.current[modelValue] ?? []
+
+      const historyForApi = existingMessages
+        .filter(m => !m.isPending)
+        .map(m => ({ role: m.role, content: m.content }))
+        .concat({ role: "user", content: currentPrompt })
+
       const pendingMessageId = makeMessageId()
       const pendingAssistantMessage: Message = {
         id: pendingMessageId,
@@ -552,8 +557,10 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         isPending: true,
         pendingStartTime: Date.now(),
       }
+
       const updatedMessages = existingMessages.concat(userMessage, pendingAssistantMessage)
       setMessagesForModel(modelValue, updatedMessages)
+
       const info = deploymentInfoByModel[modelValue]
       promises.push(
         sendToPanel(
@@ -561,7 +568,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
           pendingMessageId,
           info.deploymentName,
           info.modelPath,
-          currentPrompt,
+          historyForApi,
           maxTokens,
         )
       )

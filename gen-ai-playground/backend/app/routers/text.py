@@ -1099,9 +1099,9 @@ async def stream(
         Stream text generation responses token-by-token using Server-Sent Events (SSE).
     """
     deployment_name = stream_req.deployment_name
-    prompt = stream_req.prompt
     max_tokens = stream_req.max_tokens
     model_path = stream_req.model_path
+    messages = stream_req.messages
     
     if not model_path:
         deployment_to_model_path = {
@@ -1137,11 +1137,13 @@ async def stream(
 
     request_payload = {
         "model": model_path,
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": messages,
         "max_tokens": max_tokens,
         "temperature": 0.7,
         "stream": True,
     }
+    
+    print(f"Sending request with messages: {messages}")
 
     def _extract_token(payload: str) -> str:
         obj = json.loads(payload)
@@ -1214,7 +1216,8 @@ async def stream(
                             if before_think:
                                 yield f"data: {before_think}\n\n"
                             continue
-
+                        
+                        print(f"Streaming token: {token}")
                         yield f"data: {token}\n\n"
                         full_text = ""
 

@@ -254,7 +254,7 @@ class ConversationCreateRequest(BaseModel):
     initial_messages: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     
 class StreamRequest(BaseModel):
-    prompt: str
+    messages: list[dict] 
     deployment_name: str
     max_tokens: int | None = 256
     model_path: Optional[str] = None

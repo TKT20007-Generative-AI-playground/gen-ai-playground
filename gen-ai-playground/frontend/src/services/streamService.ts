@@ -7,7 +7,7 @@ export type StreamTextHandle = {
 }
 
 type StreamRequestBody = {
-  prompt: string
+  messages: { role: string; content: string }[]
   deployment_name: string
   model_path?: string
   max_tokens?: number
@@ -16,7 +16,7 @@ type StreamRequestBody = {
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 export function streamText(
-  prompt: string,
+  messages: { role: string; content: string }[],
   deploymentName: string,
   modelPath: string,
   maxTokens: number,
@@ -87,7 +87,7 @@ export function streamText(
   const done = (async () => {
     try {
       const body: StreamRequestBody = {
-        prompt,
+        messages,
         deployment_name: deploymentName,
         model_path: modelPath || undefined,
         max_tokens: maxTokens || undefined,
