@@ -230,11 +230,27 @@ function ChatPanel({
                 </div>
 
                 {message.isPending ? (
-                  message.pendingStartTime ? (
-                    <div>
-                      <ActionStatus actionText="Generating" startTime={message.pendingStartTime} />
-                    </div>
-                  ) : null
+                  <>
+                    {message.content ? (
+                      
+                      <Text
+                        size="sm"
+                        style={{
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          overflowWrap: "break-word",
+                        }}
+                      >
+                        {message.content}
+                      </Text>
+                    ) : (
+                      message.pendingStartTime ? (
+                        <div>
+                          <ActionStatus actionText="Generating" startTime={message.pendingStartTime} />
+                        </div>
+                      ) : null
+                    )}
+                  </>
                 ) : (
                   <>
                     <Text
@@ -251,7 +267,7 @@ function ChatPanel({
                     {message.role === "assistant" && message.reasoning && (
                       <details style={{ marginTop: "8px" }}>
                         <summary style={{ cursor: "pointer", color: "#666", fontSize: "12px" }}>
-                          Show reasoning
+                        Show reasoning
                         </summary>
                         <Text
                           size="xs"
@@ -345,7 +361,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
 
 
   // Fetch available models from backend
- useEffect(() => {
+  useEffect(() => {
     if (!isLoggedIn) return
 
     const fetchModels = async () => {
@@ -414,21 +430,24 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   }
   const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
 
-    async function loadDeploymentInfo(modelValue: string) {
-    if (deploymentNames[modelValue] && modelPaths[modelValue]) {
-      return
+  async function loadDeploymentInfo(modelValue: string): Promise<{ deploymentName: string; modelPath: string | undefined }> {
+    const existingDeploymentName = deploymentNames[modelValue]
+    const existingModelPath = modelPaths[modelValue]
+    if (existingDeploymentName) {
+      return { deploymentName: existingDeploymentName, modelPath: existingModelPath }
     }
 
     const containers = await fetchDashboardContainers()
     const container = containers.find(c =>
       c.name.trim().toLowerCase() === modelValue.trim().toLowerCase()
     )
-      if (!container) {
+    if (!container) {
       throw new Error(`Model ${modelValue} is not deployed in dashboard`)
     }
 
     setDeploymentNames(prev => ({ ...prev, [modelValue]: container.name }))
     setModelPaths(prev => ({ ...prev, [modelValue]: container.model_path }))
+    return { deploymentName: container.name, modelPath: container.model_path }
   }
 
 
@@ -438,27 +457,28 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
    */
   const sendToPanel = useCallback(async (
     modelValue: string,
-    messagesWithUser: Message[],
     pendingMessageId: string,
+    deploymentName: string,
+    modelPath?: string,
+    userPrompt?: string,
+    maxTokens?: number,
   ) => {
     setLoadingByModel(prev => ({ ...prev, [modelValue]: true }))
-    console.log("Streaming to", modelValue, "with:", {
-      deployment: deploymentNames[modelValue],
-      modelPath: modelPaths[modelValue],
-  })
 
     try {
-      const requestMessages = messagesWithUser
-        .filter(message => !message.isPending)
-        .map(message => ({ role: message.role, content: message.content }))
+      const promptForStream = (userPrompt ?? "").trim()
+      if (!promptForStream) {
+        throw new Error("Cannot stream empty prompt")
+      }
 
-      streamText(
-        requestMessages.map(m => m.content).join("\n"),
-        deploymentNames[modelValue],
-        modelPaths[modelValue], 
+      const stream = streamText(
+        promptForStream,
+        deploymentName,
+        modelPath ?? "",
+        maxTokens ?? 256,
         (token: string) => {
-          setMessagesForModel(modelValue, (prevMessages) =>
-            prevMessages.map((msg) =>
+          setMessagesForModel(modelValue, prevMessages =>
+            prevMessages.map(msg =>
               msg.id === pendingMessageId
                 ? { ...msg, content: msg.content + token }
                 : msg
@@ -466,48 +486,53 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
           )
         },
         () => {
-          setMessagesForModel(modelValue, (prevMessages) =>
-            prevMessages.map((msg) =>
+          setMessagesForModel(modelValue, prevMessages =>
+            prevMessages.map(msg =>
               msg.id === pendingMessageId
                 ? {
-                    ...msg,
-                    isPending: false,
-                    pendingStartTime: undefined,
-                    generationTimeMs: Date.now() - (msg.pendingStartTime ?? Date.now()),
-                  }
+                  ...msg,
+                  isPending: false,
+                  pendingStartTime: undefined,
+                  generationTimeMs: Date.now() - (msg.pendingStartTime ?? Date.now()),
+                }
                 : msg
             )
           )
         },
         (err: unknown) => {
           console.error("Streaming error:", err)
-          setMessagesForModel(modelValue, (prevMessages) =>
-            prevMessages.map((msg) =>
+          setMessagesForModel(modelValue, prevMessages =>
+            prevMessages.map(msg =>
               msg.id === pendingMessageId
                 ? {
-                    ...msg,
-                    content: "Failed to stream response.",
-                    isPending: false,
-                    pendingStartTime: undefined,
-                  }
+                  ...msg,
+                  content: "Failed to stream response.",
+                  isPending: false,
+                  pendingStartTime: undefined,
+                }
                 : msg
             )
           )
         }
       )
 
+      await stream.done
     } catch (error) {
-      console.error("Streaming error:", error)
+      console.error("Streaming failed:", error)
     } finally {
       setLoadingByModel(prev => ({ ...prev, [modelValue]: false }))
     }
-  }, [deploymentNames, modelPaths]);
+  }, [])
 
   const generateText = async () => {
     if (!prompt.trim()) return
     if (selectedModels.length === 0) return
 
-    await Promise.all(selectedModels.map(m => loadDeploymentInfo(m)))
+    const deploymentInfoEntries = await Promise.all(
+      selectedModels.map(async (modelValue) => [modelValue, await loadDeploymentInfo(modelValue)] as const)
+    )
+    const deploymentInfoByModel: Record<string, { deploymentName: string; modelPath: string | undefined }> =
+      Object.fromEntries(deploymentInfoEntries)
 
     const currentPrompt = prompt
     setPrompt("")
@@ -529,7 +554,17 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       }
       const updatedMessages = existingMessages.concat(userMessage, pendingAssistantMessage)
       setMessagesForModel(modelValue, updatedMessages)
-      promises.push(sendToPanel(modelValue, updatedMessages, pendingMessageId))
+      const info = deploymentInfoByModel[modelValue]
+      promises.push(
+        sendToPanel(
+          modelValue,
+          pendingMessageId,
+          info.deploymentName,
+          info.modelPath,
+          currentPrompt,
+          maxTokens,
+        )
+      )
     }
 
     await Promise.all(promises)

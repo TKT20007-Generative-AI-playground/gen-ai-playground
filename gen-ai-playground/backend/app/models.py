@@ -252,3 +252,9 @@ class ConversationCreateRequest(BaseModel):
     participants: Optional[List[str]] = None
     model_key: Optional[str] = None
     initial_messages: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    
+class StreamRequest(BaseModel):
+    prompt: str
+    deployment_name: str
+    max_tokens: int | None = 256
+    model_path: Optional[str] = None

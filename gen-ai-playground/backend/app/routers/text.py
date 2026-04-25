@@ -12,11 +12,13 @@ from pymongo.database import Database
 from datetime import datetime, timezone
 from typing import Optional
 import time
+import json
 from bson import ObjectId
 import asyncio
 import httpx
 
 from app.database import get_database
+from app.config import settings
 from app.dependencies import get_current_user, verify_token, get_admin_user, validate_csrf_token
 from app.models import (
     HistoryResponseText,
@@ -29,6 +31,7 @@ from app.models import (
     ConnectDeploymentRequest,
     UserInfo,
     ConversationCreateRequest,
+    StreamRequest,
 )
 from app.verda_service import verda_service
 from app.template_discovery import get_template_map, get_template_configs, _deployment_name_from_filename
@@ -49,6 +52,13 @@ def _parse_conversation_object_id(conversation_id: str) -> ObjectId:
         raise HTTPException(status_code=400, detail="Invalid conversation id")
 
 manager = ConnectionManager()
+
+
+def _inference_headers() -> dict[str, str]:
+    token = settings.VERDA_INFERENCE_KEY or settings.VERDA_API_KEY
+    if not token:
+        return {}
+    return {"Authorization": f"Bearer {token}"}
 
 router = APIRouter(
     prefix="/text",
@@ -1080,44 +1090,137 @@ def chat_messages_length(
     length = db.text_generations.count_documents({"username": cur_user.username})
     return {"length": length}
 
-@router.get("/stream")
-async def stream(prompt: str, deployment_name: str, model_path: str):
-    client = verda_service._get_client()
-    deployment = client.containers.get_deployment_by_name(deployment_name)
+@router.post("/stream")
+async def stream(
+    stream_req: StreamRequest,
+    _: UserInfo = Depends(get_current_user),
+):
+    """
+        Stream text generation responses token-by-token using Server-Sent Events (SSE).
+    """
+    deployment_name = stream_req.deployment_name
+    prompt = stream_req.prompt
+    max_tokens = stream_req.max_tokens
+    model_path = stream_req.model_path
+    
+    if not model_path:
+        deployment_to_model_path = {
+            _deployment_name_from_filename(template_name): cfg.model
+            for template_name, cfg in get_template_configs().items()
+        }
+        model_path = deployment_to_model_path.get(deployment_name.lower())
 
-    url = f"{deployment.endpoint_base_url}/v1/chat/completions"
+    if not model_path:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Could not resolve model_path for deployment '{deployment_name}'. "
+                "Provide model_path in request body or ensure deployment name matches a known template."
+            ),
+        )
+
+    try:
+        client = verda_service._get_client()
+        deployment = client.containers.get_deployment_by_name(deployment_name)
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not find deployment '{deployment_name}' or initialize Verda client",
+        )
+
+    base_url = (deployment.endpoint_base_url or "").rstrip("/")
+    if not base_url:
+        raise HTTPException(status_code=503, detail="Deployment endpoint URL is missing")
+
+    normalized_base_url = base_url[:-3] if base_url.endswith("/v1") else base_url
+    target_url = f"{normalized_base_url}/v1/chat/completions"
+
+    request_payload = {
+        "model": model_path,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+        "temperature": 0.7,
+        "stream": True,
+    }
+
+    def _extract_token(payload: str) -> str:
+        obj = json.loads(payload)
+        choice = obj.get("choices", [{}])[0]
+        delta = choice.get("delta", {})
+        return delta.get("content", "")
 
     async def event_generator():
-        async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream(
+        full_text = ""
+        inside_think = False
+
+        async with httpx.AsyncClient(timeout=None) as async_client:
+            async with async_client.stream(
                 "POST",
-                url,
-                json={
-                    "model": model_path,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 512,
-                    "temperature": 0.7,
-                    "stream": True,
+                target_url,
+                json=request_payload,
+                headers={
+                    **_inference_headers(),
+                    "Accept": "text/event-stream",
+                    "Cache-Control": "no-cache",
                 },
             ) as response:
+                print(f"Stream upstream status={response.status_code} url={target_url}")
+
+                if response.status_code >= 400:
+                    detail = (await response.aread()).decode("utf-8", errors="replace")
+                    print(f"Stream upstream error status={response.status_code} body={detail}")
+                    message = json.dumps(
+                        {
+                            "error": "Upstream stream failed",
+                            "status": response.status_code,
+                            "detail": detail[:500],
+                        }
+                    )
+                    yield f"data: {message}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
 
                 async for line in response.aiter_lines():
-                    if not line:
+                    if not line or not line.startswith("data: "):
                         continue
 
-                    if line.startswith("data: "):
-                        payload = line[len("data: "):]
+                    payload = line[len("data: "):]
+                    if payload == "[DONE]":
+                        yield "data: [DONE]\n\n"
+                        return
 
-                        if payload == "[DONE]":
-                            yield "data: [DONE]\n\n"
-                            break
-
-                        try:
-                            obj = json.loads(payload)
-                            delta = obj["choices"][0]["delta"].get("content", "")
-                            if delta:
-                                yield f"data: {delta}\n\n"
-                        except:
+                    try:
+                        token = _extract_token(payload)
+                        if not token:
                             continue
+
+                        full_text += token
+
+                      
+                        if inside_think:
+                            if "</think>" in full_text:
+                                inside_think = False
+                                full_text = full_text.split("</think>", 1)[1]
+                                if full_text:
+                                    yield f"data: {full_text}\n\n"
+                                    full_text = ""
+                            continue
+
+                      
+                        if "<think>" in full_text:
+                            inside_think = True
+                            before_think = full_text.split("<think>", 1)[0]
+                            full_text = ""
+                            if before_think:
+                                yield f"data: {before_think}\n\n"
+                            continue
+
+                        yield f"data: {token}\n\n"
+                        full_text = ""
+
+                    except Exception:
+                        continue
+
+        yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
