@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSock
 from fastapi.responses import StreamingResponse
 from pymongo.database import Database
 from datetime import datetime, timezone
-from typing import Optional
+from typing import AsyncIterator, Literal, Optional
 import time
 import json
 from bson import ObjectId
@@ -59,6 +59,8 @@ def _inference_headers() -> dict[str, str]:
     if not token:
         return {}
     return {"Authorization": f"Bearer {token}"}
+
+
 
 router = APIRouter(
     prefix="/text",
@@ -932,6 +934,100 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
             },
         )
         
+
+def _extract_stream_delta(payload: str) -> tuple[str, str]:
+    obj = json.loads(payload)
+    choice = obj.get("choices", [{}])[0]
+    delta = choice.get("delta", {})
+
+    content = delta.get("content")
+    reasoning = delta.get("reasoning_content")
+
+    if not isinstance(reasoning, str) or not reasoning:
+        reasoning = delta.get("reasoning")
+
+    return (
+        content if isinstance(content, str) else "",
+        reasoning if isinstance(reasoning, str) else "",
+    )
+
+
+async def _iter_processed_chat_stream(
+    response: httpx.Response,
+    include_reasoning: bool = True,
+) -> AsyncIterator[tuple[Literal["content", "reasoning"], str]]:
+    pending_content = ""
+    inside_think = False
+
+    async for line in response.aiter_lines():
+        if not line or not line.startswith("data: "):
+            continue
+
+        payload = line[len("data: "):]
+        if payload == "[DONE]":
+            break
+
+        try:
+            content_token, reasoning_token = _extract_stream_delta(payload)
+        except Exception:
+            continue
+
+        if include_reasoning and reasoning_token:
+            yield "reasoning", reasoning_token
+
+        if not content_token:
+            continue
+
+        pending_content += content_token
+
+        while pending_content:
+            if inside_think:
+                end_idx = pending_content.find("</think>")
+                if end_idx == -1:
+                    # Keep a short suffix so split end-tags can be matched.
+                    safe_len = max(0, len(pending_content) - (len("</think>") - 1))
+                    if safe_len == 0:
+                        break
+
+                    reasoning_piece = pending_content[:safe_len]
+                    pending_content = pending_content[safe_len:]
+                    if include_reasoning and reasoning_piece:
+                        yield "reasoning", reasoning_piece
+                    break
+
+                reasoning_piece = pending_content[:end_idx]
+                pending_content = pending_content[end_idx + len("</think>"):]
+                inside_think = False
+                if include_reasoning and reasoning_piece:
+                    yield "reasoning", reasoning_piece
+                continue
+
+            start_idx = pending_content.find("<think>")
+            if start_idx == -1:
+                # Keep a short suffix so split start-tags can be matched.
+                safe_len = max(0, len(pending_content) - (len("<think>") - 1))
+                if safe_len == 0:
+                    break
+
+                visible_piece = pending_content[:safe_len]
+                pending_content = pending_content[safe_len:]
+                if visible_piece:
+                    yield "content", visible_piece
+                break
+
+            before_think = pending_content[:start_idx]
+            pending_content = pending_content[start_idx + len("<think>"):]
+            inside_think = True
+            if before_think:
+                yield "content", before_think
+
+    if pending_content:
+        if inside_think:
+            if include_reasoning:
+                yield "reasoning", pending_content
+        else:
+            yield "content", pending_content
+        
 async def handle_llm_reply(
     conversation_id: str,
     model_key: str,
@@ -1017,7 +1113,6 @@ async def handle_llm_reply(
 
         assistant_text = ""
         assistant_reasoning = ""
-        inside_think = False
 
         async with httpx.AsyncClient(timeout=None) as http_client:
             async with http_client.stream(
@@ -1035,60 +1130,24 @@ async def handle_llm_reply(
                     await manager.broadcast(conversation_id, {"type": "error", "message": detail[:200]})
                     return
 
-                async for line in response.aiter_lines():
-                    if not line or not line.startswith("data: "):
+                async for chunk_type, chunk_text in _iter_processed_chat_stream(
+                    response,
+                    include_reasoning=effective_enable_thinking,
+                ):
+                    if chunk_type == "reasoning":
+                        assistant_reasoning += chunk_text
                         continue
 
-                    payload = line[len("data: "):]
-                    if payload == "[DONE]":
-                        break
-
-                    try:
-                        obj = json.loads(payload)
-                        token = obj.get("choices", [{}])[0].get("delta", {}).get("content", "")
-                        if not token:
-                            continue
-                        
-                        if inside_think:
-                            assistant_reasoning += token
-                            if "</think>" in assistant_reasoning:
-                                parts = assistant_reasoning.split("</think>", 1)
-                                assistant_reasoning = parts[0]
-                                leftover = parts[1]
-                                inside_think = False
-                                if leftover:
-                                    assistant_text += leftover
-                                    await manager.broadcast(conversation_id, {
-                                        "type": "assistant_token",
-                                        "token": leftover.replace("\n", "\\n"),
-                                    })
-                            continue
-
-                        if "<think>" in token:
-                            parts = token.split("<think>", 1)
-                            before = parts[0]
-                            inside_think = True
-                            if before:
-                                assistant_text += before
-                                await manager.broadcast(conversation_id, {
-                                    "type": "assistant_token",
-                                    "token": before.replace("\n", "\\n"),
-                                })
-                            continue
-
-                        assistant_text += token
-                        await manager.broadcast(conversation_id, {
-                            "type": "assistant_token",
-                            "token": token.replace("\n", "\\n"),
-                        })
-
-                    except Exception:
-                        continue
+                    assistant_text += chunk_text
+                    await manager.broadcast(conversation_id, {
+                        "type": "assistant_token",
+                        "token": chunk_text.replace("\n", "\\n"),
+                    })
                     
         assistant_message = {
             "role": "assistant",
             "content": assistant_text,
-            "reasoning": assistant_reasoning if assistant_reasoning else None,
+            "reasoning": assistant_reasoning if (effective_enable_thinking and assistant_reasoning) else None,
         }
         db.conversations.update_one(
             {"_id": conversation_oid},
@@ -1219,16 +1278,7 @@ async def stream(
     }
     
 
-    def _extract_token(payload: str) -> str:
-        obj = json.loads(payload)
-        choice = obj.get("choices", [{}])[0]
-        delta = choice.get("delta", {})
-        return delta.get("content", "")
-
     async def event_generator():
-        full_text = ""
-        inside_think = False
-
         async with httpx.AsyncClient(timeout=None) as async_client:
             async with async_client.stream(
                 "POST",
@@ -1256,46 +1306,17 @@ async def stream(
                     yield "data: [DONE]\n\n"
                     return
 
-                async for line in response.aiter_lines():
-                    if not line or not line.startswith("data: "):
+                async for chunk_type, chunk_text in _iter_processed_chat_stream(
+                    response,
+                    include_reasoning=enable_thinking,
+                ):
+                    if chunk_type == "reasoning":
+                        encoded_reasoning = chunk_text.replace("\n", "\\n")
+                        yield f"data: {json.dumps({'reasoning': encoded_reasoning})}\n\n"
                         continue
 
-                    payload = line[len("data: "):]
-                    if payload == "[DONE]":
-                        yield "data: [DONE]\n\n"
-                        return
-
-                    try:
-                        token = _extract_token(payload)
-                        if not token:
-                            continue
-
-                        full_text += token
-
-                      
-                        if inside_think:
-                            if "</think>" in full_text:
-                                inside_think = False
-                                full_text = full_text.split("</think>", 1)[1]
-                                if full_text:
-                                    yield f"data: {full_text}\n\n"
-                                    full_text = ""
-                            continue
-
-                      
-                        if "<think>" in full_text:
-                            inside_think = True
-                            before_think = full_text.split("<think>", 1)[0]
-                            full_text = ""
-                            if before_think:
-                                yield f"data: {before_think}\n\n"
-                            continue
-                        encoded_token = token.replace("\n", "\\n")
-                        yield f"data: {encoded_token}\n\n"
-                        full_text = ""
-
-                    except Exception:
-                        continue
+                    encoded_visible = chunk_text.replace("\n", "\\n")
+                    yield f"data: {encoded_visible}\n\n"
 
         yield "data: [DONE]\n\n"
 

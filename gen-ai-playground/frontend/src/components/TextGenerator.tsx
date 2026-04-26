@@ -487,6 +487,15 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
             )
           )
         },
+        (reasoningToken: string) => {
+          setMessagesForModel(modelValue, prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === pendingMessageId
+                ? { ...msg, reasoning: (msg.reasoning ?? "") + reasoningToken }
+                : msg
+            )
+          )
+        },
         () => {
           setMessagesForModel(modelValue, prevMessages =>
             prevMessages.map(msg =>

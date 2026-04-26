@@ -23,6 +23,7 @@ export function streamText(
   maxTokens: number,
   enableThinking: boolean,
   onToken: (token: string) => void,
+  onReasoning?: (reasoningToken: string) => void,
   onDone?: () => void,
   onError?: (err: unknown) => void
 ): StreamTextHandle {
@@ -33,7 +34,7 @@ export function streamText(
   const parseEventBlock = async (eventBlock: string) => {
     const lines = eventBlock.split("\n")
     for (const rawLine of lines) {
-      const line = rawLine.trimEnd()
+      const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine
       if (!line.startsWith("data:")) continue
 
       // so that the word are not clued together, we need to add a space after data: if there isn't one
@@ -52,6 +53,25 @@ export function streamText(
           return
         } catch {
           // If parsing fails continue 
+        }
+      }
+
+      if (data.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(data) as { reasoning?: string; token?: string }
+          if (typeof parsed.reasoning === "string") {
+            const decodedReasoning = parsed.reasoning.replace(/\\n/g, "\n")
+            onReasoning?.(decodedReasoning)
+            continue
+          }
+          if (typeof parsed.token === "string") {
+            const decodedToken = parsed.token.replace(/\\n/g, "\n")
+            onToken(decodedToken)
+            await sleep(30)
+            continue
+          }
+        } catch {
+          // If parsing fails, treat payload as plain token text.
         }
       }
 
