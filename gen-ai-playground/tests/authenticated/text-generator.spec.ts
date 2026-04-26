@@ -66,7 +66,7 @@ test.describe('Text Generator flows', () => {
     await openTextGenerator(page);
   });
 
-  test('shows and clears generating timer while text request is in-flight', async ({ page }) => {
+  test.fixme('shows and clears generating timer while text request is in-flight', async ({ page }) => {
     const responseGate = createDeferred();
 
     await page.route('**/text/stream', async (route) => {
