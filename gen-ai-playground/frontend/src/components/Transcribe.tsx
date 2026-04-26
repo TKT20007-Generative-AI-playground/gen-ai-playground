@@ -9,6 +9,7 @@ import {
   fetchAudioModelStatuses as fetchAudioModelStatusesRequest,
   transcribeAudio,
 } from "../services/audioService"
+import { notifications } from '@mantine/notifications'
 
 type TranscriptionSegment = {
   start: number
@@ -91,7 +92,6 @@ export default function Transcribe() {
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null)
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [activeTranscribeSource, setActiveTranscribeSource] = useState<TranscribeSource | null>(null)
 
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
@@ -221,11 +221,14 @@ export default function Transcribe() {
 
   const transcribeFile = async (targetFile: File, source: TranscribeSource) => {
     if (selectedModels.length === 0) {
-      setError("Please select at least one live audio model first.")
+      notifications.show({
+        title: "Error",
+        message: "Please select at least one live audio model first.",
+        color: "red",
+      })
       return
     }
 
-    setError(null)
     setActiveTranscribeSource(source)
     setIsLoading(true)
 
@@ -297,7 +300,11 @@ export default function Transcribe() {
 
   const onTranscribeUploaded = async () => {
     if (!file) {
-      setError("Please choose an audio file first.")
+      notifications.show({
+        title: "Error",
+        message: "Please choose an audio file first.",
+        color: "red",
+      })
       return
     }
     await transcribeFile(file, "uploaded")
@@ -305,7 +312,11 @@ export default function Transcribe() {
 
   const onTranscribeRecording = async () => {
     if (!recordedBlob) {
-      setError("Please record audio first.")
+      notifications.show({
+        title: "Error",
+        message: "Please record audio first.",
+        color: "red",
+      })
       return
     }
     await transcribeFile(toTranscribeFile(recordedBlob), "recording")
@@ -313,12 +324,15 @@ export default function Transcribe() {
 
   const startRecording = async () => {
     if (!recordingSupported) {
-      setError("Audio recording is not supported in this browser.")
+      notifications.show({
+        title: "Error",
+        message: "Audio recording is not supported in this browser.",
+        color: "red",
+      })
       return
     }
     if (isLoading || isRecording) return
 
-    setError(null)
     setResultsByModel({})
     setRecordedBlob(null)
     replaceRecordedAudioUrl(null)
@@ -352,7 +366,11 @@ export default function Transcribe() {
         stopActiveStream()
 
         if (!outputBlob.size) {
-          setError("No audio captured. Please try recording again.")
+          notifications.show({
+            title: "Error",
+            message: "No audio captured. Please try recording again.",
+            color: "red",
+          })
           return
         }
 
@@ -364,7 +382,11 @@ export default function Transcribe() {
         setIsRecording(false)
         setRecordingStartTime(null)
         stopActiveStream()
-        setError("Recording failed. Please try again.")
+        notifications.show({
+          title: "Error",
+          message: "Recording failed. Please try again.",
+          color: "red",
+        })
       }
 
       recorder.start()
@@ -374,7 +396,11 @@ export default function Transcribe() {
       stopActiveStream()
       setIsRecording(false)
       setRecordingStartTime(null)
-      setError("Microphone permission denied or unavailable. Please allow microphone access and retry.")
+      notifications.show({
+        title: "Error",
+        message: "Microphone permission denied or unavailable. Please allow microphone access and retry.",
+        color: "red",
+      })
     }
   }
 
@@ -536,12 +562,6 @@ export default function Transcribe() {
               )}
             </div>
           </div>
-
-          {error ? (
-            <Alert color="red" variant="light">
-              {error}
-            </Alert>
-          ) : null}
 
           <div
             style={{

@@ -110,8 +110,7 @@ test.describe("Generator page flows", () => {
     const createBtn = page.getByRole("button", { name: "Create image" });
     await createBtn.click();
 
-    const alertMessage = await page.evaluate(() => (window as any)._lastAlert);
-    expect(alertMessage).toBe("Please select a model");
+    await expect(page.getByText("Please select at least one model")).toBeVisible();
 
     await expectImagesVisible(page, false, false);
   });
@@ -222,7 +221,7 @@ test.describe("Generator page flows", () => {
     await selectModels(page, 'FLUX.2 [klein] 9B');
     await enterPromptAndGenerate(page, 'Failure path prompt');
 
-    await expect(page.getByText(/(Network Error|Image generation failed|Request failed)/i)).toBeVisible();
+    await expect(page.getByText('FLUX.2 [klein] 9B failed')).toBeVisible();
     await expect(page.getByAltText('Generated image 1')).toHaveCount(0);
   });
 });

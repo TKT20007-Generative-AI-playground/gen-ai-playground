@@ -10,17 +10,15 @@ import {
   PasswordInput,
   Button,
   Title,
-  Alert,
   Stack,
 } from "@mantine/core"
+import { notifications } from '@mantine/notifications'
 
 export default function Register() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [inviteCode, setInviteCode] = useState("")
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
   const [passwordError, setPasswordError] = useState("")
   const { isLoggedIn } = useAuth()
   const navigate = useNavigate()
@@ -47,17 +45,23 @@ export default function Register() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError("")
-    setSuccess("")
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match")
+      notifications.show({
+        title: "Failure",
+        message: "Passwords do not match",
+        color: "red",
+      })
       return
     }
 
     const validationError = validatePassword(password)
     if (validationError) {
-      setError(validationError)
+      notifications.show({
+        title: "Failure",
+        message: validationError,
+        color: "red",
+      })
       return
     }
 
@@ -68,7 +72,11 @@ export default function Register() {
         invitation_code: inviteCode,
       })
 
-      setSuccess("User registered successfully!")
+      notifications.show({
+        title: "Success",
+        message: "User registered successfully!",
+        color: "green",
+      })
       setUsername("")
       setPassword("")
       setConfirmPassword("")
@@ -79,11 +87,11 @@ export default function Register() {
       }, 1500) // timeout so that the user can see that registration was successful
     } catch (err) {
       const detail = getAxiosDetailMessage(err)
-      if (!detail || detail === "Network Error") {
-        setError("Registration failed")
-      } else {
-        setError(detail)
-      }
+      notifications.show({
+        title: "Failure",
+        message: !detail || detail === "Network Error" ? "Registration failed" : detail,
+        color: "red",
+      })
     }
   }
 
@@ -142,18 +150,6 @@ export default function Register() {
             </Button>
           </Stack>
         </form>
-
-        {error && (
-          <Alert color="red" mt="md">
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert color="green" mt="md">
-            {success}
-          </Alert>
-        )}
       </Paper>
     </Container>
   )
