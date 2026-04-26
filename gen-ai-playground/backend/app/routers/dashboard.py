@@ -18,7 +18,6 @@ router = APIRouter(
 
 
 @router.get("/containers", response_model=List[ContainerInfo])
-@router.get("/containers", response_model=List[ContainerInfo])
 def list_containers(
     admin: UserInfo = Depends(get_admin_user)
 ):

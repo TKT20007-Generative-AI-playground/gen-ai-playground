@@ -14,8 +14,6 @@ type StreamRequestBody = {
   enable_thinking?: boolean
 }
 
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
 export function streamText(
   messages: { role: string; content: string }[],
   deploymentName: string,
@@ -40,38 +38,37 @@ export function streamText(
       // so that the word are not clued together, we need to add a space after data: if there isn't one
       const data = line.startsWith("data: ") ? line.slice(6) : line.slice(5)
 
-      // Backend may think it is helpful to send error details as a JSON-encoded string; if so, parse and handle it
-      if (data.startsWith("{") && data.includes("\"error\"")) {
-        try {
-          const parsed = JSON.parse(data) as { error?: string; status?: number; detail?: string }
-          const statusPart = parsed.status ? ` (status ${parsed.status})` : ""
-          const detailPart = parsed.detail ? `: ${parsed.detail}` : ""
-          if (!settled) {
-            settled = true
-            onError?.(new Error(`${parsed.error ?? "Stream error"}${statusPart}${detailPart}`))
-          }
-          return
-        } catch {
-          // If parsing fails continue 
-        }
-      }
-
+      // Try to parse JSON frames once and dispatch on the actual field present.
+      // Substring-based detection (e.g. checking for "error" in the raw text)
+      // would false-trip on legitimate tokens that contain the word "error".
       if (data.startsWith("{")) {
         try {
-          const parsed = JSON.parse(data) as { reasoning?: string; token?: string }
+          const parsed = JSON.parse(data) as {
+            error?: string
+            status?: number
+            detail?: string
+            reasoning?: string
+            token?: string
+          }
+          if (typeof parsed.error === "string") {
+            const statusPart = parsed.status ? ` (status ${parsed.status})` : ""
+            const detailPart = parsed.detail ? `: ${parsed.detail}` : ""
+            if (!settled) {
+              settled = true
+              onError?.(new Error(`${parsed.error}${statusPart}${detailPart}`))
+            }
+            return
+          }
           if (typeof parsed.reasoning === "string") {
-            const decodedReasoning = parsed.reasoning.replace(/\\n/g, "\n")
-            onReasoning?.(decodedReasoning)
+            onReasoning?.(parsed.reasoning.replace(/\\n/g, "\n"))
             continue
           }
           if (typeof parsed.token === "string") {
-            const decodedToken = parsed.token.replace(/\\n/g, "\n")
-            onToken(decodedToken)
-            await sleep(30)
+            onToken(parsed.token.replace(/\\n/g, "\n"))
             continue
           }
         } catch {
-          // If parsing fails, treat payload as plain token text.
+          // Not valid JSON — fall through to the plain-text token handler below.
         }
       }
 
@@ -86,7 +83,6 @@ export function streamText(
       if (!settled) {
         const decoded = data.replace(/\\n/g, "\n")
         onToken(decoded)
-        await sleep(30) // how fast tokens come
       }
     }
   }

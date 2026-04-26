@@ -67,8 +67,6 @@ router = APIRouter(
     tags=["text"],
 )
 
-last_request = None
-
 @router.get("/models")
 def list_available_models(current_user: UserInfo = Depends(get_current_user)):
     """
@@ -934,11 +932,21 @@ async def handle_llm_reply(
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": 0.7,
+            "top_p": 0.9,
             "stream": True,
+            "separate_reasoning": True,
         }
 
         if effective_enable_thinking:
-            request_payload["chat_template_kwargs"] = {"enable_thinking": True}
+            thinking_kwargs = {
+                "enable_thinking": True,
+                "thinking": True,
+            }
+            request_payload["chat_template_kwargs"] = thinking_kwargs
+            request_payload["extra_body"] = {
+                "chat_template_kwargs": thinking_kwargs,
+                "separate_reasoning": True,
+            }
 
         assistant_text = ""
         assistant_reasoning = ""
@@ -1062,8 +1070,9 @@ async def stream(
     deployment_name = stream_req.deployment_name
     max_tokens = stream_req.max_tokens
     model_path = stream_req.model_path
-    messages = stream_req.messages
-    enable_thinking = stream_req.enable_thinking or False
+    # Pydantic models aren't JSON-serializable by httpx; flatten to plain dicts.
+    messages = [m.model_dump() for m in stream_req.messages]
+    enable_thinking = stream_req.enable_thinking
     
     if not model_path:
         deployment_to_model_path = {
@@ -1104,9 +1113,20 @@ async def stream(
         "temperature": 0.7,
         "top_p": 0.9,
         "stream": True,
-        "enable_thinking": enable_thinking,
+        "separate_reasoning": True,
     }
-    
+
+    if enable_thinking:
+        thinking_kwargs = {
+            "enable_thinking": True,
+            "thinking": True,
+        }
+        request_payload["chat_template_kwargs"] = thinking_kwargs
+        request_payload["extra_body"] = {
+            "chat_template_kwargs": thinking_kwargs,
+            "separate_reasoning": True,
+        }
+
 
     upstream_timeout = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=5.0)
 
@@ -1126,7 +1146,7 @@ async def stream(
 
                 if response.status_code >= 400:
                     detail = (await response.aread()).decode("utf-8", errors="replace")
-                    print(f"Stream upstream error status={response.status_code} body={detail}")
+                    print(f"Stream upstream error status={response.status_code} body={detail[:500]}")
                     message = json.dumps(
                         {
                             "error": "Upstream stream failed",

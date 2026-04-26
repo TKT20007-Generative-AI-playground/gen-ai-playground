@@ -399,7 +399,6 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
 
     const fetchModels = async () => {
       try {
-        // CALL THE REAL API FUNCTION HERE
         const availableModels = await fetchTextModels()
 
         const models: ModelOption[] = availableModels.map(
@@ -507,6 +506,32 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       }
 
 
+      // Coalesce token bursts into one render per animation frame (~60fps) so
+      // a fast model doesn't trigger one React re-render per token.
+      let pendingTokens = ""
+      let rafHandle: number | null = null
+
+      const drainPendingTokens = () => {
+        rafHandle = null
+        if (!pendingTokens) return
+        const chunk = pendingTokens
+        pendingTokens = ""
+        setMessagesForModel(modelValue, prevMessages =>
+          prevMessages.map(msg =>
+            msg.id === pendingMessageId
+              ? { ...msg, content: msg.content + chunk }
+              : msg
+          )
+        )
+      }
+
+      const flushPendingTokens = () => {
+        if (rafHandle != null) {
+          cancelAnimationFrame(rafHandle)
+        }
+        drainPendingTokens()
+      }
+
       const stream: StreamTextHandle = streamText(
         history ?? [],
         deploymentName,
@@ -514,13 +539,10 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         maxTokens ?? 256,
         enableThinking ?? false,
         (token: string) => {
-          setMessagesForModel(modelValue, prevMessages =>
-            prevMessages.map(msg =>
-              msg.id === pendingMessageId
-                ? { ...msg, content: msg.content + token }
-                : msg
-            )
-          )
+          pendingTokens += token
+          if (rafHandle == null) {
+            rafHandle = requestAnimationFrame(drainPendingTokens)
+          }
         },
         (reasoningToken: string) => {
           setMessagesForModel(modelValue, prevMessages =>
@@ -532,6 +554,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
           )
         },
         () => {
+          flushPendingTokens()
           setMessagesForModel(modelValue, prevMessages =>
             prevMessages.map(msg =>
               msg.id === pendingMessageId
@@ -547,6 +570,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         },
         (err: unknown) => {
           console.error("Streaming error:", err)
+          flushPendingTokens()
           setMessagesForModel(modelValue, prevMessages =>
             prevMessages.map(msg =>
               msg.id === pendingMessageId
