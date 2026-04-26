@@ -98,11 +98,6 @@ test.describe("Generator page flows", () => {
 
   test('fails if no model selected', async ({ page }) => {
     await page.goto(PLAYGROUND_URL);
-    
-    await page.evaluate(() => {
-      (window as any)._lastAlert = null;
-      window.alert = (msg) => ((window as any)._lastAlert = msg);
-    });
 
     const promptInput = page.getByTestId("prompt-input");
     await promptInput.fill("Test prompt without model");

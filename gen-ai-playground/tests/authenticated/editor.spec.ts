@@ -71,16 +71,8 @@ test.describe("Image Editor flows", () => {
   });
 
   test("shows alert if model, image, or prompt missing", async ({ page }) => {
-    await page.evaluate(() => {
-      (window as any)._lastAlert = null;
-      window.alert = (msg) => ((window as any)._lastAlert = msg);
-    });
-
     await page.getByRole("button", { name: "Edit image" }).click();
-
-    const alertMessage = await page.evaluate(() => (window as any)._lastAlert);
     await expect(page.getByText("Please provide an image, a prompt, and select a model")).toBeVisible();
-
     await expect(page.getByAltText("Edited result")).toHaveCount(0);
   });
 
