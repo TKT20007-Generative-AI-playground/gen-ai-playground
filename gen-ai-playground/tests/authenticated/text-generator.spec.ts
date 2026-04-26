@@ -28,19 +28,6 @@ async function selectTextModel(page: Page, modelLabel: string) {
   await option.click();
 }
 
-async function setupContainerRoute(page: Page) {
-  await page.route('**/dashboard/containers', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([
-        { name: 'model-a', model_path: '/models/model-a' },
-        { name: 'model-b', model_path: '/models/model-b' },
-      ]),
-    });
-  });
-}
-
 async function setupTextRoutes(page: Page) {
   await page.route('**/text/models', async (route) => {
     await route.fulfill({
@@ -76,7 +63,6 @@ async function setupTextRoutes(page: Page) {
 test.describe('Text Generator flows', () => {
   test.beforeEach(async ({ page }) => {
     await setupTextRoutes(page);
-    await setupContainerRoute(page);
     await openTextGenerator(page);
   });
 
@@ -242,7 +228,9 @@ test.describe('Text Generator flows', () => {
     await expect(page.getByText('Contract check reply')).toBeVisible();
     expect(callCount).toBe(1);
     expect(seenBodies[0].deployment_name).toBe('model-a');
-    expect(seenBodies[0].model_path).toBe('/models/model-a');
+    // Frontend no longer sends model_path; the backend resolves it from
+    // deployment_name via its template registry.
+    expect(seenBodies[0].model_path).toBeUndefined();
     expect(seenBodies[0].messages).toEqual([
       { role: 'user', content: 'Contract payload prompt' },
     ]);
@@ -252,7 +240,6 @@ test.describe('Text Generator flows', () => {
 test.describe('Text Generator streaming', () => {
   test.beforeEach(async ({ page }) => {
     await setupTextRoutes(page);
-    await setupContainerRoute(page);
     await openTextGenerator(page);
   });
 
@@ -302,7 +289,9 @@ test.describe('Text Generator streaming', () => {
     // Verify what the frontend actually sent upstream.
     expect(seenBodies).toHaveLength(1);
     expect(seenBodies[0].deployment_name).toBe('model-a');
-    expect(seenBodies[0].model_path).toBe('/models/model-a');
+    // Frontend no longer sends model_path; the backend resolves it from
+    // deployment_name via its template registry.
+    expect(seenBodies[0].model_path).toBeUndefined();
     expect(seenBodies[0].messages).toEqual([
       { role: 'user', content: 'Stream prompt' },
     ]);

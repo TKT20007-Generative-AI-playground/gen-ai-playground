@@ -20,10 +20,9 @@ import { useMediaQuery } from "@mantine/hooks"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { ShareConversationModal } from "./SharedConversationsModal"
-import { fetchTextModels, fetchTextModelStatuses } from "../services/textService"
+import { fetchTextModels, fetchTextModelStatuses, fetchTextDeployments } from "../services/textService"
 import { useNavigate } from "react-router-dom"
 import { streamText, type StreamTextHandle } from "../services/streamService"
-import { fetchDashboardContainers } from "../services/dashboardService"
 
 type ModelOption = {
   value: string
@@ -472,12 +471,12 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       return { deploymentName: existingDeploymentName, modelPath: existingModelPath }
     }
 
-    const containers = await fetchDashboardContainers()
+    const containers = await fetchTextDeployments()
     const container = containers.find(c =>
       c.name.trim().toLowerCase() === modelValue.trim().toLowerCase()
     )
     if (!container) {
-      throw new Error(`Model ${modelValue} is not deployed in dashboard`)
+      throw new Error(`Model ${modelValue} is not deployed`)
     }
 
     const modelPath = container.model_path ?? undefined

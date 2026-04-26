@@ -37,6 +37,21 @@ export async function fetchTextModels(): Promise<TextModelApiItem[]> {
   return res.data.available_models ?? []
 }
 
+export type TextDeployment = {
+  name: string
+  created_at?: string
+  endpoint_url?: string
+  model_path?: string | null
+}
+
+// Non-admin equivalent of fetchDashboardContainers — backed by /text/deployments,
+// which only requires get_current_user. Returns the same `name` field the chat
+// flow needs to verify a model is actually deployed.
+export async function fetchTextDeployments(): Promise<TextDeployment[]> {
+  const res = await apiClient.get<TextDeployment[]>("/text/deployments")
+  return res.data ?? []
+}
+
 export async function fetchTextModelStatuses(): Promise<TextModelStatuses> {
   const res = await apiClient.get<TextModelStatuses>("/text/model-statuses")
   return res.data
