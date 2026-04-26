@@ -8,6 +8,7 @@ import {
   Anchor,
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
+import { notifications } from '@mantine/notifications'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { loginRequest } from '../services/authService'
@@ -35,12 +36,21 @@ export default function LoginModal({ opened, onClose, redirectTo }: LoginModalPr
 
       login(res.token, res.username, res.is_admin || false)
       onClose()
+      notifications.show({
+        title: "Welcome back",
+        message: `Logged in as ${res.username}`,
+        color: "green",
+      })
       if (redirectTo) {
         navigate(redirectTo)
       }
     } catch (error: unknown) {
       const detail = (error as { response?: { data?: { detail?: string } } }).response?.data?.detail
-      alert(detail || "Login failed")
+      notifications.show({
+        title: "Login failed",
+        message: detail || "Please check your username and password and try again.",
+        color: "red",
+      })
     }
   }
 

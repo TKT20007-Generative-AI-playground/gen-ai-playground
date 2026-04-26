@@ -9,6 +9,7 @@ import {
 } from "react"
 import { PromptTextBox } from "./PromptTextBox"
 import { Text, SimpleGrid, Stack, Button } from "@mantine/core"
+import { notifications } from '@mantine/notifications'
 import { MODELS, getModelDisplayName } from "../constants/models"
 import ModelSelector from "./ModelSelector"
 import PhotoArea from "./PhotoArea"
@@ -144,7 +145,11 @@ export default function ImageGenerator() {
     setShowBox2(false)
 
     if (!model1 && !model2) {
-      alert("Please select a model")
+      notifications.show({
+        title: "Generation failed",
+        message: "Please select at least one model",
+        color: "red",
+      })
       return
     }
 
@@ -208,13 +213,17 @@ export default function ImageGenerator() {
           }
 
           console.error(err)
-          setError(
-            getAxiosRequestErrorMessage(
-              err,
-              "Image generation timed out",
-              "Image generation failed",
-            ),
+          const message = getAxiosRequestErrorMessage(
+            err,
+            "Image generation timed out",
+            "Image generation failed",
           )
+          setError(message)
+          notifications.show({
+            title: `${getModelDisplayName(model)} failed`,
+            message,
+            color: "red",
+          })
           setIsLoading(false)
           setStartTime(null)
         })

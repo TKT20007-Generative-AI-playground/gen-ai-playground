@@ -118,6 +118,17 @@ h1 {
     color: #000F65;
 }
 
+.notifications-root[data-position^='top-'] {
+    top: calc(var(--mantine-spacing-md) + 60px);
+}
+
+.notifications-notification {
+    box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
+    outline: solid;
+    outline-color: rgb(177, 177, 177);
+    outline-width: thin;
+}
+
 .btn-outline:disabled,
 .btn-outline[aria-disabled="true"],
 .btn-outline[data-disabled="true"] {

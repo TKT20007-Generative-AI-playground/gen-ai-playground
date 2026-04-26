@@ -71,18 +71,8 @@ test.describe("Image Editor flows", () => {
   });
 
   test("shows alert if model, image, or prompt missing", async ({ page }) => {
-    await page.evaluate(() => {
-      (window as any)._lastAlert = null;
-      window.alert = (msg) => ((window as any)._lastAlert = msg);
-    });
-
     await page.getByRole("button", { name: "Edit image" }).click();
-
-    const alertMessage = await page.evaluate(() => (window as any)._lastAlert);
-    expect(alertMessage).toBe(
-      "Please provide an image, a prompt, and select a model",
-    );
-
+    await expect(page.getByText("Please provide an image, a prompt, and select a model")).toBeVisible();
     await expect(page.getByAltText("Edited result")).toHaveCount(0);
   });
 
@@ -183,7 +173,7 @@ test.describe("Image Editor flows", () => {
     await promptInput.fill('Failure path edit prompt');
     await page.getByRole('button', { name: 'Edit image' }).click();
 
-    await expect(page.getByText(/(Network Error|Image editing failed|Request failed)/i)).toBeVisible();
+    await expect(page.getByText('Image editing failed').first()).toBeVisible();
     await expect(page.getByAltText('Edited result')).toHaveCount(0);
   });
 });
