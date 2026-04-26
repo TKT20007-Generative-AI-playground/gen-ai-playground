@@ -71,7 +71,7 @@ export default function DashboardUsers() {
     <Stack>
       <Group justify="space-between">
         <Text size="xl" fw={500}>User Management</Text>
-        <Button variant="light" onClick={fetchUsers}>
+        <Button className="app-btn-soft-blue" variant="light" onClick={fetchUsers}>
           Refresh
         </Button>
       </Group>

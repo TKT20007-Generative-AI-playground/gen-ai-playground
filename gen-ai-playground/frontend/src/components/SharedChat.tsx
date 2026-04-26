@@ -530,7 +530,7 @@ export default function SharedChat() {
                     onChange={e => setNoAI(e.currentTarget.checked)}
                     disabled={isTyping}
                 />
-                <Button onClick={sendMessage} disabled={!prompt.trim() || isTyping} loading={isTyping}>
+                <Button className="btn-primary app-transcribe-btn" onClick={sendMessage} disabled={!prompt.trim() || isTyping} loading={isTyping}>
                     Send
                 </Button>
             </div>

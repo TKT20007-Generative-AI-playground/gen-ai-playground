@@ -5,7 +5,9 @@ pymongo
 bcrypt
 PyJWT
 pytest
+pytest-asyncio
 pytest-mock
 mongomock
 httpx
 verda
+pytest-cov

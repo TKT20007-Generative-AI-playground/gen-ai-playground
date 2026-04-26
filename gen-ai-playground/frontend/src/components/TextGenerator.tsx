@@ -13,6 +13,7 @@ import {
   ScrollArea,
   TextInput,
   Modal,
+  Tooltip,
 } from "@mantine/core"
 
 import { useMediaQuery } from "@mantine/hooks"
@@ -185,12 +186,20 @@ function ChatPanel({
           />
         ) : null}
       </div>
-      <Button size="xs" variant="light" onClick={onShare}>
-        Share conversation
-      </Button>
+      <Tooltip
+        label="Share this conversation so you can chat with others and the AI together."
+        withArrow
+        multiline
+        w={280}
+      >
+        <Button className="app-btn-soft-blue" size="xs" variant="light" onClick={onShare}>
+          Share conversation
+        </Button>
+      </Tooltip>
 
       <ScrollArea
         style={{
+          marginTop: "14px",
           flex: 1,
           minHeight: isMobile ? "200px" : "300px",
           maxHeight: isMobile ? "55vh" : "65vh",
@@ -712,9 +721,11 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
           setSelectedModels(models)
         }}
       />
-      <Button variant="light" onClick={() => setJoinModalOpen(true)}>
-        Join conversation
-      </Button>
+      <Tooltip label="Join an existing conversation. You will need a conversation link and an invite code (If they didn't add you as a participant) from the person who created it." withArrow multiline w={280}>
+        <Button className="app-btn-soft-blue" variant="light" onClick={() => setJoinModalOpen(true)}>
+          Join conversation
+        </Button>
+      </Tooltip>
 
       <Modal
         opened={joinModalOpen}
@@ -729,7 +740,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
           onChange={e => setJoinId(e.target.value)}
           onKeyDown={e => { if (e.key === "Enter") handleJoin() }}
         />
-        <Button fullWidth mt="md" onClick={handleJoin} disabled={!joinId.trim()}>
+        <Button className="app-transcribe-btn" fullWidth mt="md" onClick={handleJoin} disabled={!joinId.trim()}>
           Join
         </Button>
       </Modal>
@@ -866,6 +877,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
               disabled={isBusy}
             />
             <Button
+              className="btn-primary app-transcribe-btn"
               onClick={generateText}
               disabled={!prompt.trim() || isBusy}
               loading={isBusy}

@@ -34,24 +34,19 @@ test("login persists after reload", async ({ page }) => {
   await expect(page.locator('#root')).toContainText('Logout');
 });
 
-test("shows error on invalid credentials (alert dialog)", async ({
-  page,
-  request,
-}) => {
+test("shows error on invalid credentials", async ({ page, request }) => {
   const user = await createAndRegisterUser(request);
   await gotoHome(page);
   const loginDialog = await openLoginDialog(page);
-  const dialogPromise = page.waitForEvent("dialog");
   await loginDialog.getByTestId("login-username").fill(user.username);
   await loginDialog.getByTestId("login-password").fill("wrong-password");
   await loginDialog.getByRole("button", { name: "Login" }).click();
-  const dialog = await dialogPromise;
-  const msg = dialog.message();
-  expect(msg.length).toBeGreaterThan(0);
-  await dialog.dismiss();
+
+  await expect(page.getByText("Login failed")).toBeVisible();
   await expectLoggedOut(page);
   await expect(loginDialog).toBeVisible();
 });
+
 
 test("logout clears auth and protected content requires login again", async ({
   page,

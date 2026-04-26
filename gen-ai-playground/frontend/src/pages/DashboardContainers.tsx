@@ -185,7 +185,7 @@ export default function DashboardContainers() {
     <Stack>
       <Group justify="space-between">
         <Text size="xl" fw={500}>Verda Deployments</Text>
-        <Button variant="light" onClick={fetchContainers}>
+        <Button className="app-btn-soft-blue" variant="light" onClick={fetchContainers}>
           Refresh
         </Button>
       </Group>
@@ -314,6 +314,7 @@ export default function DashboardContainers() {
                         {m.label.replace("Text: ", "")}
                       </Text>
                       <Button
+                        className="app-btn-soft-blue"
                         size="xs"
                         variant="light"
                         loading={deployLoading}
@@ -356,6 +357,7 @@ export default function DashboardContainers() {
                         {m.label.replace("Audio: ", "")}
                       </Text>
                       <Button
+                        className="app-btn-soft-blue"
                         size="xs"
                         variant="light"
                         loading={deployLoading}

@@ -7,6 +7,7 @@ import {
   refreshAccessToken,
   setAuthHeader,
 } from "../services/authService"
+import { notifications } from '@mantine/notifications'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [username, setUsername] = useState<string | null>(null)
@@ -128,6 +129,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     try {
       await logoutRequest()
+      notifications.show({
+        title: "Logged out",
+        message: "You have been successfully logged out.",
+        color: "blue",
+      })
     } finally {
       clearSession()
     }

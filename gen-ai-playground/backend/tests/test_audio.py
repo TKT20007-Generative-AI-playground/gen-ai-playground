@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, Mock, patch
 
 import bcrypt
+import httpx
 import jwt
 import mongomock
 import pytest
@@ -142,6 +143,55 @@ class TestAudioEndpointSelection:
         assert "Unable to fetch deployment status" in payload["whisper"]["detail"]
         mock_whisper_health.assert_not_awaited()
 
+    @patch("app.routers.audio.get_audio_template_map", return_value={"whisper-a.json": "Whisper A", "whisper-b.json": "Whisper B"})
+    @patch("app.routers.audio.verda_service")
+    def test_model_statuses_maps_live_starting_offline(
+        self,
+        mock_verda_service,
+        _mock_template_map,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_verda_service.list_deployments.return_value = [
+            {"name": "whisper-a"},
+            {"name": "whisper-b"},
+            {"name": "other"},
+        ]
+
+        def _status(name):
+            if name == "whisper-a":
+                return {"status": "healthy"}
+            if name == "whisper-b":
+                return {"status": "deploying"}
+            return {"status": "unknown"}
+
+        mock_verda_service.get_deployment_status.side_effect = _status
+
+        response = client.get("/audio/model-statuses", headers=auth_headers)
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["Whisper A"] == "live"
+        assert payload["Whisper B"] == "starting"
+
+    @patch("app.routers.audio.get_audio_template_map", return_value={"whisper-a.json": "Whisper A"})
+    @patch("app.routers.audio.verda_service")
+    def test_model_statuses_runtime_error_returns_offline_defaults(
+        self,
+        mock_verda_service,
+        _mock_template_map,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_verda_service.list_deployments.side_effect = RuntimeError("verda down")
+
+        response = client.get("/audio/model-statuses", headers=auth_headers)
+
+        assert response.status_code == 200
+        assert response.json() == {"Whisper A": "offline"}
+
 
 class TestAudioUploadValidation:
     @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
@@ -208,6 +258,95 @@ class TestAudioUploadValidation:
 
         assert response.status_code == 422
         mock_proxy_call.assert_not_awaited()
+
+
+class TestAudioDeployEndpoint:
+    @patch("app.routers.audio.verda_service")
+    @patch("app.routers.audio.get_audio_template_map", return_value={"whisper-a.json": "Whisper A"})
+    def test_deploy_audio_rejects_unknown_model(
+        self,
+        _mock_map,
+        _mock_vs,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        response = client.post(
+            "/audio/deploy",
+            headers=auth_headers,
+            json={"model_path": "Unknown"},
+        )
+
+        assert response.status_code == 400
+        assert "unsupported audio model" in response.json()["detail"].lower()
+
+    @patch("app.routers.audio.verda_service")
+    @patch("app.routers.audio.get_audio_template_map", return_value={"whisper-a.json": "Whisper A"})
+    def test_deploy_audio_runtime_error(
+        self,
+        _mock_map,
+        mock_vs,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_vs.deploy_from_template.side_effect = RuntimeError("boom")
+
+        response = client.post(
+            "/audio/deploy",
+            headers=auth_headers,
+            json={"model_path": "Whisper A"},
+        )
+
+        assert response.status_code == 500
+        assert "boom" in response.json()["detail"]
+
+    @patch("app.routers.audio.verda_service")
+    @patch("app.routers.audio.get_audio_template_map", return_value={"whisper-a.json": "Whisper A"})
+    def test_deploy_audio_generic_error(
+        self,
+        _mock_map,
+        mock_vs,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_vs.deploy_from_template.side_effect = Exception("unexpected")
+
+        response = client.post(
+            "/audio/deploy",
+            headers=auth_headers,
+            json={"model_path": "Whisper A"},
+        )
+
+        assert response.status_code == 500
+        assert "failed to deploy audio model" in response.json()["detail"].lower()
+
+    @patch("app.routers.audio.verda_service")
+    @patch("app.routers.audio.get_audio_template_map", return_value={"whisper-a.json": "Whisper A"})
+    def test_deploy_audio_success(
+        self,
+        _mock_map,
+        mock_vs,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_vs.deploy_from_template.return_value = {
+            "name": "whisper-a",
+            "status": "deploying",
+            "model": "openai/whisper-small",
+            "healthy": False,
+        }
+
+        response = client.post(
+            "/audio/deploy",
+            headers=auth_headers,
+            json={"model_path": "Whisper A"},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["status"] == "deploying"
 
 
 class TestAudioFallbackUpload:
@@ -360,6 +499,106 @@ class TestAudioHistoryPersistence:
         assert record is not None
         assert record["source"] is None
 
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    def test_transcribe_normalizes_model_and_recording_input_name(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        mock_db,
+        registered_user,
+        auth_headers,
+    ):
+        mock_proxy_call.return_value = {
+            "text": "ok",
+            "model": "openai/whisper-large-v3",
+            "language": "en",
+        }
+
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
+            data={"source": "recording", "run_id": "run-xyz"},
+            files={"file": ("audio.wav", b"abc", "audio/wav")},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["model"] == "whisper-large-v3"
+
+        rec = mock_db.audio_transcriptions.find_one({"username": "audio-user"})
+        assert rec is not None
+        assert rec["input_name"] is None
+        assert rec["run_id"] == "run-xyz"
+
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    def test_transcribe_http_status_error_with_json_detail(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        req = httpx.Request("POST", "https://a.example/transcribe")
+        resp = httpx.Response(400, json={"detail": "bad audio"}, request=req)
+        mock_proxy_call.side_effect = httpx.HTTPStatusError("boom", request=req, response=resp)
+
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
+            files={"file": ("audio.wav", b"abc", "audio/wav")},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "bad audio"
+
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    def test_transcribe_http_status_error_with_text_fallback(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        req = httpx.Request("POST", "https://a.example/transcribe")
+        resp = httpx.Response(500, text="raw failure", request=req)
+        mock_proxy_call.side_effect = httpx.HTTPStatusError("boom", request=req, response=resp)
+
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
+            files={"file": ("audio.wav", b"abc", "audio/wav")},
+        )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "raw failure"
+
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._post_with_fallback_paths", new_callable=AsyncMock)
+    def test_transcribe_request_error_returns_503(
+        self,
+        mock_proxy_call,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        req = httpx.Request("POST", "https://a.example/transcribe")
+        mock_proxy_call.side_effect = httpx.RequestError("network", request=req)
+
+        response = client.post(
+            "/audio/transcribe",
+            headers=auth_headers,
+            files={"file": ("audio.wav", b"abc", "audio/wav")},
+        )
+
+        assert response.status_code == 503
+        assert "unavailable" in response.json()["detail"].lower()
+
 
 class TestAudioHistoryEndpoints:
     def test_audio_history_returns_user_items(self, client, mock_db, registered_user, auth_headers):
@@ -469,3 +708,105 @@ class TestAudioHistoryEndpoints:
     def test_audio_history_sidebar_rejects_invalid_limit(self, client, registered_user, auth_headers):
         response = client.get("/audio/history-sidebar", headers=auth_headers, params={"limit": 0})
         assert response.status_code == 422
+
+    def test_audio_history_returns_empty(self, client, registered_user, auth_headers):
+        response = client.get("/audio/history", headers=auth_headers)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total"] == 0
+        assert payload["history"] == []
+
+    def test_audio_history_filters_date_range(self, client, mock_db, registered_user, auth_headers):
+        now = datetime.utcnow()
+        old = now - timedelta(days=10)
+        mock_db.audio_transcriptions.insert_many(
+            [
+                {
+                    "type": "transcription",
+                    "transcription_text": "recent",
+                    "model": "whisper-a",
+                    "timestamp": now,
+                    "username": "audio-user",
+                },
+                {
+                    "type": "transcription",
+                    "transcription_text": "old",
+                    "model": "whisper-a",
+                    "timestamp": old,
+                    "username": "audio-user",
+                },
+            ]
+        )
+
+        from_ts = int((now - timedelta(days=1)).timestamp() * 1000)
+        to_ts = int((now + timedelta(days=1)).timestamp() * 1000)
+        response = client.get(f"/audio/history?from={from_ts}&to={to_ts}", headers=auth_headers)
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total"] == 1
+        assert payload["history"][0]["transcription_text"] == "recent"
+
+    def test_audio_history_db_error_returns_500(self, client, mock_db, registered_user, auth_headers):
+        def _raise(*args, **kwargs):
+            _ = args, kwargs
+            raise PyMongoError("db fail")
+
+        mock_db.audio_transcriptions.insert_one(
+            {
+                "type": "transcription",
+                "transcription_text": "seed",
+                "model": "whisper-a",
+                "timestamp": datetime.utcnow(),
+                "username": "audio-user",
+            }
+        )
+
+        with patch.object(mock_db.audio_transcriptions, "find", side_effect=_raise):
+            response = client.get("/audio/history", headers=auth_headers)
+
+        assert response.status_code == 500
+        assert "error getting audio history" in response.json()["detail"].lower()
+
+
+class TestAudioHealthErrors:
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._get_with_fallback_paths", new_callable=AsyncMock)
+    @patch("app.routers.audio.verda_service")
+    def test_health_http_status_error_returns_503(
+        self,
+        mock_verda_service,
+        mock_whisper_health,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_verda_service.get_deployment_status.return_value = {"name": "whisper-a", "status": "healthy"}
+        req = httpx.Request("GET", "https://a.example/health")
+        resp = httpx.Response(500, text="boom", request=req)
+        mock_whisper_health.side_effect = httpx.HTTPStatusError("bad", request=req, response=resp)
+
+        response = client.get("/audio/health", headers=auth_headers)
+        assert response.status_code == 503
+        assert response.json()["detail"] == "boom"
+
+    @patch("app.routers.audio._resolve_audio_endpoint", return_value=("whisper-a", "https://a.example"))
+    @patch("app.routers.audio._get_with_fallback_paths", new_callable=AsyncMock)
+    @patch("app.routers.audio.verda_service")
+    def test_health_request_error_returns_503(
+        self,
+        mock_verda_service,
+        mock_whisper_health,
+        _mock_resolve,
+        client,
+        registered_user,
+        auth_headers,
+    ):
+        mock_verda_service.get_deployment_status.return_value = {"name": "whisper-a", "status": "healthy"}
+        req = httpx.Request("GET", "https://a.example/health")
+        mock_whisper_health.side_effect = httpx.RequestError("down", request=req)
+
+        response = client.get("/audio/health", headers=auth_headers)
+        assert response.status_code == 503
+        assert "unavailable" in response.json()["detail"].lower()

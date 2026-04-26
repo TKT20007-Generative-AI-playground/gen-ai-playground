@@ -80,11 +80,6 @@ def list_available_models(current_user: UserInfo = Depends(get_current_user)):
     available_models = verda_service.available_models()
     return {"available_models": available_models}
 
-@router.get("/available-compute")
-def get_available_compute(current_user: UserInfo = Depends(get_current_user)):
-    """for testing, check available compute resources for a given size"""
-    return verda_service.check_compute_resources(1)
-
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_model(
     request: DeployModelRequest,
@@ -321,144 +316,6 @@ def get_model_statuses(
     return result
 
 
-@router.post("/generate", response_model=TextGenerateResponse)
-def generate_text(
-    request: TextGenerateRequest,
-    current_user: UserInfo = Depends(get_current_user),
-    db: Database = Depends(get_database),
-    _: None = Depends(validate_csrf_token),
-):
-    """
-    Generate text using a deployed LLM model.
-    
-    Automatically discovers the correct deployment for the requested model.
-    The deployment must be healthy before calling this endpoint.
-    
-    Args:
-        request: Text generation parameters (prompt, max_tokens, etc.)
-        current_user: Authenticated user
-        db: Database for saving history
-        
-    Returns:
-        Generated text and metadata
-    
-    Notes:
-        Requires CSRF token validation for cookie-authenticated requests.
-    """
-    print(f"Text generation for user: {current_user.username}, prompt: {request.prompt[:50]}...")
-
-    # Discover deployment for the requested model
-    model_path = request.model_path if hasattr(request, 'model_path') and request.model_path else None
-    if model_path:
-        model_path = choose_text_model_path(model_path)
-    
-    # Find a running deployment
-    try:
-        deployments = verda_service.list_deployments()
-    except Exception as e:
-        raise HTTPException(status_code=503, detail="Could not reach deployment service.")
-
-    deployment_name = None
-    used_model_path = model_path
-
-    if model_path:
-        # Find deployment by template filename stem
-        template_name = _resolve_template_name(request.model_path)
-        if template_name:
-            expected_dep = _deployment_name_from_filename(template_name)
-            for d in deployments:
-                if d.get("name", "").lower() == expected_dep:
-                    deployment_name = d["name"]
-                    break
-    else:
-        # Fallback: use any healthy deployment
-        client = verda_service._get_client()
-        for d in deployments:
-            try:
-                dep_status = client.containers.get_deployment_status(d["name"])
-                if dep_status == ContainerDeploymentStatus.HEALTHY:
-                    deployment_name = d["name"]
-                    configs = get_template_configs()
-                    for tpl in get_template_map():
-                        if _deployment_name_from_filename(tpl) == d["name"].lower():
-                            used_model_path = configs[tpl].model
-                            break
-                    break
-            except Exception:
-                continue
-
-    if not deployment_name:
-        raise HTTPException(
-            status_code=503,
-            detail="No suitable deployment found. Ask an admin to deploy a model.",
-        )
-
-    # Check deployment health
-    try:
-        client = verda_service._get_client()
-        dep_status = client.containers.get_deployment_status(deployment_name)
-        status_str = dep_status.value if hasattr(dep_status, 'value') else str(dep_status)
-        if status_str != "healthy":
-            raise HTTPException(
-                status_code=503,
-                detail=f"Deployment is not healthy. Current status: {status_str}. "
-                       "Wait for the deployment to become healthy before generating text.",
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
-
-    try:
-        gen_start_time = time.perf_counter()
-        result = verda_service.generate_text(
-            deployment_name=deployment_name,
-            model_path=used_model_path or "",
-            prompt=request.prompt,
-            max_tokens=request.max_tokens,
-            temperature=request.temperature,
-            top_p=request.top_p,
-        )
-        gen_time_ms = int((time.perf_counter() - gen_start_time) * 1000)
-
-        # Save to history in MongoDB
-        try:
-            history_record = {
-                "type": "text",
-                "prompt": request.prompt,
-                "generated_text": result["generated_text"],
-                "model": result["model"],
-                "timestamp": datetime.utcnow(),
-                "username": current_user.username,
-                "usage": result.get("usage", {}),
-                "generation_time_ms": gen_time_ms,
-            }
-            db.text_generations.insert_one(history_record)
-            print(f"Saved text generation to MongoDB for user: {current_user.username}")
-        except Exception as e:
-            print(f"Failed to save text generation to MongoDB: {e}")
-
-        return TextGenerateResponse(
-            generated_text=result["generated_text"],
-            model=result["model"],
-            prompt=request.prompt,
-            usage=result.get("usage", {}),
-            generation_time_ms=gen_time_ms,
-        )
-
-    except RuntimeError as e:
-        print(f"Generate RuntimeError: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"Generate unexpected error: {type(e).__name__}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Text generation failed: {str(e)}",
-        )
-
-
 @router.post("/chat", response_model=ChatResponse)
 def chat_with_model(
     request: ChatRequest,
@@ -605,34 +462,6 @@ def get_text_history(
 
     return {"history": records}
 
-
-@router.delete("/deploy")
-def delete_deployment(
-    deployment_name: str = Query(..., description="Name of the deployment to delete"),
-    current_user: UserInfo = Depends(get_admin_user),
-    _csrf: None = Depends(validate_csrf_token),
-):
-    """
-    Delete a specific deployment and clean up resources.
-
-    Important: Always clean up deployments when done to avoid unnecessary charges.
-
-    Args:
-        deployment_name: Name of the Verda deployment to delete.
-        current_user: Authenticated admin user.
-
-    Returns:
-        Deletion status.
-
-    Raises:
-        HTTPException: 403 if the user is not an admin.
-        HTTPException: 500 if deletion fails.
-    """
-    print(f"User {current_user.username} deleting deployment: {deployment_name}")
-    result = verda_service.delete_deployment(deployment_name)
-    if result.get("status") == "error":
-        raise HTTPException(status_code=500, detail=result.get("message"))
-    return result
 
 @router.get("/history", response_model=HistoryResponseText)
 def history(

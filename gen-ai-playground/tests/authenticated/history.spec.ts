@@ -477,3 +477,4 @@ test.describe("History page flows", () => {
     await expect(page.getByText("Yes you are right")).toHaveCount(0);
   });
 });
+

@@ -3,6 +3,7 @@ import {
   Badge,
   Box,
   Button,
+  CopyButton,
   Divider,
   Group,
   Paper,
@@ -114,10 +115,11 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
 
         {messages.length > 1 && (
           <Button
+            className="app-history-small-action"
             variant="subtle"
-            size="compact-xs"
+            size="xs"
             color="gray"
-            style={{ width: "fit-content", fontSize: 11, opacity: 0.7 }}
+            style={{ width: "fit-content", opacity: 0.8 }}
             onClick={() => setShowAll(prev => !prev)}
           >
             {showAll ? "Show less" : `View all ${messages.length} messages`}
@@ -145,17 +147,40 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
           >
             {messages.length} messages
           </Badge>
-          <Button
-            component="a"
-            href={`/chat/conversations/${item._id}`}
-            size="compact-xs"
-            variant="subtle"
-            color="gray"
-            radius="sm"
-            style={{ fontSize: 10, padding: "0 6px", height: 18 }}
-          >
-            Open conversation
-          </Button>
+
+          <Tooltip label="Open conversation in chat view" withArrow position="top">
+            <Button
+              className="app-history-small-action app-btn-soft-blue"
+              component="a"
+              href={`/chat/conversations/${item._id}`}
+              size="xs"
+              variant="subtle"
+              color="blue"
+              radius="sm"
+            >
+              Open conversation
+            </Button>
+          </Tooltip>
+
+          <CopyButton value={`${window.location.origin}/chat/conversations/${item._id}`} timeout={2000}>
+            {({ copied, copy }) => (
+              <Tooltip label="Copy conversation link to clipboard" withArrow>
+                <Button className={`app-history-small-action${copied ? "" : " app-btn-soft-blue"}`} color={copied ? "teal" : "blue"} onClick={copy} size="xs" variant="subtle" radius="sm">
+                  Copy link
+                </Button>
+              </Tooltip>
+            )}
+          </CopyButton>
+          
+          <CopyButton value={item.invite_code}>
+            {({ copied, copy }) => (
+              <Tooltip label="Copy invite code to clipboard" withArrow>
+                <Button className={`app-history-small-action${copied ? "" : " app-btn-soft-blue"}`} color={copied ? "teal" : "blue"} onClick={copy} size="xs" variant="subtle" radius="sm">
+                  Copy invite code
+                </Button>
+              </Tooltip>
+            )}
+          </CopyButton>
 
           <Group gap={4} align="center">
             <Box c="dimmed" style={{ display: "flex" }}>
