@@ -34,7 +34,7 @@ export function PromptTextBox({ onSubmit, value, onChange, usage }: PromptTextBo
       />
 
       <Group justify="center">
-        <Button onClick={handleSubmit}>{usage}</Button>
+        <Button className="btn-primary" onClick={handleSubmit}>{usage}</Button>
       </Group>
     </Stack>
   )

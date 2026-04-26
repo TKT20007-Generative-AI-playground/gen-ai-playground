@@ -96,10 +96,11 @@ export default function TextCard({ item }: { item: TextRecord }) {
 
         {isLong && (
           <Button
+            className="app-history-small-action"
             variant="subtle"
-            size="compact-xs"
+            size="xs"
             color="gray"
-            style={{ width: "fit-content", fontSize: 11, opacity: 0.7 }}
+            style={{ width: "fit-content", opacity: 0.8 }}
             onClick={() => setExpanded(!expanded)}
           >
             {expanded ? "Show less" : "Read more"}

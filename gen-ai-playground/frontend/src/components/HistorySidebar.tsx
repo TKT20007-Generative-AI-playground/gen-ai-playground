@@ -287,6 +287,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                         ))}
                       </Stack>
                       <Button
+                        className="app-btn-soft-blue"
                         mt="xs"
                         size="xs"
                         variant="light"
@@ -348,6 +349,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                         {item.model || "default"}
                       </Badge>
                       <Button
+                        className="app-btn-soft-blue"
                         mt="xs"
                         size="xs"
                         variant="light"
@@ -365,6 +367,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                         View in History
                       </Button>
                       <Button
+                        className="app-btn-soft-blue"
                         mt="xs"
                         size="xs"
                         variant="light"
@@ -414,6 +417,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                         ))}
                       </Stack>
                       <Button
+                        className="app-btn-soft-blue"
                         mt="xs"
                         size="xs"
                         variant="light"
@@ -472,6 +476,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
 
                       <Text size="xs">Type: {item.image_type || "generated"}</Text>
                       <Button
+                        className="app-btn-soft-blue"
                         mt="xs"
                         size="xs"
                         variant="light"

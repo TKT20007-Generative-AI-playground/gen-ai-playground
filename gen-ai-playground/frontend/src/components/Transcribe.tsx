@@ -486,6 +486,7 @@ export default function Transcribe() {
                 disabled={isLoading || isRecording}
               />
               <Button
+                className="btn-primary app-transcribe-btn"
                 onClick={onTranscribeUploaded}
                 loading={isLoading && activeTranscribeSource === "uploaded"}
                 disabled={!canTranscribeUploaded}
@@ -519,13 +520,14 @@ export default function Transcribe() {
                       width: "100%",
                     }}
                   >
-                    <Button onClick={startRecording} disabled={!canStartRecording} fullWidth>
+                    <Button className="btn-primary app-transcribe-btn" onClick={startRecording} disabled={!canStartRecording} fullWidth>
                       {recordingButtonText}
                     </Button>
-                    <Button color="orange" onClick={stopRecording} disabled={!canStopRecording} fullWidth>
+                    <Button className="app-transcribe-btn" color="orange" onClick={stopRecording} disabled={!canStopRecording} fullWidth>
                       Stop recording
                     </Button>
                     <Button
+                      className="app-transcribe-btn"
                       variant="default"
                       onClick={clearRecording}
                       disabled={isRecording || !recordedBlob}
@@ -552,6 +554,7 @@ export default function Transcribe() {
                   ) : null}
 
                   <Button
+                    className="btn-primary app-transcribe-btn"
                     onClick={onTranscribeRecording}
                     loading={isLoading && activeTranscribeSource === "recording"}
                     disabled={!canTranscribeRecording}
