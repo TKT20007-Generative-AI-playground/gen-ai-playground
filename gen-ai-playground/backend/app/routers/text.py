@@ -6,7 +6,7 @@ generate text completions, chat with the model, and clean up.
 """
 import math
 import secrets
-from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Depends, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pymongo.database import Database
 from datetime import datetime, timezone
@@ -1224,6 +1224,7 @@ def chat_messages_length(
 @router.post("/stream")
 async def stream(
     stream_req: StreamRequest,
+    request: Request,
     _: UserInfo = Depends(get_current_user),
 ):
     """
@@ -1278,8 +1279,10 @@ async def stream(
     }
     
 
+    upstream_timeout = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=5.0)
+
     async def event_generator():
-        async with httpx.AsyncClient(timeout=None) as async_client:
+        async with httpx.AsyncClient(timeout=upstream_timeout) as async_client:
             async with async_client.stream(
                 "POST",
                 target_url,
@@ -1310,6 +1313,13 @@ async def stream(
                     response,
                     include_reasoning=enable_thinking,
                 ):
+                    # Bail out early if the client aborted; exiting the `async with`
+                    # blocks closes the upstream TCP connection so the inference
+                    # engine can free the GPU slot.
+                    if await request.is_disconnected():
+                        print("Stream client disconnected; closing upstream")
+                        return
+
                     if chunk_type == "reasoning":
                         encoded_reasoning = chunk_text.replace("\n", "\\n")
                         yield f"data: {json.dumps({'reasoning': encoded_reasoning})}\n\n"
@@ -1320,4 +1330,11 @@ async def stream(
 
         yield "data: [DONE]\n\n"
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+        },
+    )

@@ -94,8 +94,16 @@ export async function fetchDeployableAudioModels(): Promise<Array<{ value: strin
   return res.data.available_models ?? []
 }
 
-export async function fetchDashboardContainers(): Promise<any[]> {
-  const res = await apiClient.get("/dashboard/containers", {
+export type DashboardContainer = {
+  name: string
+  status: string
+  image: string
+  container_id: string
+  model_path?: string | null
+}
+
+export async function fetchDashboardContainers(): Promise<DashboardContainer[]> {
+  const res = await apiClient.get<DashboardContainer[]>("/dashboard/containers", {
     headers: getCsrfHeaders(),
   })
   return res.data
