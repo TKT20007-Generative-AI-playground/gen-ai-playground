@@ -315,10 +315,10 @@ export default function DashboardInvitations() {
       <Group justify="space-between">
         <Text size="xl" fw={500}>Invitation Code Management</Text>
         <Group gap="sm">
-          <Button variant="light" onClick={fetchCodes}>
+          <Button className="app-btn-soft-blue" variant="light" onClick={fetchCodes}>
             Refresh
           </Button>
-          <Button leftSection={<IconPlus size={16} />} onClick={() => setCreateModalOpen(true)}>
+          <Button className="btn-primary" leftSection={<IconPlus size={16} />} onClick={() => setCreateModalOpen(true)}>
             Create Code
           </Button>
         </Group>
@@ -377,11 +377,11 @@ export default function DashboardInvitations() {
                 </Text>
                 <Group gap="xs" mt="xs" wrap="wrap">
                   {code.uses_count >= code.max_uses ? (
-                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleAddUses(code.code)}>Add Uses</Button>
+                    <Button className="app-btn-soft-blue" size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleAddUses(code.code)}>Add Uses</Button>
                   ) : isCodeExpired(code) ? (
-                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleExtend(code.code)}>Extend</Button>
+                    <Button className="app-btn-soft-blue" size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleExtend(code.code)}>Extend</Button>
                   ) : !code.is_active ? (
-                    <Button size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleReactivate(code.code)}>Reactivate</Button>
+                    <Button className="app-btn-soft-blue" size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleReactivate(code.code)}>Reactivate</Button>
                   ) : (
                     <Button size="xs" variant="light" color="yellow" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleDeactivate(code.code)}>Deactivate</Button>
                   )}
