@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: mongo
-          image: mongo
+          image: docker.io/mongo:8.2.7
           imagePullPolicy: Always
           ports:
             - containerPort: 27017
