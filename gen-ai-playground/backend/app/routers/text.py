@@ -1058,11 +1058,13 @@ def chat_messages_length(
     length = db.text_generations.count_documents({"username": cur_user.username})
     return {"length": length}
 
+
 @router.post("/stream")
 async def stream(
     stream_req: StreamRequest,
     request: Request,
-    _: UserInfo = Depends(get_current_user),
+    current_user: UserInfo = Depends(get_current_user),
+    db: Database = Depends(get_database),
 ):
     """
         Stream text generation responses token-by-token using Server-Sent Events (SSE).
@@ -1073,6 +1075,8 @@ async def stream(
     # Pydantic models aren't JSON-serializable by httpx; flatten to plain dicts.
     messages = [m.model_dump() for m in stream_req.messages]
     enable_thinking = stream_req.enable_thinking
+    
+    
     
     if not model_path:
         deployment_to_model_path = {
@@ -1127,57 +1131,86 @@ async def stream(
             "separate_reasoning": True,
         }
 
+    stream_start_time = time.perf_counter()
+    assistant_reply = ""
+    assistant_reasoning = ""
 
     upstream_timeout = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=5.0)
 
     async def event_generator():
-        async with httpx.AsyncClient(timeout=upstream_timeout) as async_client:
-            async with async_client.stream(
-                "POST",
-                target_url,
-                json=request_payload,
-                headers={
-                    **_inference_headers(),
-                    "Accept": "text/event-stream",
-                    "Cache-Control": "no-cache",
-                },
-            ) as response:
-                print(f"Stream upstream status={response.status_code} url={target_url}")
+        nonlocal assistant_reply, assistant_reasoning
+        try:
+            async with httpx.AsyncClient(timeout=upstream_timeout) as async_client:
+                async with async_client.stream(
+                    "POST",
+                    target_url,
+                    json=request_payload,
+                    headers={
+                        **_inference_headers(),
+                        "Accept": "text/event-stream",
+                        "Cache-Control": "no-cache",
+                    },
+                ) as response:
+                    print(f"Stream upstream status={response.status_code} url={target_url}")
 
-                if response.status_code >= 400:
-                    detail = (await response.aread()).decode("utf-8", errors="replace")
-                    print(f"Stream upstream error status={response.status_code} body={detail[:500]}")
-                    message = json.dumps(
-                        {
-                            "error": "Upstream stream failed",
-                            "status": response.status_code,
-                            "detail": detail[:500],
-                        }
-                    )
-                    yield f"data: {message}\n\n"
-                    yield "data: [DONE]\n\n"
-                    return
-
-                async for chunk_type, chunk_text in _iter_processed_chat_stream(
-                    response,
-                    include_reasoning=enable_thinking,
-                ):
-                    # Bail out early if the client aborted; exiting the `async with`
-                    # blocks closes the upstream TCP connection so the inference
-                    # engine can free the GPU slot.
-                    if await request.is_disconnected():
-                        print("Stream client disconnected; closing upstream")
+                    if response.status_code >= 400:
+                        detail = (await response.aread()).decode("utf-8", errors="replace")
+                        print(f"Stream upstream error status={response.status_code} body={detail[:500]}")
+                        message = json.dumps(
+                            {
+                                "error": "Upstream stream failed",
+                                "status": response.status_code,
+                                "detail": detail[:500],
+                            }
+                        )
+                        yield f"data: {message}\n\n"
+                        yield "data: [DONE]\n\n"
                         return
 
-                    if chunk_type == "reasoning":
-                        encoded_reasoning = chunk_text.replace("\n", "\\n")
-                        yield f"data: {json.dumps({'reasoning': encoded_reasoning})}\n\n"
-                        continue
+                    async for chunk_type, chunk_text in _iter_processed_chat_stream(
+                        response,
+                        include_reasoning=enable_thinking,
+                    ):
+                        # Bail out early if the client aborted; exiting the `async with`
+                        # blocks closes the upstream TCP connection so the inference
+                        # engine can free the GPU slot.
+                        if await request.is_disconnected():
+                            print("Stream client disconnected; closing upstream")
+                            return
 
-                    encoded_visible = chunk_text.replace("\n", "\\n")
-                    yield f"data: {encoded_visible}\n\n"
+                        if chunk_type == "reasoning":
+                            assistant_reasoning += chunk_text
+                            encoded_reasoning = chunk_text.replace("\n", "\\n")
+                            yield f"data: {json.dumps({'reasoning': encoded_reasoning})}\n\n"
+                            continue
 
-        yield "data: [DONE]\n\n"
+                        assistant_reply += chunk_text
+                        encoded_visible = chunk_text.replace("\n", "\\n")
+                        yield f"data: {encoded_visible}\n\n"
+
+            yield "data: [DONE]\n\n"
+        finally:
+            if not assistant_reply and not assistant_reasoning:
+                return
+
+            chat_time_ms = int((time.perf_counter() - stream_start_time) * 1000)
+            try:
+                history_record = {
+                    "type": "chat",
+                    "messages": messages,
+                    "reply": assistant_reply,
+                    "reasoning": assistant_reasoning if (enable_thinking and assistant_reasoning) else None,
+                    "model": model_path,
+                    "timestamp": datetime.utcnow(),
+                    "username": current_user.username,
+                    "usage": {},
+                    "generation_time_ms": chat_time_ms,
+                }
+                db.text_generations.insert_one(history_record)
+            except Exception as e:
+                print(f"Failed to save stream chat to MongoDB: {e}")
+    
+    
 
     return StreamingResponse(
         event_generator(),
