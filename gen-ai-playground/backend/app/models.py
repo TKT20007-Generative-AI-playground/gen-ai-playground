@@ -118,6 +118,7 @@ class ContainerInfo(BaseModel):
     status: str
     image: str = ""
     container_id: str
+    model_path: str | None = None
 
 
 class ContainerActionResponse(BaseModel):
@@ -251,3 +252,10 @@ class ConversationCreateRequest(BaseModel):
     participants: Optional[List[str]] = None
     model_key: Optional[str] = None
     initial_messages: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+    
+class StreamRequest(BaseModel):
+    messages: List[ChatMessage]
+    deployment_name: str
+    max_tokens: int = Field(default=256, ge=1, le=32768)
+    model_path: Optional[str] = None
+    enable_thinking: bool = False

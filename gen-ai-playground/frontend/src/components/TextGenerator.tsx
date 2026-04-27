@@ -20,8 +20,9 @@ import { useMediaQuery } from "@mantine/hooks"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { ShareConversationModal } from "./SharedConversationsModal"
+import { fetchTextModels, fetchTextModelStatuses, fetchTextDeployments } from "../services/textService"
 import { useNavigate } from "react-router-dom"
-import { chatWithTextModel, fetchTextModels, fetchTextModelStatuses } from "../services/textService"
+import { streamText, type StreamTextHandle } from "../services/streamService"
 
 type ModelOption = {
   value: string
@@ -41,11 +42,6 @@ type Message = {
   pendingStartTime?: number
 }
 
-type ChatApiResponse = {
-  reply: string
-  reasoning?: string | null
-  generation_time_ms?: number | null
-}
 
 type ModelStatus = "live" | "starting" | "offline" | "unknown"
 
@@ -58,19 +54,6 @@ const makeMessageId = () => {
 }
 
 const MAX_MODELS = 4
-
-function parseModelReply(rawReply: string): {
-  thinking: string | null
-  actualReply: string
-} {
-  const thinkingMatch = rawReply.match(/<think>([\s\S]*?)<\/think>/)
-  if (thinkingMatch) {
-    const thinking = thinkingMatch[1].trim()
-    const actualReply = rawReply.replace(/<think>[\s\S]*?<\/think>/, "").trim()
-    return { thinking, actualReply }
-  }
-  return { thinking: null, actualReply: rawReply.trim() }
-}
 
 const modelStatusPriority: Record<ModelStatus, number> = {
   live: 0,
@@ -118,6 +101,7 @@ type ChatPanelProps = {
   enableThinking: boolean
   onToggleThinking: (enabled: boolean) => void
   onShare: () => void
+  onStop: () => void
 }
 
 function ChatPanel({
@@ -132,6 +116,7 @@ function ChatPanel({
   enableThinking,
   onToggleThinking,
   onShare,
+  onStop,
 }: ChatPanelProps) {
   const isMobile = useMediaQuery("(max-width: 768px)")
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -181,6 +166,11 @@ function ChatPanel({
         <Button size="xs" color="orange" onClick={onClearMessages} disabled={isBusy}>
           Clear
         </Button>
+        {isLoading && (
+          <Button size="xs" color="red" onClick={onStop}>
+            Stop
+          </Button>
+        )}
         {thinkingMode === "thinking" ? (
           <Text size="xs" c="dimmed">
             Thinking only
@@ -255,11 +245,27 @@ function ChatPanel({
                 </div>
 
                 {message.isPending ? (
-                  message.pendingStartTime ? (
-                    <div>
-                      <ActionStatus actionText="Generating" startTime={message.pendingStartTime} />
-                    </div>
-                  ) : null
+                  <>
+                    {message.content ? (
+
+                      <Text
+                        size="sm"
+                        style={{
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          overflowWrap: "break-word",
+                        }}
+                      >
+                        {message.content}
+                      </Text>
+                    ) : (
+                      message.pendingStartTime ? (
+                        <div>
+                          <ActionStatus actionText="Generating" startTime={message.pendingStartTime} />
+                        </div>
+                      ) : null
+                    )}
+                  </>
                 ) : (
                   <>
                     <Text
@@ -318,18 +324,51 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
   const [maxTokens, setMaxTokens] = useState<number>(256)
   const [enableThinkingByModel, setEnableThinkingByModel] = useState<Record<string, boolean>>({})
+  const [deploymentNames, setDeploymentNames] = useState<Record<string, string>>({})
+  const [modelPaths, setModelPaths] = useState<Record<string, string>>({})
 
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [shareTargetModel, setShareTargetModel] = useState<string | null>(null)
+
+  // Locked from Send-press until every per-model stream finishes, so a slow
+  // /dashboard/containers fetch can't let a second submit slip through.
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const isSubmittingRef = useRef(false)
 
   const sidebarOpen = opened
 
   // Keep a ref so async loops always see the latest messages.
   const messagesByModelRef = useRef<Record<string, Message[]>>({})
 
-  const setMessagesForModel = (modelValue: string, next: Message[]) => {
-    messagesByModelRef.current = { ...messagesByModelRef.current, [modelValue]: next }
-    setMessagesByModel(prev => ({ ...prev, [modelValue]: next }))
+  // Active stream handles per model so the Stop button can cancel them.
+  const streamHandlesRef = useRef<Record<string, StreamTextHandle>>({})
+
+  // Cancel any in-flight streams if the user navigates away mid-generation.
+  useEffect(() => {
+    return () => {
+      for (const handle of Object.values(streamHandlesRef.current)) {
+        handle.cancel()
+      }
+      streamHandlesRef.current = {}
+    }
+  }, [])
+
+
+  const setMessagesForModel = (
+    modelValue: string,
+    updater: Message[] | ((prev: Message[]) => Message[])
+  ) => {
+    setMessagesByModel(prev => {
+      const previous = prev[modelValue] ?? []
+      const next = typeof updater === "function" ? updater(previous) : updater
+
+      messagesByModelRef.current[modelValue] = next
+
+      return {
+        ...prev,
+        [modelValue]: next,
+      }
+    })
   }
 
   const clearMessagesForModel = (modelValue: string) => {
@@ -337,8 +376,6 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   }
 
   const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
-  const [statusMsgs, setStatusMsgs] = useState<Record<string, string | null>>({})
-
   const [joinModalOpen, setJoinModalOpen] = useState(false)
   const [joinId, setJoinId] = useState("")
   const navigate = useNavigate()
@@ -359,9 +396,11 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   // Fetch available models from backend
   useEffect(() => {
     if (!isLoggedIn) return
+
     const fetchModels = async () => {
       try {
         const availableModels = await fetchTextModels()
+
         const models: ModelOption[] = availableModels.map(
           (m: { value: string; label: string; supports_thinking?: boolean; model_mode?: "thinking" | "hybrid" | "instruct" | null }) => ({
             value: m.value,
@@ -370,6 +409,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
             modelMode: m.model_mode ?? null,
           })
         )
+
         if (enableTestModel) {
           models.push({
             value: "test_model",
@@ -378,11 +418,13 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
             modelMode: null,
           })
         }
+
         setModelOptions(models)
       } catch {
         // silent
       }
     }
+
     fetchModels()
   }, [enableTestModel, isLoggedIn])
 
@@ -419,102 +461,230 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     return false
   }
   const isAnyLoading = selectedModels.some((m) => Boolean(loadingByModel[m]))
+  const isBusy = isAnyLoading || isSubmitting
+
+  async function loadDeploymentInfo(modelValue: string): Promise<{ deploymentName: string; modelPath: string | undefined }> {
+    const existingDeploymentName = deploymentNames[modelValue]
+    const existingModelPath = modelPaths[modelValue]
+    if (existingDeploymentName) {
+      return { deploymentName: existingDeploymentName, modelPath: existingModelPath }
+    }
+
+    const containers = await fetchTextDeployments()
+    const container = containers.find(c =>
+      c.name.trim().toLowerCase() === modelValue.trim().toLowerCase()
+    )
+    if (!container) {
+      throw new Error(`Model ${modelValue} is not deployed`)
+    }
+
+    const modelPath = container.model_path ?? undefined
+    setDeploymentNames(prev => ({ ...prev, [modelValue]: container.name }))
+    setModelPaths(prev => modelPath ? { ...prev, [modelValue]: modelPath } : prev)
+    return { deploymentName: container.name, modelPath }
+  }
+
 
   /**
    * Send message to a single model panel.
    * Only works with live/healthy models (dropdown enforces this).
    */
-  const sendToPanel = async (
+  const sendToPanel = useCallback(async (
     modelValue: string,
-    messagesWithUser: Message[],
     pendingMessageId: string,
+    deploymentName: string,
+    modelPath?: string,
+    history?: { role: string; content: string }[],
+    maxTokens?: number,
+    enableThinking?: boolean,
   ) => {
     setLoadingByModel(prev => ({ ...prev, [modelValue]: true }))
-    console.log(`Sending to ${modelValue}:`, messagesWithUser)
 
     try {
-      const requestMessages = messagesWithUser
-        .filter(message => !message.isPending)
-        .map(message => ({ role: message.role, content: message.content }))
+      if (!history || history.length === 0) {
+        throw new Error("Cannot stream empty history")
+      }
 
-      const result = await chatWithTextModel({
-        model_path: modelValue,
-        messages: requestMessages,
-        max_tokens: maxTokens,
-        temperature: 0.7,
-        top_p: 0.9,
-        enable_thinking: isThinkingEnabled(modelValue),
-      }) as ChatApiResponse
-      const parsed = parseModelReply(result.reply)
-      const reasoning = result.reasoning ?? parsed.thinking
-      if (reasoning) console.log("Thinking:", reasoning)
-      const label = getModelLabel(modelValue)
-      const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
-        message.id === pendingMessageId
-          ? {
-            ...message,
-            content: parsed.actualReply,
-            reasoning,
-            modelLabel: label,
-            generationTimeMs: result.generation_time_ms ?? undefined,
-            isPending: false,
-            pendingStartTime: undefined,
+
+      // Coalesce token bursts into one render per animation frame (~60fps) so
+      // a fast model doesn't trigger one React re-render per token.
+      let pendingTokens = ""
+      let rafHandle: number | null = null
+
+      const drainPendingTokens = () => {
+        rafHandle = null
+        if (!pendingTokens) return
+        const chunk = pendingTokens
+        pendingTokens = ""
+        setMessagesForModel(modelValue, prevMessages =>
+          prevMessages.map(msg =>
+            msg.id === pendingMessageId
+              ? { ...msg, content: msg.content + chunk }
+              : msg
+          )
+        )
+      }
+
+      const flushPendingTokens = () => {
+        if (rafHandle != null) {
+          cancelAnimationFrame(rafHandle)
+        }
+        drainPendingTokens()
+      }
+
+      const stream: StreamTextHandle = streamText(
+        history ?? [],
+        deploymentName,
+        modelPath ?? "",
+        maxTokens ?? 256,
+        enableThinking ?? false,
+        (token: string) => {
+          pendingTokens += token
+          if (rafHandle == null) {
+            rafHandle = requestAnimationFrame(drainPendingTokens)
           }
-          : message,
+        },
+        (reasoningToken: string) => {
+          setMessagesForModel(modelValue, prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === pendingMessageId
+                ? { ...msg, reasoning: (msg.reasoning ?? "") + reasoningToken }
+                : msg
+            )
+          )
+        },
+        () => {
+          flushPendingTokens()
+          setMessagesForModel(modelValue, prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === pendingMessageId
+                ? {
+                  ...msg,
+                  isPending: false,
+                  pendingStartTime: undefined,
+                  generationTimeMs: Date.now() - (msg.pendingStartTime ?? Date.now()),
+                }
+                : msg
+            )
+          )
+        },
+        (err: unknown) => {
+          console.error("Streaming error:", err)
+          flushPendingTokens()
+          setMessagesForModel(modelValue, prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === pendingMessageId
+                ? {
+                  ...msg,
+                  content: "Failed to stream response.",
+                  isPending: false,
+                  pendingStartTime: undefined,
+                }
+                : msg
+            )
+          )
+        }
       )
-      setMessagesForModel(modelValue, replaced)
-    } catch (error: unknown) {
-      console.error("chat error:", error)
-      const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data
-        ?.detail
-      const replaced = (messagesByModelRef.current[modelValue] ?? []).map(message =>
-        message.id === pendingMessageId
-          ? {
-            ...message,
-            content: "Failed to generate a response.",
-            isPending: false,
-            pendingStartTime: undefined,
-          }
-          : message,
-      )
-      setMessagesForModel(modelValue, replaced)
-      setStatusMsgs(prev => ({
-        ...prev,
-        [modelValue]: detail || "Failed to reach the server.",
-      }))
+
+      streamHandlesRef.current[modelValue] = stream
+      await stream.done
+    } catch (error) {
+      console.error("Streaming failed:", error)
     } finally {
+      if (streamHandlesRef.current[modelValue]) {
+        delete streamHandlesRef.current[modelValue]
+      }
       setLoadingByModel(prev => ({ ...prev, [modelValue]: false }))
     }
+  }, [])
+
+  const stopGenerationForModel = (modelValue: string) => {
+    const handle = streamHandlesRef.current[modelValue]
+    if (handle) {
+      handle.cancel()
+      delete streamHandlesRef.current[modelValue]
+    }
+
+    setMessagesForModel(modelValue, prev =>
+      prev.map(msg =>
+        msg.isPending
+          ? {
+            ...msg,
+            isPending: false,
+            pendingStartTime: undefined,
+            generationTimeMs: msg.pendingStartTime
+              ? Date.now() - msg.pendingStartTime
+              : undefined,
+          }
+          : msg
+      )
+    )
+
+    setLoadingByModel(prev => ({ ...prev, [modelValue]: false }))
   }
 
   const generateText = async () => {
     if (!prompt.trim()) return
     if (selectedModels.length === 0) return
+    // Synchronous re-entry guard — blocks a second Send before React re-renders
+    // the disabled state, even within the same event-loop tick.
+    if (isSubmittingRef.current) return
+    isSubmittingRef.current = true
+    setIsSubmitting(true)
 
-    const currentPrompt = prompt
-    setPrompt("")
-    const userMessage: Message = { id: makeMessageId(), role: "user", content: currentPrompt }
+    try {
+      const deploymentInfoEntries = await Promise.all(
+        selectedModels.map(async (modelValue) => [modelValue, await loadDeploymentInfo(modelValue)] as const)
+      )
+      const deploymentInfoByModel: Record<string, { deploymentName: string; modelPath: string | undefined }> =
+        Object.fromEntries(deploymentInfoEntries)
 
-    // Launch all selected panels in parallel
-    const promises: Promise<void>[] = []
+      const currentPrompt = prompt
+      setPrompt("")
+      const userMessage: Message = { id: makeMessageId(), role: "user", content: currentPrompt }
 
-    for (const modelValue of selectedModels) {
-      const existingMessages = messagesByModelRef.current[modelValue] ?? []
-      const pendingMessageId = makeMessageId()
-      const pendingAssistantMessage: Message = {
-        id: pendingMessageId,
-        role: "assistant",
-        content: "",
-        modelLabel: getModelLabel(modelValue),
-        isPending: true,
-        pendingStartTime: Date.now(),
+      const promises: Promise<void>[] = []
+
+      for (const modelValue of selectedModels) {
+        const existingMessages = messagesByModelRef.current[modelValue] ?? []
+
+        const historyForApi = existingMessages
+          .filter(m => !m.isPending)
+          .map(m => ({ role: m.role, content: m.content }))
+          .concat({ role: "user", content: currentPrompt })
+
+        const pendingMessageId = makeMessageId()
+        const pendingAssistantMessage: Message = {
+          id: pendingMessageId,
+          role: "assistant",
+          content: "",
+          modelLabel: getModelLabel(modelValue),
+          isPending: true,
+          pendingStartTime: Date.now(),
+        }
+
+        const updatedMessages = existingMessages.concat(userMessage, pendingAssistantMessage)
+        setMessagesForModel(modelValue, updatedMessages)
+
+        const info = deploymentInfoByModel[modelValue]
+        promises.push(
+          sendToPanel(
+            modelValue,
+            pendingMessageId,
+            info.deploymentName,
+            info.modelPath,
+            historyForApi,
+            maxTokens,
+            enableThinkingByModel[modelValue] ?? false
+          )
+        )
       }
-      const updatedMessages = existingMessages.concat(userMessage, pendingAssistantMessage)
-      setMessagesForModel(modelValue, updatedMessages)
-      promises.push(sendToPanel(modelValue, updatedMessages, pendingMessageId))
-    }
 
-    await Promise.all(promises)
+      await Promise.all(promises)
+    } finally {
+      isSubmittingRef.current = false
+      setIsSubmitting(false)
+    }
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -566,11 +736,13 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         placeholder={selectedModels.length > 0 ? "" : "Select models"}
         data={dropdownData}
         value={selectedModels}
-        onChange={setSelectedModels}
         maxValues={MAX_MODELS}
         searchable
         clearable
-        disabled={isAnyLoading}
+        disabled={isBusy}
+        onChange={(models) => {
+          setSelectedModels(models)
+        }}
       />
       <Tooltip label="Join an existing conversation. You will need a conversation link and an invite code (If they didn't add you as a participant) from the person who created it." withArrow multiline w={280}>
         <Button className="app-btn-soft-blue" variant="light" onClick={() => setJoinModalOpen(true)}>
@@ -610,7 +782,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
             step={64}
             clampBehavior="strict"
             style={{ width: 180 }}
-            disabled={isAnyLoading}
+            disabled={isBusy}
           />
         </Group>
       )}
@@ -646,9 +818,9 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                       messages={messagesByModel[modelValue] ?? []}
                       onClearMessages={() => clearMessagesForModel(modelValue)}
                       isLoading={loadingByModel[modelValue] ?? false}
-                      isBusy={isAnyLoading}
+                      isBusy={isBusy}
                       modelStatus={modelStatuses[modelValue] ?? "unknown"}
-                      statusMessage={statusMsgs[modelValue] ?? null}
+                      statusMessage={null}
                       thinkingMode={getThinkingMode(modelValue)}
                       enableThinking={enableThinkingByModel[modelValue] ?? false}
                       onToggleThinking={(enabled) => {
@@ -662,6 +834,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                         setShareTargetModel(modelValue)
                         setShareModalOpen(true)
                       }}
+                      onStop={() => stopGenerationForModel(modelValue)}
                     />
                   ))}
                 </div>
@@ -694,9 +867,9 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                   messages={messagesByModel[modelValue] ?? []}
                   onClearMessages={() => clearMessagesForModel(modelValue)}
                   isLoading={loadingByModel[modelValue] ?? false}
-                  isBusy={isAnyLoading}
+                  isBusy={isBusy}
                   modelStatus={modelStatuses[modelValue] ?? "unknown"}
-                  statusMessage={statusMsgs[modelValue] ?? null}
+                  statusMessage={null}
                   thinkingMode={getThinkingMode(modelValue)}
                   enableThinking={enableThinkingByModel[modelValue] ?? false}
                   onToggleThinking={(enabled) => {
@@ -710,6 +883,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
                     setShareTargetModel(modelValue)
                     setShareModalOpen(true)
                   }}
+                  onStop={() => stopGenerationForModel(modelValue)}
                 />
               ))}
             </div>
@@ -723,13 +897,13 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={isAnyLoading}
+              disabled={isBusy}
             />
             <Button
               className="btn-primary app-transcribe-btn"
               onClick={generateText}
-              disabled={!prompt.trim() || isAnyLoading}
-              loading={isAnyLoading}
+              disabled={!prompt.trim() || isBusy}
+              loading={isBusy}
             >
               Send
             </Button>

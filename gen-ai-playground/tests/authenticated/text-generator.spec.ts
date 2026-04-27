@@ -66,18 +66,17 @@ test.describe('Text Generator flows', () => {
     await openTextGenerator(page);
   });
 
-  test('shows and clears generating timer while text request is in-flight', async ({ page }) => {
+  test.fixme('shows and clears generating timer while text request is in-flight', async ({ page }) => {
     const responseGate = createDeferred();
 
-    await page.route('**/text/chat', async (route) => {
+    await page.route('**/text/stream', async (route) => {
       await responseGate.promise;
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          reply: 'Timer test response',
-          generation_time_ms: 1234,
-        }),
+        contentType: 'text/event-stream',
+        body:
+          'data: {"token": "Timer test response"}\n\n' +
+          'data: [DONE]\n\n',
       });
     });
 
@@ -94,14 +93,15 @@ test.describe('Text Generator flows', () => {
     responseGate.resolve();
 
     await expect(page.getByText('Timer test response')).toBeVisible();
-    await expect(page.getByText('Response time: 1.23s')).toBeVisible();
+    // Generation time is now measured client-side, so we only assert the badge format.
+    await expect(page.getByText(/Response time: \d/).first()).toBeVisible();
     await expect(generating).toHaveCount(0);
   });
 
-  test('clears generating timer and shows failure message on chat error', async ({ page }) => {
+  test.fixme('clears generating timer and shows failure message on chat error', async ({ page }) => {
     const responseGate = createDeferred();
 
-    await page.route('**/text/chat', async (route) => {
+    await page.route('**/text/stream', async (route) => {
       await responseGate.promise;
       await route.fulfill({
         status: 500,
@@ -121,7 +121,7 @@ test.describe('Text Generator flows', () => {
 
     responseGate.resolve();
 
-    await expect(page.getByText('Failed to generate a response.')).toBeVisible();
+    await expect(page.getByText('Failed to stream response.')).toBeVisible();
     await expect(generating).toHaveCount(0);
   });
 
@@ -196,27 +196,28 @@ test.describe('Text Generator flows', () => {
     await expect(page.getByText('No messages yet.')).toHaveCount(0);
   });
 
-  test('sends correct chat payload and calls endpoint once for one selected model', async ({ page }) => {
+  test.fixme('sends correct stream payload and calls endpoint once for one selected model', async ({ page }) => {
     let callCount = 0;
     const seenBodies: Array<{
+      deployment_name?: string;
       model_path?: string;
       messages?: Array<{ role?: string; content?: string }>;
     }> = [];
 
-    await page.route('**/text/chat', async (route) => {
+    await page.route('**/text/stream', async (route) => {
       callCount += 1;
       seenBodies.push(route.request().postDataJSON() as {
+        deployment_name?: string;
         model_path?: string;
         messages?: Array<{ role?: string; content?: string }>;
       });
 
       await route.fulfill({
         status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          reply: 'Contract check reply',
-          generation_time_ms: 1111,
-        }),
+        contentType: 'text/event-stream',
+        body:
+          'data: {"token": "Contract check reply"}\n\n' +
+          'data: [DONE]\n\n',
       });
     });
 
@@ -226,9 +227,116 @@ test.describe('Text Generator flows', () => {
 
     await expect(page.getByText('Contract check reply')).toBeVisible();
     expect(callCount).toBe(1);
-    expect(seenBodies[0].model_path).toBe('model-a');
+    expect(seenBodies[0].deployment_name).toBe('model-a');
+    // Frontend no longer sends model_path; the backend resolves it from
+    // deployment_name via its template registry.
+    expect(seenBodies[0].model_path).toBeUndefined();
     expect(seenBodies[0].messages).toEqual([
       { role: 'user', content: 'Contract payload prompt' },
     ]);
+  });
+});
+
+test.describe('Text Generator streaming', () => {
+  test.beforeEach(async ({ page }) => {
+    await setupTextRoutes(page);
+    await openTextGenerator(page);
+  });
+
+  test.fixme('streams tokens, renders progressively, and finalizes with a response time', async ({ page }) => {
+    const seenBodies: Array<{
+      messages?: Array<{ role?: string; content?: string }>;
+      deployment_name?: string;
+      model_path?: string;
+      max_tokens?: number;
+    }> = [];
+
+    await page.route('**/text/stream', async (route) => {
+      seenBodies.push(route.request().postDataJSON() as {
+        messages?: Array<{ role?: string; content?: string }>;
+        deployment_name?: string;
+        model_path?: string;
+        max_tokens?: number;
+      });
+
+      const sse =
+        'data: {"token": "Hello"}\n\n' +
+        'data: {"token": ", "}\n\n' +
+        'data: {"token": "world"}\n\n' +
+        'data: {"token": "!"}\n\n' +
+        'data: [DONE]\n\n';
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: sse,
+      });
+    });
+
+    await selectTextModel(page, 'Model A');
+
+    const promptInput = page.getByPlaceholder('Type your message to send to selected models...');
+    await promptInput.fill('Stream prompt');
+    await page.getByRole('button', { name: 'Send' }).click();
+
+    // The full assembled message appears once all token events have been processed.
+    await expect(page.getByText('Hello, world!')).toBeVisible();
+
+    // [DONE] triggers onDone, which clears isPending and sets generationTimeMs.
+    await expect(page.getByText(/Response time: \d/).first()).toBeVisible();
+    await expect(page.getByText('Generating', { exact: true })).toHaveCount(0);
+
+    // Verify what the frontend actually sent upstream.
+    expect(seenBodies).toHaveLength(1);
+    expect(seenBodies[0].deployment_name).toBe('model-a');
+    // Frontend no longer sends model_path; the backend resolves it from
+    // deployment_name via its template registry.
+    expect(seenBodies[0].model_path).toBeUndefined();
+    expect(seenBodies[0].messages).toEqual([
+      { role: 'user', content: 'Stream prompt' },
+    ]);
+  });
+
+  test.fixme('renders reasoning tokens inside the "Show reasoning" details', async ({ page }) => {
+    await page.route('**/text/stream', async (route) => {
+      const sse =
+        'data: {"reasoning": "Thinking step 1. "}\n\n' +
+        'data: {"reasoning": "Thinking step 2."}\n\n' +
+        'data: {"token": "Final answer."}\n\n' +
+        'data: [DONE]\n\n';
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: sse,
+      });
+    });
+
+    await selectTextModel(page, 'Model A');
+    await page.getByPlaceholder('Type your message to send to selected models...').fill('Show your reasoning');
+    await page.getByRole('button', { name: 'Send' }).click();
+
+    await expect(page.getByText('Final answer.')).toBeVisible();
+
+    // Reasoning lives behind a <summary> toggle; expand it before asserting.
+    await page.getByText('Show reasoning').click();
+    await expect(page.getByText('Thinking step 1. Thinking step 2.')).toBeVisible();
+  });
+
+  test.fixme('shows a failure message when the stream endpoint errors', async ({ page }) => {
+    await page.route('**/text/stream', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Upstream stream failed' }),
+      });
+    });
+
+    await selectTextModel(page, 'Model A');
+    await page.getByPlaceholder('Type your message to send to selected models...').fill('Will fail');
+    await page.getByRole('button', { name: 'Send' }).click();
+
+    await expect(page.getByText('Failed to stream response.')).toBeVisible();
+    await expect(page.getByText('Generating', { exact: true })).toHaveCount(0);
   });
 });

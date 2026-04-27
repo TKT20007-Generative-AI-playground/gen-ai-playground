@@ -6,16 +6,19 @@ generate text completions, chat with the model, and clean up.
 """
 import math
 import secrets
-from fastapi import APIRouter, HTTPException, Depends, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Depends, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from pymongo.database import Database
 from datetime import datetime, timezone
-from typing import Optional
+from typing import AsyncIterator, Literal, Optional
 import time
+import json
 from bson import ObjectId
 import asyncio
-
+import httpx
 
 from app.database import get_database
+from app.config import settings
 from app.dependencies import get_current_user, verify_token, get_admin_user, validate_csrf_token
 from app.models import (
     HistoryResponseText,
@@ -28,6 +31,7 @@ from app.models import (
     ConnectDeploymentRequest,
     UserInfo,
     ConversationCreateRequest,
+    StreamRequest,
 )
 from app.verda_service import verda_service
 from app.template_discovery import get_template_map, get_template_configs, _deployment_name_from_filename
@@ -48,6 +52,15 @@ def _parse_conversation_object_id(conversation_id: str) -> ObjectId:
         raise HTTPException(status_code=400, detail="Invalid conversation id")
 
 manager = ConnectionManager()
+
+
+def _inference_headers() -> dict[str, str]:
+    token = settings.VERDA_INFERENCE_KEY or settings.VERDA_API_KEY
+    if not token:
+        return {}
+    return {"Authorization": f"Bearer {token}"}
+
+
 
 router = APIRouter(
     prefix="/text",
@@ -748,6 +761,100 @@ async def conversation_ws(websocket: WebSocket, conversation_id: str, db=Depends
             },
         )
         
+
+def _extract_stream_delta(payload: str) -> tuple[str, str]:
+    obj = json.loads(payload)
+    choice = obj.get("choices", [{}])[0]
+    delta = choice.get("delta", {})
+
+    content = delta.get("content")
+    reasoning = delta.get("reasoning_content")
+
+    if not isinstance(reasoning, str) or not reasoning:
+        reasoning = delta.get("reasoning")
+
+    return (
+        content if isinstance(content, str) else "",
+        reasoning if isinstance(reasoning, str) else "",
+    )
+
+
+async def _iter_processed_chat_stream(
+    response: httpx.Response,
+    include_reasoning: bool = True,
+) -> AsyncIterator[tuple[Literal["content", "reasoning"], str]]:
+    pending_content = ""
+    inside_think = False
+
+    async for line in response.aiter_lines():
+        if not line or not line.startswith("data: "):
+            continue
+
+        payload = line[len("data: "):]
+        if payload == "[DONE]":
+            break
+
+        try:
+            content_token, reasoning_token = _extract_stream_delta(payload)
+        except Exception:
+            continue
+
+        if include_reasoning and reasoning_token:
+            yield "reasoning", reasoning_token
+
+        if not content_token:
+            continue
+
+        pending_content += content_token
+
+        while pending_content:
+            if inside_think:
+                end_idx = pending_content.find("</think>")
+                if end_idx == -1:
+                    # Keep a short suffix so split end-tags can be matched.
+                    safe_len = max(0, len(pending_content) - (len("</think>") - 1))
+                    if safe_len == 0:
+                        break
+
+                    reasoning_piece = pending_content[:safe_len]
+                    pending_content = pending_content[safe_len:]
+                    if include_reasoning and reasoning_piece:
+                        yield "reasoning", reasoning_piece
+                    break
+
+                reasoning_piece = pending_content[:end_idx]
+                pending_content = pending_content[end_idx + len("</think>"):]
+                inside_think = False
+                if include_reasoning and reasoning_piece:
+                    yield "reasoning", reasoning_piece
+                continue
+
+            start_idx = pending_content.find("<think>")
+            if start_idx == -1:
+                # Keep a short suffix so split start-tags can be matched.
+                safe_len = max(0, len(pending_content) - (len("<think>") - 1))
+                if safe_len == 0:
+                    break
+
+                visible_piece = pending_content[:safe_len]
+                pending_content = pending_content[safe_len:]
+                if visible_piece:
+                    yield "content", visible_piece
+                break
+
+            before_think = pending_content[:start_idx]
+            pending_content = pending_content[start_idx + len("<think>"):]
+            inside_think = True
+            if before_think:
+                yield "content", before_think
+
+    if pending_content:
+        if inside_think:
+            if include_reasoning:
+                yield "reasoning", pending_content
+        else:
+            yield "content", pending_content
+        
 async def handle_llm_reply(
     conversation_id: str,
     model_key: str,
@@ -756,7 +863,6 @@ async def handle_llm_reply(
     db: Database = Depends(get_database),
     cur_user: UserInfo = Depends(get_current_user),
 ):
-
     try:
         try:
             conversation_oid = _parse_conversation_object_id(conversation_id)
@@ -778,7 +884,7 @@ async def handle_llm_reply(
 
         try:
             deployments = verda_service.list_deployments()
-        except Exception as e:
+        except Exception:
             await manager.broadcast(conversation_id, {"type": "error", "message": "Could not reach deployment service."})
             return
 
@@ -809,30 +915,76 @@ async def handle_llm_reply(
 
         await manager.broadcast(conversation_id, {"type": "assistant_typing"})
 
-        # chat
         try:
-            model_path = choose_text_model_path(model_key)
-            result = await asyncio.to_thread(
-                verda_service.chat,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=0.7,
-                top_p=0.9,
-                enable_thinking=effective_enable_thinking,
-                supports_thinking=supports_thinking,
-                deployment_name=deployment_name,
-                model_path=model_path,
-            )
-            assistant_text = result["reply"]
-            assistant_reasoning = result.get("reasoning")
+            verda_client = verda_service._get_client()
+            deployment_obj = verda_client.containers.get_deployment_by_name(deployment_name)
+            base_url = (deployment_obj.endpoint_base_url or "").rstrip("/")
         except Exception as e:
-            await manager.broadcast(conversation_id, {"type": "error", "message": str(e)})
+            await manager.broadcast(conversation_id, {"type": "error", "message": f"Could not get deployment URL: {str(e)}"})
             return
+        normalized = base_url[:-3] if base_url.endswith("/v1") else base_url
+        target_url = f"{normalized}/v1/chat/completions"
 
+        model_path = choose_text_model_path(model_key)
+
+        request_payload = {
+            "model": model_path,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "stream": True,
+            "separate_reasoning": True,
+        }
+
+        if effective_enable_thinking:
+            thinking_kwargs = {
+                "enable_thinking": True,
+                "thinking": True,
+            }
+            request_payload["chat_template_kwargs"] = thinking_kwargs
+            request_payload["extra_body"] = {
+                "chat_template_kwargs": thinking_kwargs,
+                "separate_reasoning": True,
+            }
+
+        assistant_text = ""
+        assistant_reasoning = ""
+
+        async with httpx.AsyncClient(timeout=None) as http_client:
+            async with http_client.stream(
+                "POST",
+                target_url,
+                json=request_payload,
+                headers={
+                    **_inference_headers(),
+                    "Accept": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                },
+            ) as response:
+                if response.status_code >= 400:
+                    detail = (await response.aread()).decode("utf-8", errors="replace")
+                    await manager.broadcast(conversation_id, {"type": "error", "message": detail[:200]})
+                    return
+
+                async for chunk_type, chunk_text in _iter_processed_chat_stream(
+                    response,
+                    include_reasoning=effective_enable_thinking,
+                ):
+                    if chunk_type == "reasoning":
+                        assistant_reasoning += chunk_text
+                        continue
+
+                    assistant_text += chunk_text
+                    await manager.broadcast(conversation_id, {
+                        "type": "assistant_token",
+                        "token": chunk_text.replace("\n", "\\n"),
+                    })
+                    
         assistant_message = {
             "role": "assistant",
             "content": assistant_text,
-            "reasoning": assistant_reasoning,
+            "reasoning": assistant_reasoning if (effective_enable_thinking and assistant_reasoning) else None,
         }
         db.conversations.update_one(
             {"_id": conversation_oid},
@@ -905,3 +1057,133 @@ def chat_messages_length(
 ):
     length = db.text_generations.count_documents({"username": cur_user.username})
     return {"length": length}
+
+@router.post("/stream")
+async def stream(
+    stream_req: StreamRequest,
+    request: Request,
+    _: UserInfo = Depends(get_current_user),
+):
+    """
+        Stream text generation responses token-by-token using Server-Sent Events (SSE).
+    """
+    deployment_name = stream_req.deployment_name
+    max_tokens = stream_req.max_tokens
+    model_path = stream_req.model_path
+    # Pydantic models aren't JSON-serializable by httpx; flatten to plain dicts.
+    messages = [m.model_dump() for m in stream_req.messages]
+    enable_thinking = stream_req.enable_thinking
+    
+    if not model_path:
+        deployment_to_model_path = {
+            _deployment_name_from_filename(template_name): cfg.model
+            for template_name, cfg in get_template_configs().items()
+        }
+        model_path = deployment_to_model_path.get(deployment_name.lower())
+
+    if not model_path:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Could not resolve model_path for deployment '{deployment_name}'. "
+                "Provide model_path in request body or ensure deployment name matches a known template."
+            ),
+        )
+
+    try:
+        client = verda_service._get_client()
+        deployment = client.containers.get_deployment_by_name(deployment_name)
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not find deployment '{deployment_name}' or initialize Verda client",
+        )
+
+    base_url = (deployment.endpoint_base_url or "").rstrip("/")
+    if not base_url:
+        raise HTTPException(status_code=503, detail="Deployment endpoint URL is missing")
+
+    normalized_base_url = base_url[:-3] if base_url.endswith("/v1") else base_url
+    target_url = f"{normalized_base_url}/v1/chat/completions"
+
+    request_payload = {
+        "model": model_path,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": 0.7,
+        "top_p": 0.9,
+        "stream": True,
+        "separate_reasoning": True,
+    }
+
+    if enable_thinking:
+        thinking_kwargs = {
+            "enable_thinking": True,
+            "thinking": True,
+        }
+        request_payload["chat_template_kwargs"] = thinking_kwargs
+        request_payload["extra_body"] = {
+            "chat_template_kwargs": thinking_kwargs,
+            "separate_reasoning": True,
+        }
+
+
+    upstream_timeout = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=5.0)
+
+    async def event_generator():
+        async with httpx.AsyncClient(timeout=upstream_timeout) as async_client:
+            async with async_client.stream(
+                "POST",
+                target_url,
+                json=request_payload,
+                headers={
+                    **_inference_headers(),
+                    "Accept": "text/event-stream",
+                    "Cache-Control": "no-cache",
+                },
+            ) as response:
+                print(f"Stream upstream status={response.status_code} url={target_url}")
+
+                if response.status_code >= 400:
+                    detail = (await response.aread()).decode("utf-8", errors="replace")
+                    print(f"Stream upstream error status={response.status_code} body={detail[:500]}")
+                    message = json.dumps(
+                        {
+                            "error": "Upstream stream failed",
+                            "status": response.status_code,
+                            "detail": detail[:500],
+                        }
+                    )
+                    yield f"data: {message}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                async for chunk_type, chunk_text in _iter_processed_chat_stream(
+                    response,
+                    include_reasoning=enable_thinking,
+                ):
+                    # Bail out early if the client aborted; exiting the `async with`
+                    # blocks closes the upstream TCP connection so the inference
+                    # engine can free the GPU slot.
+                    if await request.is_disconnected():
+                        print("Stream client disconnected; closing upstream")
+                        return
+
+                    if chunk_type == "reasoning":
+                        encoded_reasoning = chunk_text.replace("\n", "\\n")
+                        yield f"data: {json.dumps({'reasoning': encoded_reasoning})}\n\n"
+                        continue
+
+                    encoded_visible = chunk_text.replace("\n", "\\n")
+                    yield f"data: {encoded_visible}\n\n"
+
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+        },
+    )

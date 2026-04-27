@@ -212,17 +212,45 @@ class TestHandleLlmReply:
             lambda: [{"name": "deploy-a"}],
         )
 
+        # Mock client now needs both endpoints used by the streaming code path.
         mock_client = SimpleNamespace(
             containers=SimpleNamespace(
-                get_deployment_status=lambda _name: SimpleNamespace(value="healthy")
+                get_deployment_status=lambda _name: SimpleNamespace(value="healthy"),
+                get_deployment_by_name=lambda _name: SimpleNamespace(endpoint_base_url="http://mock/v1"),
             )
         )
         monkeypatch.setattr(text_router.verda_service, "_get_client", lambda: mock_client)
-        monkeypatch.setattr(
-            text_router.verda_service,
-            "chat",
-            lambda **_kwargs: {"reply": "hello", "reasoning": None, "model": "org/model-a", "usage": {}},
-        )
+        monkeypatch.setattr(text_router, "_inference_headers", lambda: {})
+
+        # Fake httpx.AsyncClient + stream context managers so the `async with` chain
+        # succeeds without making a real HTTP call to an upstream model server.
+        class _FakeResponse:
+            status_code = 200
+
+        class _FakeStreamCtx:
+            async def __aenter__(self):
+                return _FakeResponse()
+
+            async def __aexit__(self, *_):
+                return False
+
+        class _FakeClient:
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_):
+                return False
+
+            def stream(self, *_args, **_kwargs):
+                return _FakeStreamCtx()
+
+        monkeypatch.setattr(text_router.httpx, "AsyncClient", lambda **_kwargs: _FakeClient())
+
+        # Stand in for the SSE parser with a deterministic single-token stream.
+        async def fake_iter(_response, include_reasoning=False):
+            yield "content", "hello"
+
+        monkeypatch.setattr(text_router, "_iter_processed_chat_stream", fake_iter)
 
         asyncio.run(
             text_router.handle_llm_reply(
@@ -233,9 +261,9 @@ class TestHandleLlmReply:
             )
         )
 
-        assert broadcast.await_count >= 2
         message_types = [call.args[1]["type"] for call in broadcast.await_args_list]
         assert "assistant_typing" in message_types
+        assert "assistant_token" in message_types
         assert "assistant_done" in message_types
 
         conversation = mock_db.conversations.find_one({"_id": text_router._parse_conversation_object_id(conv_id)})
