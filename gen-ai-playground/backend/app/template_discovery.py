@@ -23,6 +23,14 @@ def _is_audio_template(filename: str) -> bool:
     return filename.startswith("whisper-")
 
 
+def _is_video_template(filename: str) -> bool:
+    return filename.startswith("video-")
+
+
+def _is_text_template(filename: str) -> bool:
+    return not _is_audio_template(filename) and not _is_video_template(filename)
+
+
 def _display_name_from_filename(filename: str) -> str:
     """'deepseek-7b-sglang.json' -> 'Deepseek-7b-sglang'"""
     stem = filename.removesuffix(".json")
@@ -101,9 +109,9 @@ def discover_templates(include_audio: bool = False) -> dict[str, str]:
         include_audio: If False, exclude audio/whisper templates.
     """
     if include_audio:
-        names, _ = _discover_templates_with_predicate(lambda _filename: True)
+        names, _ = _discover_templates_with_predicate(lambda filename: not _is_video_template(filename))
     else:
-        names, _ = _discover_templates_with_predicate(lambda filename: not _is_audio_template(filename))
+        names, _ = _discover_templates_with_predicate(_is_text_template)
     return names
 
 
@@ -116,16 +124,22 @@ def discover_audio_templates() -> dict[str, str]:
     return names
 
 
+def discover_video_templates() -> dict[str, str]:
+    names, _configs = _discover_templates_with_predicate(_is_video_template)
+    return names
+
+
 _cache: dict[str, str] | None = None
 _config_cache: dict[str, TemplateConfig] | None = None
 _audio_cache: dict[str, str] | None = None
+_video_cache: dict[str, str] | None = None
 
 
 def _ensure_cache() -> None:
     global _cache, _config_cache
     if _cache is None or _config_cache is None:
         _cache, _config_cache = _discover_templates_with_predicate(
-            lambda filename: not _is_audio_template(filename)
+            _is_text_template
         )
 
 def get_template_map() -> dict[str, str]:
@@ -148,11 +162,19 @@ def get_audio_template_map() -> dict[str, str]:
     return _audio_cache
 
 
+def get_video_template_map() -> dict[str, str]:
+    global _video_cache
+    if _video_cache is None:
+        _video_cache = discover_video_templates()
+    return _video_cache
+
+
 def refresh() -> dict[str, str]:
     """Re-scan the templates directory and update all caches."""
-    global _cache, _config_cache, _audio_cache
+    global _cache, _config_cache, _audio_cache, _video_cache
     _cache, _config_cache = _discover_templates_with_predicate(
-        lambda filename: not _is_audio_template(filename)
+        _is_text_template
     )
     _audio_cache = discover_audio_templates()
+    _video_cache = discover_video_templates()
     return _cache

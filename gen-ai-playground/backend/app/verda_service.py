@@ -378,13 +378,13 @@ class VerdaService:
             )
         elif cfg.engine == "custom":
             custom_plain_env: dict[str, str] = {}
-            if cfg.model:
+            if template_json.startswith("whisper-") and cfg.model:
                 custom_plain_env["WHISPER_MODEL"] = cfg.model
+            elif template_json.startswith("video-") and cfg.model:
+                custom_plain_env["VIDEO_MODEL"] = cfg.model
             if cfg.custom and cfg.custom.env:
                 custom_plain_env.update(cfg.custom.env)
 
-            # Safety fallback: keep Whisper custom templates on GPU even if
-            # a stale template payload does not include explicit env values.
             if template_json.startswith("whisper-"):
                 custom_plain_env.setdefault("WHISPER_DEVICE", "cuda")
                 custom_plain_env.setdefault("WHISPER_COMPUTE_TYPE", "float16")

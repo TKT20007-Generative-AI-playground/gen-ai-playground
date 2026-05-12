@@ -1,7 +1,7 @@
 import type { AxiosRequestConfig } from "axios"
 import { apiClient } from "./httpClient"
 
-export type HistoryType = "image" | "text" | "audio" | "shared-chat"
+export type HistoryType = "image" | "text" | "audio" | "video" | "shared-chat"
 
 export async function fetchSidebarHistory<T = unknown>(
   historyType: HistoryType,
@@ -12,6 +12,7 @@ export async function fetchSidebarHistory<T = unknown>(
     image: "/images/history-sidebar",
     text: "/text/history-sidebar",
     audio: "/audio/history-sidebar",
+    video: "/video/history-sidebar",
     "shared-chat": "/text/shared-conversations-sidebar",
   }
 
@@ -19,6 +20,7 @@ export async function fetchSidebarHistory<T = unknown>(
     image: { limit },
     text: { limit },
     audio: { limit: audioFetchLimit },
+    video: { limit },
     "shared-chat": { limit },
   }
 
@@ -70,6 +72,18 @@ export async function fetchAudioHistoryList(
   return res.data
 }
 
+export async function fetchVideoHistoryList(
+  params: URLSearchParams,
+): Promise<{ history?: unknown[]; total_pages?: number; total?: number }> {
+  const res = await apiClient.get<{ history?: unknown[]; total_pages?: number; total?: number }>(
+    "/video/history",
+    {
+      params,
+    },
+  )
+  return res.data
+}
+
 async function fetchLength(path: string, config?: AxiosRequestConfig): Promise<number> {
   try {
     const res = await apiClient.get<{ length?: number }>(path, config)
@@ -96,6 +110,10 @@ export async function fetchAudioLength(): Promise<number> {
   } catch {
     return 0
   }
+}
+
+export function fetchVideoLength(): Promise<number> {
+  return fetchLength("/video/history-length")
 }
 
 export function fetchConversationsLength(): Promise<number> {

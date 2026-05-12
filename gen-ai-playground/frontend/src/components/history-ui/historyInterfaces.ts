@@ -49,6 +49,22 @@ export interface AudioRecord {
   transcription_time_ms?: number
   source?: string
 }
+
+export interface VideoRecord {
+  type: string
+  prompt: string
+  model: string
+  timestamp: string
+  username: string
+  video_data: string
+  mime_type: string
+  generation_time_ms?: number
+  height?: number
+  width?: number
+  num_frames?: number
+  fps?: number
+  seed?: number
+}
 export interface ConversationMessage {
   role: string
   content: string
