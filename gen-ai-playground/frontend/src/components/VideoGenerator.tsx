@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { Alert, Badge, Button, Card, Group, Loader, NumberInput, Select, SimpleGrid, Stack, Text, Textarea } from "@mantine/core"
 import { notifications } from "@mantine/notifications"
 
+import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import {
   fetchVideoModels,
@@ -25,10 +26,10 @@ function buildDropdownData(modelOptions: VideoModelApiItem[], statuses: VideoMod
   return modelOptions
     .map(model => {
       const status = statuses[model.value] ?? "unknown"
-      const labelPrefix = status === "live" ? "Live" : status === "starting" ? "Starting" : "Offline"
+      const emoji = status === "live" ? "\u{1F7E2}" : status === "starting" ? "\u{1F7E1}" : "\u26AA"
       return {
         value: model.value,
-        label: `${labelPrefix} - ${model.label}`,
+        label: `${emoji} ${model.label}`,
         disabled: status !== "live",
       }
     })
@@ -107,14 +108,6 @@ export default function VideoGenerator() {
     const liveModel = modelOptions.find(model => modelStatuses[model.value] === "live")
     if (liveModel) setSelectedModel(liveModel.value)
   }, [modelOptions, modelStatuses, selectedModel])
-
-  useEffect(() => {
-    if (!loading || startedAt === null) return
-    const intervalId = window.setInterval(() => {
-      setElapsedMs(Date.now() - startedAt)
-    }, 500)
-    return () => window.clearInterval(intervalId)
-  }, [loading, startedAt])
 
   const dropdownData = useMemo(
     () => buildDropdownData(modelOptions, modelStatuses),
@@ -247,13 +240,14 @@ export default function VideoGenerator() {
       />
 
       <Group justify="space-between" align="center">
-        <Button className="btn-primary" onClick={onGenerate} loading={loading} disabled={!canGenerate}>
+        <Button className="btn-primary" onClick={onGenerate} disabled={loading || !canGenerate}>
           Generate video
         </Button>
-        {elapsedMs !== null ? (
+        {loading && startedAt ? (
+          <ActionStatus actionText="Generating video" startTime={startedAt} />
+        ) : elapsedMs !== null ? (
           <Text size="sm" c="dimmed">
-            {loading ? "Running " : "Completed in "}
-            {formatDurationMs(elapsedMs, { compactMinutes: true })}
+            Completed in {formatDurationMs(elapsedMs, { compactMinutes: true })}
           </Text>
         ) : null}
       </Group>

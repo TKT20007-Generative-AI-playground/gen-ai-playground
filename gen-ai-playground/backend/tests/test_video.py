@@ -122,7 +122,7 @@ def test_video_deploy_uses_resolved_template(
     )
 
 
-@patch("app.routers.video.get_video_template_map", return_value={"video-wan21-t2v-13b-custom.json": "Wan2.1 T2V 1.3B"})
+@patch("app.routers.video.get_video_template_map", return_value={"video-wan21-t2v-1-3b-custom.json": "Wan2.1 T2V 1.3B"})
 @patch("app.routers.video.verda_service")
 def test_video_deploy_accepts_wan_human_label_alias(
     mock_verda_service,
@@ -132,7 +132,7 @@ def test_video_deploy_accepts_wan_human_label_alias(
     auth_headers,
 ):
     mock_verda_service.deploy_from_template.return_value = {
-        "name": "video-wan21-t2v-13b-custom",
+        "name": "video-wan21-t2v-1-3b-custom",
         "status": "deploying",
         "model": "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
     }
@@ -145,7 +145,7 @@ def test_video_deploy_accepts_wan_human_label_alias(
 
     assert response.status_code == 200
     mock_verda_service.deploy_from_template.assert_called_once_with(
-        template_json="video-wan21-t2v-13b-custom.json",
+        template_json="video-wan21-t2v-1-3b-custom.json",
         deployment_name=None,
     )
 

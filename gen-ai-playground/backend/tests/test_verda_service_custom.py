@@ -104,7 +104,7 @@ class TestCustomTemplateDeploymentPayload:
         )
 
         mock_client = MagicMock()
-        mock_client.containers.create_deployment.return_value = SimpleNamespace(name="video-wan21-t2v-13b-custom")
+        mock_client.containers.create_deployment.return_value = SimpleNamespace(name="video-wan21-t2v-1-3b-custom")
 
         with (
             patch.object(service, "_parse_and_validate_template", return_value=cfg),
@@ -125,9 +125,9 @@ class TestCustomTemplateDeploymentPayload:
             patch("app.verda_service.Container", side_effect=_ns_factory),
             patch("app.verda_service.Deployment", side_effect=_ns_factory),
         ):
-            result = service.deploy_from_template("video-wan21-t2v-13b-custom.json")
+            result = service.deploy_from_template("video-wan21-t2v-1-3b-custom.json")
 
-        assert result["name"] == "video-wan21-t2v-13b-custom"
+        assert result["name"] == "video-wan21-t2v-1-3b-custom"
         mock_ensure_hf_secret.assert_not_called()
 
         deployment_payload = mock_client.containers.create_deployment.call_args.args[0]
