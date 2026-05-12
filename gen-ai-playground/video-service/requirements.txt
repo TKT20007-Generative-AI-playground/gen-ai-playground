@@ -1,0 +1,8 @@
+fastapi[standard]
+diffusers
+transformers
+accelerate
+torch
+imageio
+imageio-ffmpeg
+python-multipart
