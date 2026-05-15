@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query, Request, WebSocket
 from fastapi.responses import StreamingResponse
 from pymongo.database import Database
 from datetime import datetime, timezone
-from typing import AsyncIterator, Literal, Optional
+from typing import Any, AsyncIterator, Literal, Optional
 import time
 import json
 from bson import ObjectId
@@ -404,20 +404,31 @@ def chat_with_model(
         chat_time_ms = int((time.perf_counter() - chat_start_time) * 1000)
 
         # Save to history
-        try:
-            history_record = {
-                "type": "chat",
-                "messages": [msg.model_dump() for msg in request.messages],
-                "reply": result["reply"],
-                "model": result["model"],
-                "timestamp": datetime.utcnow(),
-                "username": current_user.username,
-                "usage": result.get("usage", {}),
-                "generation_time_ms": chat_time_ms,
-            }
-            db.text_generations.insert_one(history_record)
-        except Exception as e:
-            print(f"Failed to save chat to MongoDB: {e}")
+        create_history_record(
+            db=db,
+            username=current_user.username,
+            type="chat",
+            messages=request.messages,
+            reply=result["reply"],
+            model=result["model"],
+            usage=result.get("usage", {}),
+            generation_time_ms=chat_time_ms,
+        )
+
+        # try:
+        #     history_record = {
+        #         "type": "chat",
+        #         "messages": [msg.model_dump() for msg in request.messages],
+        #         "reply": result["reply"],
+        #         "model": result["model"],
+        #         "timestamp": datetime.utcnow(),
+        #         "username": current_user.username,
+        #         "usage": result.get("usage", {}),
+        #         "generation_time_ms": chat_time_ms,
+        #     }
+        #     db.text_generations.insert_one(history_record)
+        # except Exception as e:
+        #     print(f"Failed to save chat to MongoDB: {e}")
 
         return ChatResponse(
             reply=result["reply"],
@@ -1192,23 +1203,19 @@ async def stream(
         finally:
             if not assistant_reply and not assistant_reasoning:
                 return
-
-            chat_time_ms = int((time.perf_counter() - stream_start_time) * 1000)
-            try:
-                history_record = {
-                    "type": "chat",
+            create_history_record(
+                history={
                     "messages": messages,
-                    "reply": assistant_reply,
-                    "reasoning": assistant_reasoning if (enable_thinking and assistant_reasoning) else None,
-                    "model": model_path,
-                    "timestamp": datetime.utcnow(),
-                    "username": current_user.username,
-                    "usage": {},
-                    "generation_time_ms": chat_time_ms,
-                }
-                db.text_generations.insert_one(history_record)
-            except Exception as e:
-                print(f"Failed to save stream chat to MongoDB: {e}")
+                    "assistant_reply": assistant_reply,
+                    "assistant_reasoning": assistant_reasoning,
+                    "model_path": model_path,
+                    "enable_thinking": enable_thinking
+                },
+                stream_start_time=stream_start_time,
+                db=db,
+                current_user=current_user
+            )
+
     
     
 
@@ -1220,3 +1227,31 @@ async def stream(
             "Cache-Control": "no-cache",
         },
     )
+    
+def create_history_record(
+    history: dict[str, Any],
+    stream_start_time: float,
+    db: Database,
+    current_user: UserInfo,
+):
+    chat_time_ms = int((time.perf_counter() - stream_start_time) * 1000)
+    try:
+        history_record = {
+            "type": "chat",
+            "messages": history["messages"],
+            "reply": history["assistant_reply"],
+            "reasoning": history["assistant_reasoning"]
+            if (history["enable_thinking"] and history["assistant_reasoning"])
+            else None,
+            "model": history["model_path"],
+            "timestamp": datetime.utcnow(),
+            "username": current_user.username,
+            "usage": {},
+            "generation_time_ms": chat_time_ms,
+        }
+        db.text_generations.insert_one(history_record)
+    except Exception as e:
+        print(f"Failed to save stream chat to MongoDB: {e}")
+        
+        
+        
