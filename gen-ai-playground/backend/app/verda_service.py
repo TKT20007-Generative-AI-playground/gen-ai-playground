@@ -425,7 +425,7 @@ class VerdaService:
 
         scaling_options = ScalingOptions(
             min_replica_count=1,
-            max_replica_count=3,
+            max_replica_count=1,
             scale_down_policy=ScalingPolicy(delay_seconds=300),
             scale_up_policy=ScalingPolicy(delay_seconds=0),
             queue_message_ttl_seconds=500,
@@ -520,7 +520,7 @@ class VerdaService:
         # Create scaling configuration (minimal for dev/playground use)
         scaling_options = ScalingOptions(
             min_replica_count=1,
-            max_replica_count=3,
+            max_replica_count=1,
             scale_down_policy=ScalingPolicy(delay_seconds=300),
             scale_up_policy=ScalingPolicy(delay_seconds=0),
             queue_message_ttl_seconds=500,
@@ -618,7 +618,7 @@ class VerdaService:
         # Create scaling configuration (minimal for dev/playground use)
         scaling_options = ScalingOptions(
             min_replica_count=1,
-            max_replica_count=3,
+            max_replica_count=1,
             scale_down_policy=ScalingPolicy(delay_seconds=300),
             scale_up_policy=ScalingPolicy(delay_seconds=0),
             queue_message_ttl_seconds=500,
@@ -916,7 +916,8 @@ class VerdaService:
                 }
                 for d in deployments
             ]
-        except APIException as e:
+        except Exception as e:
+            print(f"Error fetching deployments: {e}")
             return [{"error": str(e)}]
 
     def connect_to_existing(self, deployment_name: str, model_path: str = DEFAULT_MODEL) -> dict:

@@ -207,6 +207,7 @@ export default function VideoGenerator() {
         label="Prompt"
         placeholder="A quiet Nordic forest at dawn, low mist, slow cinematic camera movement"
         minRows={4}
+        maxLength={1500}
         value={prompt}
         onChange={event => setPrompt(event.currentTarget.value)}
         disabled={loading}
@@ -216,17 +217,18 @@ export default function VideoGenerator() {
         label="Negative prompt"
         placeholder="Optional"
         minRows={2}
+        maxLength={1500}
         value={negativePrompt}
         onChange={event => setNegativePrompt(event.currentTarget.value)}
         disabled={loading}
       />
 
       <SimpleGrid cols={{ base: 1, sm: 2, md: 5 }} spacing="sm">
-        <NumberInput label="Height" min={256} max={720} value={height} onChange={value => setHeight(value as number | "")} disabled={loading} />
-        <NumberInput label="Width" min={256} max={1280} value={width} onChange={value => setWidth(value as number | "")} disabled={loading} />
-        <NumberInput label="Frames" min={9} max={81} value={numFrames} onChange={value => setNumFrames(value as number | "")} disabled={loading} />
-        <NumberInput label="Steps" min={4} max={40} value={steps} onChange={value => setSteps(value as number | "")} disabled={loading} />
-        <NumberInput label="Seed" value={seed} onChange={value => setSeed(value as number | "")} disabled={loading} />
+        <NumberInput label="Height" min={256} max={720} allowDecimal={false} clampBehavior="strict" value={height} onChange={value => setHeight(value as number | "")} disabled={loading} />
+        <NumberInput label="Width" min={256} max={1280} allowDecimal={false} clampBehavior="strict" value={width} onChange={value => setWidth(value as number | "")} disabled={loading} />
+        <NumberInput label="Frames" min={9} max={81} allowDecimal={false} clampBehavior="strict" value={numFrames} onChange={value => setNumFrames(value as number | "")} disabled={loading} />
+        <NumberInput label="Steps" min={4} max={40} allowDecimal={false} clampBehavior="strict" value={steps} onChange={value => setSteps(value as number | "")} disabled={loading} />
+        <NumberInput label="Seed" allowDecimal={false} value={seed} onChange={value => setSeed(value as number | "")} disabled={loading} />
       </SimpleGrid>
 
       <NumberInput
@@ -234,6 +236,7 @@ export default function VideoGenerator() {
         min={1}
         max={12}
         step={0.5}
+        clampBehavior="strict"
         value={guidanceScale}
         onChange={value => setGuidanceScale(value as number | "")}
         disabled={loading}
@@ -243,9 +246,7 @@ export default function VideoGenerator() {
         <Button className="btn-primary" onClick={onGenerate} disabled={loading || !canGenerate}>
           Generate video
         </Button>
-        {loading && startedAt ? (
-          <ActionStatus actionText="Generating video" startTime={startedAt} />
-        ) : elapsedMs !== null ? (
+        {!loading && elapsedMs !== null ? (
           <Text size="sm" c="dimmed">
             Completed in {formatDurationMs(elapsedMs, { compactMinutes: true })}
           </Text>
@@ -262,9 +263,7 @@ export default function VideoGenerator() {
         <Card withBorder radius="md" p="xl">
           <Stack align="center" gap="sm">
             <Loader />
-            <Text c="dimmed" ta="center">
-              Video generation can take several minutes even on a strong GPU.
-            </Text>
+            {startedAt && <ActionStatus actionText="Generating video" startTime={startedAt} />}
           </Stack>
         </Card>
       ) : null}
