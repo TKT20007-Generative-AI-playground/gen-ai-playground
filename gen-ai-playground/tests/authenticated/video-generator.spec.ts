@@ -58,7 +58,7 @@ test.describe('Video Generator flows', () => {
     await openVideoGenerator(page);
 
     await expect(page.getByText('Generate a short text-to-video clip')).toBeVisible();
-    await page.getByLabel('Prompt').fill('A calm lake at sunrise');
+    await page.getByLabel('Prompt', { exact: true }).fill('A calm lake at sunrise');
     await page.getByRole('button', { name: 'Generate video' }).click();
 
     await expect(page.locator('video')).toBeVisible();
@@ -75,7 +75,7 @@ test.describe('Video Generator flows', () => {
 
     await openVideoGenerator(page);
 
-    await page.getByLabel('Prompt').fill('A calm lake at sunrise');
+    await page.getByLabel('Prompt', { exact: true }).fill('A calm lake at sunrise');
     await expect(page.getByRole('button', { name: 'Generate video' })).toBeDisabled();
   });
 });
