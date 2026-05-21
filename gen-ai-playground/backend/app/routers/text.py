@@ -16,6 +16,9 @@ import json
 from bson import ObjectId
 import asyncio
 import httpx
+import traceback
+
+
 
 from app.database import get_database
 from app.config import settings
@@ -102,15 +105,20 @@ def deploy_model(
         HTTPException: 500 if deployment fails.
     """
     print(f"User {current_user.username} requesting model deployment: {request.model_path}")
+   
     
     try:
-        result = _deploy_model_internal(request.model_path)
-        return DeploymentStatusResponse(**result)
+       result = _deploy_model_internal(request.model_path)
+       return DeploymentStatusResponse(**result)
+
     except RuntimeError as e:
-        print(f"Deploy RuntimeError: {e}")
+        print("Deploy RuntimeError:")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
     except Exception as e:
-        print(f"Deploy unexpected error: {e}")
+        print("Deploy unexpected error:")
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to deploy model: {str(e)}",
