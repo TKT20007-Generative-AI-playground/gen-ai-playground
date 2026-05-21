@@ -247,8 +247,6 @@ class VerdaService:
         )
         
         response = client.containers.client.get(SERVERLESS_COMPUTE_RESOURCES_ENDPOINT)
-    
-         
         resources = []
         for item in response.json():
             if isinstance(item, list):
@@ -265,7 +263,7 @@ class VerdaService:
         """Determine the compute resource name based on template config and available GPU types.
         Selects cheapest option from cfg.gpu_types that is available
         """
-        gpu_type_priority = ["l40s", "a100", "h100", "h200", "b200","b300"]
+        gpu_type_priority = ["RTX PRO 6000", "h100", "h200", "b200","b300"]
         for gpu_type in gpu_type_priority:
             if gpu_type in cfg.gpu_types and any(
                 name.startswith(gpu_type.upper()) for name in available_gpu_types
