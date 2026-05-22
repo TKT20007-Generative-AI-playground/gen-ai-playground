@@ -633,7 +633,7 @@ class TestListDeployments:
 
         assert result == []
 
-    def test_api_exception_returns_error_list(self):
+    def test_api_exception_returns_empty_list(self):
         service = VerdaService()
         mock_client = MagicMock()
         mock_client.containers.get_deployments.side_effect = _make_api_exception(
@@ -644,9 +644,7 @@ class TestListDeployments:
         with patch.object(service, "_get_client", return_value=mock_client):
             result = service.list_deployments()
 
-        assert len(result) == 1
-        assert "error" in result[0]
-        assert "api error" in result[0]["error"]
+        assert result == []
 
 
 class TestChatReasoningExtraction:
