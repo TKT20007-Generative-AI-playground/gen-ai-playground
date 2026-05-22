@@ -247,8 +247,6 @@ class VerdaService:
         )
         
         response = client.containers.client.get(SERVERLESS_COMPUTE_RESOURCES_ENDPOINT)
-    
-         
         resources = []
         for item in response.json():
             if isinstance(item, list):
@@ -265,7 +263,7 @@ class VerdaService:
         """Determine the compute resource name based on template config and available GPU types.
         Selects cheapest option from cfg.gpu_types that is available
         """
-        gpu_type_priority = ["l40s", "a100", "h100", "h200", "b200","b300"]
+        gpu_type_priority = ["RTX PRO 6000", "h100", "h200", "b200","b300"]
         for gpu_type in gpu_type_priority:
             if gpu_type in cfg.gpu_types and any(
                 name.startswith(gpu_type.upper()) for name in available_gpu_types
@@ -413,6 +411,7 @@ class VerdaService:
 
         # Build Verda container
         container = Container(
+            name = deployment_name,
             image=image,
             exposed_port=cfg.port,
             healthcheck=HealthcheckSettings(
@@ -450,10 +449,23 @@ class VerdaService:
             scaling=scaling_options,
             is_spot=False,
         )
+         
+        
+        try:
+            created = client.containers.create_deployment(deployment)
 
-        created = client.containers.create_deployment(deployment)
+        except Exception as e:
+            print("\n===== DEPLOY FAILED =====")
+            import traceback
+            traceback.print_exc()
+
+            raise RuntimeError(
+                f"Verda deployment creation failed: {e}"
+            )
 
         print(f"Created deployment from template: {created.name}")
+        
+
         return {
             "name": created.name,
             "status": "deploying",
@@ -558,102 +570,7 @@ class VerdaService:
             "message": "Deployment created. Model download and server startup may take several minutes.",
         }
         
-    def deploy_second_model(
-        self,
-        model_path: str = SECOND_MODEL,
-        deployment_name: Optional[str] = None,
-    ) -> dict:
-        """
-        Deploy an SGLang container with the specified LLM model on Verda.
-        
-        Args:
-            model_path: HuggingFace model identifier (e.g. 'Qwen/Qwen3-8B')
-            deployment_name: Custom deployment name. Auto-generated if not provided.
-            
-        Returns:
-            dict with deployment info (name, status, model)
-        """
-        client = self._get_client()
 
-        # Generate a unique deployment name if not provided
-        if deployment_name is None:
-            timestamp = datetime.now().strftime("%Y%m%d-%H%M%S").lower()
-            deployment_name = f'{model_path.split("/")[-1].lower()}-{timestamp}'
-
-        # Ensure HF secret exists
-        self._ensure_hf_secret()
-
-        # Create container configuration
-        # Use v0.5.8 image which natively supports Qwen3
-        container = Container(
-            image=SGLANG_IMAGE_QWEN,
-            exposed_port=APP_PORT,
-            healthcheck=HealthcheckSettings(
-                enabled=True, port=APP_PORT, path="/health"
-            ),
-            entrypoint_overrides=EntrypointOverridesSettings(
-                enabled=True,
-                cmd=[
-                    "python3",
-                    "-m",
-                    "sglang.launch_server",
-                    "--model-path",
-                    model_path,
-                    "--host",
-                    "0.0.0.0",
-                    "--port",
-                    str(APP_PORT),
-                    "--trust-remote-code",
-                ],
-            ),
-            env=[
-                EnvVar(
-                    name="HF_TOKEN",
-                    value_or_reference_to_secret=HF_SECRET_NAME,
-                    type=EnvVarType.SECRET,
-                )
-            ],
-        )
-
-        # Create scaling configuration (minimal for dev/playground use)
-        scaling_options = ScalingOptions(
-            min_replica_count=1,
-            max_replica_count=3,
-            scale_down_policy=ScalingPolicy(delay_seconds=300),
-            scale_up_policy=ScalingPolicy(delay_seconds=0),
-            queue_message_ttl_seconds=500,
-            concurrent_requests_per_replica=32,
-            scaling_triggers=ScalingTriggers(
-                queue_load=QueueLoadScalingTrigger(threshold=1),
-                cpu_utilization=UtilizationScalingTrigger(
-                    enabled=True, threshold=90
-                ),
-                gpu_utilization=UtilizationScalingTrigger(
-                    enabled=True, threshold=90
-                ),
-            ),
-        )
-
-        # General Compute = 24GB VRAM, sufficient for 7B models
-        compute = ComputeResource(name=DEFAULT_COMPUTE, size=1)
-
-        # Create deployment
-        deployment = Deployment(
-            name=deployment_name,
-            containers=[container],
-            compute=compute,
-            scaling=scaling_options,
-            is_spot=False,
-        )
-        
-        created = client.containers.create_deployment(deployment)
-        print(f"Created deployment: {created.name}")
-        return {
-            "name": created.name,
-            "status": "deploying",
-            "model": model_path,
-            "message": "Deployment created. Model download and server startup may take several minutes.",
-        }
 
     def get_deployment_status(self, deployment_name: str, model_path: Optional[str] = None) -> dict:
         """
