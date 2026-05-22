@@ -75,7 +75,7 @@ export default function DashboardContainers() {
           })
         }
       } catch {
-        setDeployOptions(options)
+        // silent
       }
 
       try {
@@ -89,7 +89,7 @@ export default function DashboardContainers() {
           })
         }
       } catch {
-        setDeployOptions(options)
+        // silent
       }
 
       try {
@@ -103,7 +103,7 @@ export default function DashboardContainers() {
           })
         }
       } catch {
-        setDeployOptions(options)
+        // silent
       }
 
       setDeployOptions(options)
