@@ -918,7 +918,7 @@ class VerdaService:
             ]
         except Exception as e:
             print(f"Error fetching deployments: {e}")
-            return [{"error": str(e)}]
+            return []
 
     def connect_to_existing(self, deployment_name: str, model_path: str = DEFAULT_MODEL) -> dict:
         """
