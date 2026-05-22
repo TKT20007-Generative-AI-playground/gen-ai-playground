@@ -13,10 +13,13 @@ from diffusers import WanPipeline
 from diffusers.utils import export_to_video
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+import threading
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_NAME = "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
+
+_inference_lock = threading.Lock()
 
 
 def _env_int(name: str, default: int) -> int:
@@ -132,16 +135,18 @@ def generate_video(request: VideoGenerateRequest) -> dict[str, Any]:
     try:
         pipe = _get_pipe()
         generation_start = time.perf_counter()
-        output = pipe(
-            prompt=prompt,
-            negative_prompt=request.negative_prompt,
-            height=height,
-            width=width,
-            num_frames=num_frames,
-            num_inference_steps=num_inference_steps,
-            guidance_scale=guidance_scale,
-            generator=generator,
-        )
+        
+        with _inference_lock:
+            output = pipe(
+                prompt=prompt,
+                negative_prompt=request.negative_prompt,
+                height=height,
+                width=width,
+                num_frames=num_frames,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale,
+                generator=generator,
+            )
 
         frames = output.frames[0]
         with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp:
