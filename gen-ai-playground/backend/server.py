@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager to initialize and clean up resources."""
     container_handler = ContainerHandler()
     app.state.container_handler = container_handler
-    await container_handler.start_watchdog(timeout_minutes=5, check_interval_seconds=30)
+    await container_handler.start_watchdog(timeout_minutes=15, check_interval_seconds=30)
     print("Container watchdog started.")
     yield
     # Cleanup container handler

@@ -34,7 +34,7 @@ class ContainerHandler:
                 print(f"Container {container_name} timestamp updated, was idle {elapsed:.2f} min")
                 
     
-    def _check_idle_containers(self, timeout_minutes: int = 5):
+    def _check_idle_containers(self, timeout_minutes: int = 15):
         """ check for containers that have been idle longer than timeout_minutes and delete them """
         for container_name, container_info in list(self.active_containers.items()):
             last_request_time = container_info.get("last_request_time") 
@@ -45,7 +45,7 @@ class ContainerHandler:
                     self.delete_container(container_name)
 
 
-    async def start_watchdog(self, timeout_minutes: int = 5, check_interval_seconds: int = 30):
+    async def start_watchdog(self, timeout_minutes: int = 15, check_interval_seconds: int = 30):
         self._watchdog_task = asyncio.create_task(
             self._watch(timeout_minutes, check_interval_seconds)
         )
