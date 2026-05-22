@@ -8,6 +8,7 @@ import {
   MultiSelect,
   NumberInput,
   Paper,
+  Select,
   Switch,
   Text,
   ScrollArea,
@@ -21,8 +22,11 @@ import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { ShareConversationModal } from "./SharedConversationsModal"
 import { fetchTextModels, fetchTextModelStatuses, fetchTextDeployments } from "../services/textService"
+import { deployTextModel, fetchDeployableTextModels } from "../services/dashboardService"
 import { useNavigate } from "react-router-dom"
 import { streamText, type StreamTextHandle } from "../services/streamService"
+import { getRequestErrorMessage } from "../utils/errors"
+import { notifications } from "@mantine/notifications"
 
 type ModelOption = {
   value: string
@@ -326,6 +330,10 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const [enableThinkingByModel, setEnableThinkingByModel] = useState<Record<string, boolean>>({})
   const [deploymentNames, setDeploymentNames] = useState<Record<string, string>>({})
   const [modelPaths, setModelPaths] = useState<Record<string, string>>({})
+  const [deployOptions, setDeployOptions] = useState<Array<{ id: string; label: string; modelPath: string }>>([])
+  const [selectedDeployId, setSelectedDeployId] = useState<string | null>(null)
+  const [deployLoading, setDeployLoading] = useState(false)
+  const [deployError, setDeployError] = useState<string | null>(null)
 
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [shareTargetModel, setShareTargetModel] = useState<string | null>(null)
@@ -428,6 +436,26 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     fetchModels()
   }, [enableTestModel, isLoggedIn])
 
+  useEffect(() => {
+    if (!isLoggedIn) return
+
+    const fetchDeployOptions = async () => {
+      try {
+        const availableModels = await fetchDeployableTextModels()
+        const options = availableModels.map(model => ({
+          id: model.value,
+          label: model.label,
+          modelPath: model.value,
+        }))
+        setDeployOptions(options)
+      } catch {
+        // silent
+      }
+    }
+
+    fetchDeployOptions()
+  }, [isLoggedIn])
+
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
     try {
@@ -449,6 +477,34 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     const id = setInterval(fetchStatuses, 30000)
     return () => clearInterval(id)
   }, [fetchStatuses, isLoggedIn])
+
+  const handleDeployModel = async () => {
+    if (!selectedDeployId) return
+    const selected = deployOptions.find(option => option.id === selectedDeployId)
+    if (!selected) return
+
+    setDeployLoading(true)
+    setDeployError(null)
+    try {
+      await deployTextModel(selected.modelPath)
+      notifications.show({
+        title: "Model started",
+        message: `${selected.label} is starting up. It may take a couple minutes.`,
+        color: "green",
+      })
+      await fetchStatuses()
+    } catch (error) {
+      const detail = getRequestErrorMessage(error, "Failed to deploy model")
+      setDeployError(detail)
+      notifications.show({
+        title: "Start failed",
+        message: detail || "Please try again.",
+        color: "red",
+      })
+    } finally {
+      setDeployLoading(false)
+    }
+  }
 
   const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
   const getModelOption = (value: string) => modelOptions.find((m) => m.value === value)
@@ -730,6 +786,36 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
       <Text c="dimmed" size="sm" mb={6}>
         Select up to {MAX_MODELS} models for text generation.
       </Text>
+
+      {deployOptions.length > 0 && (
+        <>
+          <Select
+            label="Start model"
+            placeholder="Select model to start"
+            data={deployOptions.map(option => ({ value: option.id, label: option.label }))}
+            value={selectedDeployId}
+            onChange={setSelectedDeployId}
+            searchable
+            clearable
+          />
+          {deployError && (
+            <Alert color="red" variant="light" p="xs">
+              {deployError}
+            </Alert>
+          )}
+          {selectedDeployId && (
+            <Button
+              className="app-btn-soft-blue"
+              variant="light"
+              onClick={handleDeployModel}
+              loading={deployLoading}
+              disabled={deployLoading}
+            >
+              Start model
+            </Button>
+          )}
+        </>
+      )}
 
       <MultiSelect
         label="Models"

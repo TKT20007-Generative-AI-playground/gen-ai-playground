@@ -19,13 +19,11 @@ import {
   Alert,
   ScrollArea,
   Card,
-  Collapse,
-  UnstyledButton,
-  Chip,
   Box,
 } from "@mantine/core"
-import { IconChevronDown, IconChevronRight } from "@tabler/icons-react"
 import { useMediaQuery } from "@mantine/hooks"
+import DeployableModelChips from "../components/DeployableModelChips"
+import DeployableModelList from "../components/DeployableModelList"
 
 interface Container {
   name: string
@@ -53,8 +51,12 @@ export default function DashboardContainers() {
   const [audioOpen, setAudioOpen] = useState(true)
 
   const isMobile = useMediaQuery("(max-width: 768px)")
-  const textModels = deployOptions.filter(m => m.kind === "text")
-  const audioModels = deployOptions.filter(m => m.kind === "audio")
+  const textModels = deployOptions
+    .filter(m => m.kind === "text")
+    .map(m => ({ id: m.id, label: m.label.replace("Text: ", "") }))
+  const audioModels = deployOptions
+    .filter(m => m.kind === "audio")
+    .map(m => ({ id: m.id, label: m.label.replace("Audio: ", "") }))
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -200,42 +202,19 @@ export default function DashboardContainers() {
         // MOBILE: model chips + cards
         <Stack gap="md">
           <Stack gap="xs">
-            {textModels.length > 0 && (
-              <>
-                <Text size="sm" fw={500} c="dimmed">Text Models</Text>
-                <ScrollArea>
-                  <Group gap="xs" wrap="wrap">
-                    {textModels.map(m => (
-                      <Chip
-                        key={m.id}
-                        checked={selectedModelId === m.id}
-                        onChange={() => setSelectedModelId(selectedModelId === m.id ? null : m.id)}
-                      >
-                        {m.label.replace("Text: ", "")}
-                      </Chip>
-                    ))}
-                  </Group>
-                </ScrollArea>
-              </>
-            )}
-            {audioModels.length > 0 && (
-              <>
-                <Text size="sm" fw={500} c="dimmed" mt="xs">Audio Models</Text>
-                <ScrollArea>
-                  <Group gap="xs" wrap="wrap">
-                    {audioModels.map(m => (
-                      <Chip
-                        key={m.id}
-                        checked={selectedModelId === m.id}
-                        onChange={() => setSelectedModelId(selectedModelId === m.id ? null : m.id)}
-                      >
-                        {m.label.replace("Audio: ", "")}
-                      </Chip>
-                    ))}
-                  </Group>
-                </ScrollArea>
-              </>
-            )}
+            <DeployableModelChips
+              title="Text Models"
+              models={textModels}
+              selectedId={selectedModelId}
+              onSelect={setSelectedModelId}
+            />
+            <DeployableModelChips
+              title="Audio Models"
+              models={audioModels}
+              selectedId={selectedModelId}
+              onSelect={setSelectedModelId}
+              titleMarginTop="xs"
+            />
           </Stack>
 
           {selectedModelId && (
@@ -288,91 +267,25 @@ export default function DashboardContainers() {
             }}
           >
             <Stack gap="xs">
-              {/* Text Models section */}
-              <UnstyledButton onClick={() => setTextOpen(o => !o)} style={{ width: "100%" }}>
-                <Group justify="space-between">
-                  <Text size="sm" fw={600}>Text Models</Text>
-                  {textOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-                </Group>
-              </UnstyledButton>
-              <Collapse in={textOpen}>
-                <Stack gap={4}>
-                  {textModels.length === 0 && (
-                    <Text size="xs" c="dimmed" py={4}>No models available</Text>
-                  )}
-                  {textModels.map(m => (
-                    <Group
-                      key={m.id}
-                      justify="space-between"
-                      style={{
-                        width: "100%",
-                        borderRadius: 6,
-                        padding: "6px 8px",
-                      }}
-                    >
-                      <Text size="sm" style={{ userSelect: "none" }}>
-                        {m.label.replace("Text: ", "")}
-                      </Text>
-                      <Button
-                        className="app-btn-soft-blue"
-                        size="xs"
-                        variant="light"
-                        loading={deployLoading}
-                        disabled={deployLoading}
-                        onClick={e => {
-                          e.stopPropagation()
-                          handleDeployById(m.id)
-                        }}
-                      >
-                        Deploy
-                      </Button>
-                    </Group>
-                  ))}
-                </Stack>
-              </Collapse>
+              <DeployableModelList
+                title="Text Models"
+                models={textModels}
+                isOpen={textOpen}
+                onToggle={() => setTextOpen(o => !o)}
+                onDeploy={handleDeployById}
+                deployLoading={deployLoading}
+              />
 
-              {/* Audio Models section */}
-              <UnstyledButton onClick={() => setAudioOpen(o => !o)} style={{ width: "100%" }}>
-                <Group justify="space-between" mt="xs">
-                  <Text size="sm" fw={600}>Audio Models</Text>
-                  {audioOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
-                </Group>
-              </UnstyledButton>
-              <Collapse in={audioOpen}>
-                <Stack gap={4}>
-                  {audioModels.length === 0 && (
-                    <Text size="xs" c="dimmed" py={4}>No models available</Text>
-                  )}
-                  {audioModels.map(m => (
-                    <Group
-                      key={m.id}
-                      justify="space-between"
-                      style={{
-                        width: "100%",
-                        borderRadius: 6,
-                        padding: "6px 8px",
-                      }}
-                    >
-                      <Text size="sm" style={{ userSelect: "none" }}>
-                        {m.label.replace("Audio: ", "")}
-                      </Text>
-                      <Button
-                        className="app-btn-soft-blue"
-                        size="xs"
-                        variant="light"
-                        loading={deployLoading}
-                        disabled={deployLoading}
-                        onClick={e => {
-                          e.stopPropagation()
-                          handleDeployById(m.id)
-                        }}
-                      >
-                        Deploy
-                      </Button>
-                    </Group>
-                  ))}
-                </Stack>
-              </Collapse>
+              <Box mt="xs">
+                <DeployableModelList
+                  title="Audio Models"
+                  models={audioModels}
+                  isOpen={audioOpen}
+                  onToggle={() => setAudioOpen(o => !o)}
+                  onDeploy={handleDeployById}
+                  deployLoading={deployLoading}
+                />
+              </Box>
             </Stack>
           </Box>
 
