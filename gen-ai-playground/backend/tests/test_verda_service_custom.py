@@ -53,7 +53,7 @@ class TestCustomTemplateDeploymentPayload:
         with (
             patch.object(service, "_parse_and_validate_template", return_value=cfg),
             patch.object(service, "_get_client", return_value=mock_client),
-            patch.object(service, "_resolve_gpu", return_value=("L40S", 1)),
+            patch.object(service, "_resolve_gpu", return_value=("RTX PRO 6000", 1)),
             patch.object(service, "_generate_command_from_template", return_value=[]),
             patch.object(service, "_resolve_image_from_template", return_value="repo/whisper-service:v1"),
             patch.object(service, "_ensure_hf_secret") as mock_ensure_hf_secret,
@@ -327,12 +327,12 @@ class TestResolveGpu:
             engine="sglang",
             sglang=_make_sglang(tp=4),
             vllm=None,
-            gpu_types=["l40s"],
+            gpu_types=["RTX PRO 6000"],
         )
-        mock_resource = SimpleNamespace(name="L40S", size=4, is_available=True)
+        mock_resource = SimpleNamespace(name="RTX PRO 6000", size=4, is_available=True)
         compute_name, gpu_count = service._resolve_gpu(cfg, resources=[mock_resource])
         assert gpu_count == 4
-        assert compute_name == "L40S"
+        assert compute_name == "RTX PRO 6000"
 
     def test_vllm_uses_tensor_parallel_size(self):
         service = VerdaService()
@@ -340,16 +340,16 @@ class TestResolveGpu:
             engine="vllm",
             sglang=None,
             vllm=_make_vllm(tensor_parallel_size=2),
-            gpu_types=["l40s"],
+            gpu_types=["RTX PRO 6000"],
         )
-        mock_resource = SimpleNamespace(name="L40S", size=2, is_available=True)
+        mock_resource = SimpleNamespace(name="RTX PRO 6000", size=2, is_available=True)
         compute_name, gpu_count = service._resolve_gpu(cfg, resources=[mock_resource])
         assert gpu_count == 2
 
     def test_default_gpu_count_is_one(self):
         service = VerdaService()
-        cfg = SimpleNamespace(engine="sglang", sglang=None, vllm=None, gpu_types=["l40s"])
-        mock_resource = SimpleNamespace(name="L40S", size=1, is_available=True)
+        cfg = SimpleNamespace(engine="sglang", sglang=None, vllm=None, gpu_types=["RTX PRO 6000"])
+        mock_resource = SimpleNamespace(name="RTX PRO 6000", size=1, is_available=True)
         compute_name, gpu_count = service._resolve_gpu(cfg, resources=[mock_resource])
         assert gpu_count == 1
 
@@ -359,7 +359,7 @@ class TestResolveGpu:
             engine="sglang",
             sglang=None,
             vllm=None,
-            gpu_types=["l40s"],
+            gpu_types=["RTX PRO 6000"],
         )
         mock_resource = SimpleNamespace(name="A100", size=1, is_available=True)
         compute_name, gpu_count = service._resolve_gpu(cfg, resources=[mock_resource])
@@ -391,7 +391,7 @@ class TestDeployFromTemplateEngines:
         with (
             patch.object(service, "_parse_and_validate_template", return_value=cfg),
             patch.object(service, "_get_client", return_value=mock_client),
-            patch.object(service, "_resolve_gpu", return_value=("L40S", 1)),
+            patch.object(service, "_resolve_gpu", return_value=("RTX PRO 6000", 1)),
             patch.object(service, "_generate_command_from_template", return_value=["python3", "-m", "sglang"]),
             patch.object(service, "_resolve_image_from_template", return_value="docker.io/lmsysorg/sglang:v0.5"),
             patch.object(service, "_ensure_hf_secret") as mock_ensure_hf,
@@ -435,7 +435,7 @@ class TestDeployFromTemplateEngines:
         with (
             patch.object(service, "_parse_and_validate_template", return_value=cfg),
             patch.object(service, "_get_client", return_value=mock_client),
-            patch.object(service, "_resolve_gpu", return_value=("L40S", 1)),
+            patch.object(service, "_resolve_gpu", return_value=("RTX PRO 6000", 1)),
             patch.object(service, "_generate_command_from_template", return_value=["python3", "-m", "vllm"]),
             patch.object(service, "_resolve_image_from_template", return_value="docker.io/vllm/vllm-openai:v0.13"),
             patch.object(service, "_ensure_hf_secret") as mock_ensure_hf,
