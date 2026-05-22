@@ -418,6 +418,7 @@ def chat_with_model(
             type="chat",
             messages=request.messages,
             reply=result["reply"],
+            reasoning=result.get("reasoning"),
             model=result["model"],
             usage=result.get("usage", {}),
             generation_time_ms=chat_time_ms,
@@ -1221,26 +1222,51 @@ async def stream(
     )
     
 def create_history_record(
-    history: dict[str, Any],
-    stream_start_time: float,
+    *,
     db: Database,
-    current_user: UserInfo,
+    current_user: Optional[UserInfo] = None,
+    username: Optional[str] = None,
+    type: str = "chat",
+    messages: Optional[list[Any]] = None,
+    reply: Optional[str] = None,
+    reasoning: Optional[str] = None,
+    model: Optional[str] = None,
+    usage: Optional[dict[str, Any]] = None,
+    generation_time_ms: Optional[int] = None,
+    history: Optional[dict[str, Any]] = None,
+    stream_start_time: Optional[float] = None,
 ):
-    chat_time_ms = int((time.perf_counter() - stream_start_time) * 1000)
     try:
-        history_record = {
-            "type": "chat",
-            "messages": history["messages"],
-            "reply": history["assistant_reply"],
-            "reasoning": history["assistant_reasoning"]
-            if (history["enable_thinking"] and history["assistant_reasoning"])
-            else None,
-            "model": history["model_path"],
-            "timestamp": datetime.utcnow(),
-            "username": current_user.username,
-            "usage": {},
-            "generation_time_ms": chat_time_ms,
-        }
+        if history is not None:
+            chat_time_ms = int((time.perf_counter() - stream_start_time) * 1000)
+            history_record = {
+                "type": "chat",
+                "messages": history["messages"],
+                "reply": history["assistant_reply"],
+                "reasoning": history["assistant_reasoning"]
+                if (history["enable_thinking"] and history["assistant_reasoning"])
+                else None,
+                "model": history["model_path"],
+                "timestamp": datetime.utcnow(),
+                "username": current_user.username if current_user else username,
+                "usage": {},
+                "generation_time_ms": chat_time_ms,
+            }
+        else:
+            history_record = {
+                "type": type,
+                "messages": [
+                    msg.model_dump() if hasattr(msg, "model_dump") else msg
+                    for msg in (messages or [])
+                ],
+                "reply": reply,
+                "reasoning": reasoning,
+                "model": model,
+                "timestamp": datetime.utcnow(),
+                "username": username or (current_user.username if current_user else None),
+                "usage": usage or {},
+                "generation_time_ms": generation_time_ms or 0,
+            }
         db.text_generations.insert_one(history_record)
     except Exception as e:
         print(f"Failed to save stream chat to MongoDB: {e}")
