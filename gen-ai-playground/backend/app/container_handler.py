@@ -54,6 +54,8 @@ class ContainerHandler:
     async def _watch(self, timeout_minutes: int, interval: int):
         while True:
             await asyncio.sleep(interval)
+            if not self.active_containers:
+                continue # if there are no active containers, skip the check and the print statement to reduce unnecessary logs
             print("checking for idle containers...")
             self._check_idle_containers(timeout_minutes)
 
