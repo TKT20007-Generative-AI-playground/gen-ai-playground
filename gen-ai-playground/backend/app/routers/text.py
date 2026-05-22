@@ -22,7 +22,7 @@ import traceback
 
 from app.database import get_database
 from app.config import settings
-from app.dependencies import get_current_user, verify_token, get_admin_user, validate_csrf_token
+from app.dependencies import get_container_handler, get_current_user, verify_token, get_admin_user, validate_csrf_token
 from app.models import (
     HistoryResponseText,
     TextGenerateRequest,
@@ -38,8 +38,8 @@ from app.models import (
 )
 from app.verda_service import verda_service
 from app.template_discovery import get_template_map, get_template_configs, _deployment_name_from_filename
-from verda.containers import ContainerDeploymentStatus
 from app.connection_manager import ConnectionManager
+from app.container_handler import ContainerHandler
 
 
 def _sanitize_slug(model_path: str) -> str:
@@ -85,6 +85,7 @@ def list_available_models(current_user: UserInfo = Depends(get_current_user)):
 def deploy_model(
     request: DeployModelRequest,
     current_user: UserInfo = Depends(get_admin_user),
+    container_handler: ContainerHandler = Depends(get_container_handler),
     _: None = Depends(validate_csrf_token),
 ):
     """
@@ -108,7 +109,7 @@ def deploy_model(
    
     
     try:
-       result = _deploy_model_internal(request.model_path)
+       result = _deploy_model_internal(request.model_path, container_handler)
        return DeploymentStatusResponse(**result)
 
     except RuntimeError as e:
@@ -212,7 +213,7 @@ def _model_supports_thinking(template_name: str | None) -> bool:
     return False
 
 
-def _deploy_model_internal(model_key: str) -> dict:
+def _deploy_model_internal(model_key: str, container_handler: ContainerHandler) -> dict:
     """
     Internal helper to deploy a model by key.
     Used by the admin /deploy endpoint.
@@ -220,7 +221,7 @@ def _deploy_model_internal(model_key: str) -> dict:
     # Check V2 templates 
     template = _resolve_template_name(model_key)
     if template:
-        return verda_service.deploy_from_template(template_json=template)
+        return verda_service.deploy_from_template(template_json=template, container_handler=container_handler)
     else:
         return {"error": f"Model '{model_key}' not found in available templates."}
 
@@ -327,6 +328,7 @@ def chat_with_model(
     request: ChatRequest,
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
+    container_handler: ContainerHandler = Depends(get_container_handler),
     _: None = Depends(validate_csrf_token),
 ):
     """
@@ -392,6 +394,8 @@ def chat_with_model(
     except Exception as e:
         print(f"Failed to check deployment status for '{deployment_name}': {e}")
         raise HTTPException(status_code=503, detail=f"Failed to check deployment status: {str(e)}")
+
+    container_handler.set_latest_request_timestamp(deployment_name)
 
     # Detect if model supports thinking from template config
     supports_thinking = _model_supports_thinking(template_name)
@@ -866,6 +870,7 @@ async def handle_llm_reply(
     enable_thinking: bool = False,
     db: Database = Depends(get_database),
     cur_user: UserInfo = Depends(get_current_user),
+    container_handler: ContainerHandler = Depends(get_container_handler),
 ):
     try:
         try:
@@ -916,6 +921,8 @@ async def handle_llm_reply(
         except Exception as e:
             await manager.broadcast(conversation_id, {"type": "error", "message": f"Failed to check deployment: {str(e)}"})
             return
+
+        container_handler.set_latest_request_timestamp(deployment_name)
 
         await manager.broadcast(conversation_id, {"type": "assistant_typing"})
 
@@ -1069,6 +1076,7 @@ async def stream(
     request: Request,
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
+    container_handler: ContainerHandler = Depends(get_container_handler),
 ):
     """
         Stream text generation responses token-by-token using Server-Sent Events (SSE).
@@ -1106,6 +1114,8 @@ async def stream(
             status_code=503,
             detail=f"Could not find deployment '{deployment_name}' or initialize Verda client",
         )
+
+    container_handler.set_latest_request_timestamp(deployment_name)
 
     base_url = (deployment.endpoint_base_url or "").rstrip("/")
     if not base_url:

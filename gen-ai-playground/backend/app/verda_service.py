@@ -4,6 +4,9 @@ Verda Cloud service for deploying and managing AI model containers.
 Uses the Verda Python SDK to deploy SGLang-based LLM containers
 and run inference against them.
 """
+from __future__ import annotations
+from typing import TYPE_CHECKING
+ 
 from datetime import datetime
 from typing import Optional
 import json
@@ -32,6 +35,11 @@ from verda.exceptions import APIException
 
 from app.config import settings
 from app.template_models import TemplateConfig
+
+
+if TYPE_CHECKING:
+    from app.container_handler import ContainerHandler  
+
 
 
 # Default model configuration
@@ -304,6 +312,7 @@ class VerdaService:
     def deploy_from_template(
         self,
         template_json: str,
+        container_handler: ContainerHandler,
         deployment_name: Optional[str] = None,
         gpu_type: Optional[str] = None,
     ) -> dict:
@@ -453,6 +462,12 @@ class VerdaService:
         
         try:
             created = client.containers.create_deployment(deployment)
+            
+            # Add to active containers in ContainerHandler for lifecycle management
+            container_handler.add_container({
+                "name": created.name,
+                "model": cfg.model,
+            })
 
         except Exception as e:
             print("\n===== DEPLOY FAILED =====")

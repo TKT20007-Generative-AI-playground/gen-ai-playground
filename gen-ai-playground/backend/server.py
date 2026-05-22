@@ -6,9 +6,22 @@ Refactored with proper separation of concerns.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from contextlib import asynccontextmanager
 from app.config import settings
 from app.routers import auth, images, text, dashboard, invitations, audio
+from app.container_handler import ContainerHandler
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager to initialize and clean up resources."""
+    container_handler = ContainerHandler()
+    app.state.container_handler = container_handler
+    await container_handler.start_watchdog(timeout_minutes=5, check_interval_seconds=30)
+    print("Container watchdog started.")
+    yield
+    # Cleanup container handler
+    await container_handler.cleanup()
 
 
 # Initialize FastAPI app
@@ -18,6 +31,7 @@ app = FastAPI(
     version="1.0.0",
     docs_url=None if settings.IS_PROD else "/docs",
     redoc_url=None if settings.IS_PROD else "/redoc",
+    lifespan=lifespan
 )
 
 # Configure CORS
