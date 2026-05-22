@@ -422,22 +422,6 @@ def chat_with_model(
             usage=result.get("usage", {}),
             generation_time_ms=chat_time_ms,
         )
-
-        # try:
-        #     history_record = {
-        #         "type": "chat",
-        #         "messages": [msg.model_dump() for msg in request.messages],
-        #         "reply": result["reply"],
-        #         "model": result["model"],
-        #         "timestamp": datetime.utcnow(),
-        #         "username": current_user.username,
-        #         "usage": result.get("usage", {}),
-        #         "generation_time_ms": chat_time_ms,
-        #     }
-        #     db.text_generations.insert_one(history_record)
-        # except Exception as e:
-        #     print(f"Failed to save chat to MongoDB: {e}")
-
         return ChatResponse(
             reply=result["reply"],
             reasoning=result.get("reasoning"),
