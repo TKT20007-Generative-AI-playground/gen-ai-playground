@@ -142,7 +142,8 @@ export default function VideoGenerator() {
     }
 
     setLoading(true)
-    setStartedAt(Date.now())
+    const startTime = Date.now()
+    setStartedAt(startTime)
     setElapsedMs(0)
     setError(null)
     setResult(null)
@@ -160,7 +161,7 @@ export default function VideoGenerator() {
         seed: typeof seed === "number" ? seed : undefined,
       })
       setResult(response)
-      setElapsedMs(response.generation_time_ms ?? (startedAt ? Date.now() - startedAt : null))
+      setElapsedMs(response.generation_time_ms ?? (Date.now() - startTime))
       window.dispatchEvent(new Event("history-update"))
     } catch (err: unknown) {
       setError(getErrorDetail(err))
