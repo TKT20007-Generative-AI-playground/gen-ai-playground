@@ -4,7 +4,7 @@
   "name": "Custom Engine",
   "explanation": "Example configuration for custom inference engines. Demonstrates how to use a custom base command with positional args and key-value arguments for non-standard inference frameworks.",
   "short_explanation": "Custom engine configuration template",
-  "gpu_types": ["h100", "h200", "b200", "a100", "l40s"],
+  "gpu_types": ["h100", "h200", "b200", "RTX PRO 6000"],
   "custom": {
     "base_command": "python -m my_inference_engine.serve",
     "model_flag": "--model-path",
