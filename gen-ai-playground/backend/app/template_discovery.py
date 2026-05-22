@@ -106,7 +106,9 @@ def discover_templates(include_audio: bool = False) -> dict[str, str]:
     Skips files in _SKIP_TEMPLATES and invalid templates.
 
     Args:
-        include_audio: If False, exclude audio/whisper templates.
+        include_audio: If False, return text templates only (excluding audio
+            and video templates). If True, include audio/whisper templates in
+            addition to text templates, while still excluding video templates.
     """
     if include_audio:
         names, _ = _discover_templates_with_predicate(lambda filename: not _is_video_template(filename))
