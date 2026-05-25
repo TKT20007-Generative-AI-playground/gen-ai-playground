@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { Alert, Button, FileInput, MultiSelect, Text, Textarea } from "@mantine/core"
+import { Alert, Button, FileInput, MultiSelect, Select, Text, Textarea } from "@mantine/core"
 
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
@@ -10,6 +10,9 @@ import {
   transcribeAudio,
 } from "../services/audioService"
 import { notifications } from '@mantine/notifications'
+import { useAuth } from "../context/AuthContext"
+import { deployAudioModel, fetchDeployableAudioModels} from "../services/dashboardService"
+import { getRequestErrorMessage } from "../utils/errors"
 
 type TranscriptionSegment = {
   start: number
@@ -102,6 +105,62 @@ export default function Transcribe() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const recordingChunksRef = useRef<Blob[]>([])
+
+  const [deployOptions, setDeployOptions] = useState<Array<{ id: string; label: string; modelPath: string }>>([])
+  const [selectedDeployId, setSelectedDeployId] = useState<string | null>(null)
+  const [deployLoading, setDeployLoading] = useState(false)
+  const [deployError, setDeployError] = useState<string | null>(null)
+  const { isLoggedIn } = useAuth()
+
+
+  
+   useEffect(() => {
+      if (!isLoggedIn) return
+  
+      const fetchDeployOptions = async () => {
+        try {
+          const availableModels = await fetchDeployableAudioModels()
+          const options = availableModels.map(model => ({
+            id: model.value,
+            label: model.label,
+            modelPath: model.value,
+          }))
+          setDeployOptions(options)
+        } catch {
+          // silent
+        }
+      }
+  
+      fetchDeployOptions()
+    }, [isLoggedIn])
+
+    const handleDeployModel = async () => {
+      if (!selectedDeployId) return
+      const selected = deployOptions.find(option => option.id === selectedDeployId)
+      if (!selected) return
+  
+      setDeployLoading(true)
+      setDeployError(null)
+      try {
+        await deployAudioModel(selected.modelPath)
+        notifications.show({
+          title: "Model started",
+          message: `${selected.label} is starting up. It may take a couple minutes.`,
+          color: "green",
+        })
+        await fetchAudioModelStatuses()
+      } catch (error) {
+        const detail = getRequestErrorMessage(error, "Failed to deploy model")
+        setDeployError(detail)
+        notifications.show({
+          title: "Start failed",
+          message: detail || "Please try again.",
+          color: "red",
+        })
+      } finally {
+        setDeployLoading(false)
+      }
+    }
 
   const stopActiveStream = () => {
     if (!streamRef.current) return
@@ -443,6 +502,39 @@ export default function Transcribe() {
       <Text c="dimmed" size="sm" mb={6}>
         Select up to {MAX_AUDIO_MODELS} models for transcription.
       </Text>
+
+      <>
+        <Select
+          label="Start model"
+          placeholder="Select model to start"
+          data={deployOptions.map(option => ({ value: option.id, label: option.label }))}
+          value={selectedDeployId}
+          onChange={setSelectedDeployId}
+          searchable
+          clearable
+        />
+        
+        {deployOptions.length > 0 && (
+          <>
+            {deployError && (
+              <Alert color="red" variant="light" p="xs">
+                {deployError}
+              </Alert>
+            )}
+            {selectedDeployId && (
+              <Button
+                className="app-btn-soft-blue"
+                variant="light"
+                onClick={handleDeployModel}
+                loading={deployLoading}
+                disabled={deployLoading}
+              >
+                Start model
+              </Button>
+            )}
+          </>
+        )}
+      </>
 
       <MultiSelect
         label="Models"
