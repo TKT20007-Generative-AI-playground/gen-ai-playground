@@ -16,6 +16,7 @@ from bson import ObjectId
 from server import app
 from app.dependencies import validate_csrf_token
 from app.config import settings
+from app.container_handler import ContainerHandler
 
 
 # ---------------------------------------------------------------------------
@@ -34,6 +35,7 @@ def mock_db():
 def client(mock_db):
     """Create a test client with mocked database."""
     app.dependency_overrides[validate_csrf_token] = lambda: None
+    app.state.container_handler = ContainerHandler()
     with patch('app.database.db_manager.db', mock_db):
         with patch('app.database.get_database', return_value=mock_db):
             yield TestClient(app)
