@@ -16,9 +16,9 @@ class ContainerHandler:
         }
 
 
-    def delete_container(self, container_name: str):
+    async def delete_container(self, container_name: str):
         if container_name in self.active_containers:
-            res = self.verda_service.delete_deployment(container_name)
+            res = await asyncio.to_thread(self.verda_service.delete_deployment, container_name)
             print(f"Deleted container {container_name} response: {res}")
             del self.active_containers[container_name]
             print(f"Container {container_name} deleted.")
@@ -34,7 +34,7 @@ class ContainerHandler:
                 print(f"Container {container_name} timestamp updated, was idle {elapsed:.2f} min")
                 
     
-    def _check_idle_containers(self, timeout_minutes: int = 15):
+    async def _check_idle_containers(self, timeout_minutes: int = 15):
         """ check for containers that have been idle longer than timeout_minutes and delete them """
         for container_name, container_info in list(self.active_containers.items()):
             last_request_time = container_info.get("last_request_time") 
@@ -42,7 +42,7 @@ class ContainerHandler:
                 elapsed = (datetime.now() - last_request_time).total_seconds() / 60
                 if elapsed > timeout_minutes:
                     print(f"Container {container_name} idle {elapsed:.2f} min, deleting...")
-                    self.delete_container(container_name)
+                    await self.delete_container(container_name)
 
 
     async def start_watchdog(self, timeout_minutes: int = 15, check_interval_seconds: int = 30):
@@ -57,7 +57,7 @@ class ContainerHandler:
             if not self.active_containers:
                 continue # if there are no active containers, skip the check and the print statement to reduce unnecessary logs
             print("checking for idle containers...")
-            self._check_idle_containers(timeout_minutes)
+            await self._check_idle_containers(timeout_minutes)
 
 
     async def cleanup(self):
@@ -66,4 +66,4 @@ class ContainerHandler:
         
         # delete all active containers/deployments on shutdown
         # for container_name in list(self.active_containers.keys()):
-        #     self.delete_container(container_name)
+        #     await self.delete_container(container_name)
