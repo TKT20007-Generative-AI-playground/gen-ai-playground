@@ -316,7 +316,7 @@ def get_audio_model_statuses(_current_user: UserInfo = Depends(get_current_user)
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_audio_model(
     request: DeployModelRequest,
-    current_user: UserInfo = Depends(get_admin_user),
+    current_user: UserInfo = Depends(get_current_user),
     _: None = Depends(validate_csrf_token),
     container_handler: ContainerHandler = Depends(get_container_handler),
 ):

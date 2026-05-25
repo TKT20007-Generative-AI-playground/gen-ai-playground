@@ -84,7 +84,7 @@ def list_available_models(current_user: UserInfo = Depends(get_current_user)):
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_model(
     request: DeployModelRequest,
-    current_user: UserInfo = Depends(get_admin_user),
+    current_user: UserInfo = Depends(get_current_user),
     container_handler: ContainerHandler = Depends(get_container_handler),
     _: None = Depends(validate_csrf_token),
 ):
@@ -96,7 +96,8 @@ def deploy_model(
 
     Args:
         request: Deployment configuration (model path).
-        current_user: Authenticated admin user.
+        current_user: Authenticated user.
+        container_handler: Container handler for managing deployments.
 
     Returns:
         Deployment status information.
