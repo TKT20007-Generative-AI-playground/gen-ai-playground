@@ -152,6 +152,9 @@ class TestHandleLlmReply:
                 model_key="Model A",
                 db=mock_db,
                 cur_user=UserInfo(username="alice", is_admin=False),
+                container_handler=SimpleNamespace(
+                    set_latest_request_timestamp=lambda *_args, **_kwargs: None
+                ),
             )
         )
 
@@ -183,6 +186,9 @@ class TestHandleLlmReply:
                 model_key="Model A",
                 db=mock_db,
                 cur_user=UserInfo(username="alice", is_admin=False),
+                container_handler=SimpleNamespace(
+                    set_latest_request_timestamp=lambda *_args, **_kwargs: None
+                ),
             )
         )
 
@@ -260,6 +266,9 @@ class TestHandleLlmReply:
                 model_key="Model A",
                 db=mock_db,
                 cur_user=UserInfo(username="alice", is_admin=False),
+                container_handler=SimpleNamespace(
+                    set_latest_request_timestamp=lambda *_args, **_kwargs: None
+                ),
             )
         )
 
