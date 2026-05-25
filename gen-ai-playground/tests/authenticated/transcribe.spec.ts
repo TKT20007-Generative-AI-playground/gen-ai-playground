@@ -36,7 +36,7 @@ async function selectAudioModel(page: Page, modelLabel: string) {
   const modelInput = page.locator('input[data-type="visible"][aria-haspopup="listbox"]').first();
   await modelInput.click();
 
-  const option = page.locator('div[role="option"][data-combobox-option="true"]', {
+  const option = page.locator('div[role="option"][data-combobox-option="true"]:visible', {
     hasText: modelLabel,
   }).first();
   await option.click();
@@ -94,18 +94,18 @@ test.describe('Transcribe flows', () => {
     const modelInput = page.locator('input[data-type="visible"][aria-haspopup="listbox"]');
 
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Whisper A' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Whisper A' }).first().click();
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Whisper B' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Whisper B' }).first().click();
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Whisper C' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Whisper C' }).first().click();
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Whisper D' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Whisper D' }).first().click();
 
     await expect(page.getByText('Run transcription to see the model\'s output.')).toHaveCount(4);
 
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Whisper E' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Whisper E' }).first().click();
 
     await expect(page.getByText('Run transcription to see the model\'s output.')).toHaveCount(4);
   });
