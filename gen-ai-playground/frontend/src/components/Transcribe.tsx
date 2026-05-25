@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Alert, Button, FileInput, MultiSelect, Select, Text, Textarea } from "@mantine/core"
 
 import ActionStatus from "./ActionStatus"
@@ -10,9 +10,9 @@ import {
   transcribeAudio,
 } from "../services/audioService"
 import { notifications } from '@mantine/notifications'
+import { useDeployModel } from "../hooks/useDeployModel"
 import { useAuth } from "../context/AuthContext"
 import { deployAudioModel, fetchDeployableAudioModels} from "../services/dashboardService"
-import { getRequestErrorMessage } from "../utils/errors"
 
 type TranscriptionSegment = {
   start: number
@@ -106,61 +106,25 @@ export default function Transcribe() {
   const streamRef = useRef<MediaStream | null>(null)
   const recordingChunksRef = useRef<Blob[]>([])
 
-  const [deployOptions, setDeployOptions] = useState<Array<{ id: string; label: string; modelPath: string }>>([])
-  const [selectedDeployId, setSelectedDeployId] = useState<string | null>(null)
-  const [deployLoading, setDeployLoading] = useState(false)
-  const [deployError, setDeployError] = useState<string | null>(null)
+
   const { isLoggedIn } = useAuth()
-
-
   
-   useEffect(() => {
-      if (!isLoggedIn) return
-  
-      const fetchDeployOptions = async () => {
-        try {
-          const availableModels = await fetchDeployableAudioModels()
-          const options = availableModels.map(model => ({
-            id: model.value,
-            label: model.label,
-            modelPath: model.value,
-          }))
-          setDeployOptions(options)
-        } catch {
-          // silent
-        }
-      }
-  
-      fetchDeployOptions()
-    }, [isLoggedIn])
-
-    const handleDeployModel = async () => {
-      if (!selectedDeployId) return
-      const selected = deployOptions.find(option => option.id === selectedDeployId)
-      if (!selected) return
-  
-      setDeployLoading(true)
-      setDeployError(null)
-      try {
-        await deployAudioModel(selected.modelPath)
-        notifications.show({
-          title: "Model started",
-          message: `${selected.label} is starting up. It may take a couple minutes.`,
-          color: "green",
-        })
-        await fetchAudioModelStatuses()
-      } catch (error) {
-        const detail = getRequestErrorMessage(error, "Failed to deploy model")
-        setDeployError(detail)
-        notifications.show({
-          title: "Start failed",
-          message: detail || "Please try again.",
-          color: "red",
-        })
-      } finally {
-        setDeployLoading(false)
-      }
+  const audioService = useMemo(() => ({
+    fetchOptions: async () => {
+      const availableModels = await fetchDeployableAudioModels()
+      return availableModels.map(model => ({ value: model.value, label: model.label }))
+    },
+    deploy: async (modelPath: string) => {
+      await deployAudioModel(modelPath)
+    },
+    fetchStatuses: async () => {
+      const statuses = await fetchAudioModelStatusesRequest()
+      setModelStatuses(statuses)
     }
+  }), [])
+
+  const audioDeploy = useDeployModel(isLoggedIn, audioService)
+
 
   const stopActiveStream = () => {
     if (!streamRef.current) return
@@ -507,27 +471,27 @@ export default function Transcribe() {
         <Select
           label="Start model"
           placeholder="Select model to start"
-          data={deployOptions.map(option => ({ value: option.id, label: option.label }))}
-          value={selectedDeployId}
-          onChange={setSelectedDeployId}
+          data={audioDeploy.deployOptions.map(option => ({ value: option.id, label: option.label }))}
+          value={audioDeploy.selectedDeployId}
+          onChange={audioDeploy.setSelectedDeployId}
           searchable
           clearable
         />
         
-        {deployOptions.length > 0 && (
+        {audioDeploy.deployOptions.length > 0 && (
           <>
-            {deployError && (
+            {audioDeploy.deployError && (
               <Alert color="red" variant="light" p="xs">
-                {deployError}
+                {audioDeploy.deployError}
               </Alert>
             )}
-            {selectedDeployId && (
+            {audioDeploy.selectedDeployId && (
               <Button
                 className="app-btn-soft-blue"
                 variant="light"
-                onClick={handleDeployModel}
-                loading={deployLoading}
-                disabled={deployLoading}
+                onClick={audioDeploy.handleDeployModel}
+                loading={audioDeploy.deployLoading}
+                disabled={audioDeploy.deployLoading}
               >
                 Start model
               </Button>

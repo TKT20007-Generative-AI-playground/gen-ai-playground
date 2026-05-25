@@ -1,5 +1,5 @@
 import { useAuth } from "../context/AuthContext"
-import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent, useMemo } from "react"
 
 import {
   Alert,
@@ -22,11 +22,10 @@ import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { ShareConversationModal } from "./SharedConversationsModal"
 import { fetchTextModels, fetchTextModelStatuses, fetchTextDeployments } from "../services/textService"
-import { deployTextModel, fetchDeployableTextModels } from "../services/dashboardService"
+import { deployTextModel} from "../services/dashboardService"
 import { useNavigate } from "react-router-dom"
 import { streamText, type StreamTextHandle } from "../services/streamService"
-import { getRequestErrorMessage } from "../utils/errors"
-import { notifications } from "@mantine/notifications"
+import { useDeployModel } from "../hooks/useDeployModel"
 
 type ModelOption = {
   value: string
@@ -330,10 +329,6 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
   const [enableThinkingByModel, setEnableThinkingByModel] = useState<Record<string, boolean>>({})
   const [deploymentNames, setDeploymentNames] = useState<Record<string, string>>({})
   const [modelPaths, setModelPaths] = useState<Record<string, string>>({})
-  const [deployOptions, setDeployOptions] = useState<Array<{ id: string; label: string; modelPath: string }>>([])
-  const [selectedDeployId, setSelectedDeployId] = useState<string | null>(null)
-  const [deployLoading, setDeployLoading] = useState(false)
-  const [deployError, setDeployError] = useState<string | null>(null)
 
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [shareTargetModel, setShareTargetModel] = useState<string | null>(null)
@@ -436,25 +431,7 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     fetchModels()
   }, [enableTestModel, isLoggedIn])
 
-  useEffect(() => {
-    if (!isLoggedIn) return
 
-    const fetchDeployOptions = async () => {
-      try {
-        const availableModels = await fetchDeployableTextModels()
-        const options = availableModels.map(model => ({
-          id: model.value,
-          label: model.label,
-          modelPath: model.value,
-        }))
-        setDeployOptions(options)
-      } catch {
-        // silent
-      }
-    }
-
-    fetchDeployOptions()
-  }, [isLoggedIn])
 
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
@@ -473,38 +450,34 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
 
   useEffect(() => {
     if (!isLoggedIn) return
+
     fetchStatuses()
-    const id = setInterval(fetchStatuses, 30000)
-    return () => clearInterval(id)
+    const interval = window.setInterval(fetchStatuses, 30000)
+    return () => window.clearInterval(interval)
   }, [fetchStatuses, isLoggedIn])
 
-  const handleDeployModel = async () => {
-    if (!selectedDeployId) return
-    const selected = deployOptions.find(option => option.id === selectedDeployId)
-    if (!selected) return
 
-    setDeployLoading(true)
-    setDeployError(null)
-    try {
-      await deployTextModel(selected.modelPath)
-      notifications.show({
-        title: "Model started",
-        message: `${selected.label} is starting up. It may take a couple minutes.`,
-        color: "green",
-      })
-      await fetchStatuses()
-    } catch (error) {
-      const detail = getRequestErrorMessage(error, "Failed to deploy model")
-      setDeployError(detail)
-      notifications.show({
-        title: "Start failed",
-        message: detail || "Please try again.",
-        color: "red",
-      })
-    } finally {
-      setDeployLoading(false)
+  const textService = useMemo(() => ({
+    fetchOptions: async () => {
+      const availableModels = await fetchTextModels()
+      return availableModels.map(model => ({ value: model.value, label: model.label }))
+    },
+    deploy: async (modelPath: string) => {
+      await deployTextModel(modelPath)
+    },
+    fetchStatuses: async () => {
+      const statuses = await fetchTextModelStatuses()
+      if (enableTestModel) {
+        setModelStatuses({ ...statuses, test_model: "live" })
+      } else {
+        setModelStatuses({ ...statuses })
+      }
     }
-  }
+  }), [enableTestModel])
+
+  const textDeploy = useDeployModel(isLoggedIn, textService)
+
+
 
   const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
   const getModelOption = (value: string) => modelOptions.find((m) => m.value === value)
@@ -791,27 +764,27 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         <Select
           label="Start model"
           placeholder="Select model to start"
-          data={deployOptions.map(option => ({ value: option.id, label: option.label }))}
-          value={selectedDeployId}
-          onChange={setSelectedDeployId}
+          data={textDeploy.deployOptions.map(option => ({ value: option.id, label: option.label }))}
+          value={textDeploy.selectedDeployId}
+          onChange={textDeploy.setSelectedDeployId}
           searchable
           clearable
         />
-  
-        {deployOptions.length > 0 && (
+
+        {textDeploy.deployOptions.length > 0 && (
           <>
-            {deployError && (
+            {textDeploy.deployError && (
               <Alert color="red" variant="light" p="xs">
-                {deployError}
+                {textDeploy.deployError}
               </Alert>
             )}
-            {selectedDeployId && (
+            {textDeploy.selectedDeployId && (
               <Button
                 className="app-btn-soft-blue"
                 variant="light"
-                onClick={handleDeployModel}
-                loading={deployLoading}
-                disabled={deployLoading}
+                onClick={textDeploy.handleDeployModel}
+                loading={textDeploy.deployLoading}
+                disabled={textDeploy.deployLoading}
               >
                 Start model
               </Button>
