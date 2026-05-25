@@ -787,35 +787,38 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         Select up to {MAX_MODELS} models for text generation.
       </Text>
 
-      {deployOptions.length > 0 && (
-        <>
-          <Select
-            label="Start model"
-            placeholder="Select model to start"
-            data={deployOptions.map(option => ({ value: option.id, label: option.label }))}
-            value={selectedDeployId}
-            onChange={setSelectedDeployId}
-            searchable
-            clearable
-          />
-          {deployError && (
-            <Alert color="red" variant="light" p="xs">
-              {deployError}
-            </Alert>
-          )}
-          {selectedDeployId && (
-            <Button
-              className="app-btn-soft-blue"
-              variant="light"
-              onClick={handleDeployModel}
-              loading={deployLoading}
-              disabled={deployLoading}
-            >
-              Start model
-            </Button>
-          )}
-        </>
-      )}
+      <>
+        <Select
+          label="Start model"
+          placeholder="Select model to start"
+          data={deployOptions.map(option => ({ value: option.id, label: option.label }))}
+          value={selectedDeployId}
+          onChange={setSelectedDeployId}
+          searchable
+          clearable
+        />
+  
+        {deployOptions.length > 0 && (
+          <>
+            {deployError && (
+              <Alert color="red" variant="light" p="xs">
+                {deployError}
+              </Alert>
+            )}
+            {selectedDeployId && (
+              <Button
+                className="app-btn-soft-blue"
+                variant="light"
+                onClick={handleDeployModel}
+                loading={deployLoading}
+                disabled={deployLoading}
+              >
+                Start model
+              </Button>
+            )}
+          </>
+        )}
+      </>
 
       <MultiSelect
         label="Models"
