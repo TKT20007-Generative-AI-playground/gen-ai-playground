@@ -9,10 +9,10 @@ import {
   fetchAudioModelStatuses as fetchAudioModelStatusesRequest,
   transcribeAudio,
 } from "../services/audioService"
-import { notifications } from '@mantine/notifications'
+import { notifications } from "@mantine/notifications"
 import { useDeployModel } from "../hooks/useDeployModel"
 import { useAuth } from "../context/AuthContext"
-import { deployAudioModel, fetchDeployableAudioModels} from "../services/dashboardService"
+import { deployAudioModel, fetchDeployableAudioModels } from "../services/dashboardService"
 
 type TranscriptionSegment = {
   start: number
@@ -95,7 +95,9 @@ export default function Transcribe() {
   const [recordingStartTime, setRecordingStartTime] = useState<number | null>(null)
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
-  const [activeTranscribeSource, setActiveTranscribeSource] = useState<TranscribeSource | null>(null)
+  const [activeTranscribeSource, setActiveTranscribeSource] = useState<TranscribeSource | null>(
+    null,
+  )
 
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
   const [modelStatuses, setModelStatuses] = useState<Record<string, ModelStatus>>({})
@@ -106,25 +108,26 @@ export default function Transcribe() {
   const streamRef = useRef<MediaStream | null>(null)
   const recordingChunksRef = useRef<Blob[]>([])
 
-
   const { isLoggedIn } = useAuth()
-  
-  const audioService = useMemo(() => ({
-    fetchOptions: async () => {
-      const availableModels = await fetchDeployableAudioModels()
-      return availableModels.map(model => ({ value: model.value, label: model.label }))
-    },
-    deploy: async (modelPath: string) => {
-      await deployAudioModel(modelPath)
-    },
-    fetchStatuses: async () => {
-      const statuses = await fetchAudioModelStatusesRequest()
-      setModelStatuses(statuses)
-    }
-  }), [])
+
+  const audioService = useMemo(
+    () => ({
+      fetchOptions: async () => {
+        const availableModels = await fetchDeployableAudioModels()
+        return availableModels.map(model => ({ value: model.value, label: model.label }))
+      },
+      deploy: async (modelPath: string) => {
+        await deployAudioModel(modelPath)
+      },
+      fetchStatuses: async () => {
+        const statuses = await fetchAudioModelStatusesRequest()
+        setModelStatuses(statuses)
+      },
+    }),
+    [],
+  )
 
   const audioDeploy = useDeployModel(isLoggedIn, audioService)
-
 
   const stopActiveStream = () => {
     if (!streamRef.current) return
@@ -236,7 +239,8 @@ export default function Transcribe() {
   const getModelStatusMessage = (status: ModelStatus): string | null => {
     if (status === "live") return null
     if (status === "starting") return "This model is starting up. It may take a minute or two."
-    if (status === "offline") return "This model is not deployed. Ask an admin to deploy it from the dashboard."
+    if (status === "offline")
+      return "This model is not deployed. Ask an admin to deploy it from the dashboard."
     return "Model status is currently unknown."
   }
 
@@ -421,7 +425,8 @@ export default function Transcribe() {
       setRecordingStartTime(null)
       notifications.show({
         title: "Error",
-        message: "Microphone permission denied or unavailable. Please allow microphone access and retry.",
+        message:
+          "Microphone permission denied or unavailable. Please allow microphone access and retry.",
         color: "red",
       })
     }
@@ -441,7 +446,8 @@ export default function Transcribe() {
   const canStartRecording = !isLoading && !isRecording
   const canStopRecording = !isLoading && isRecording
   const canTranscribeUploaded = !isLoading && !isRecording && !!file && selectedModels.length > 0
-  const canTranscribeRecording = !isLoading && !isRecording && !!recordedBlob && selectedModels.length > 0
+  const canTranscribeRecording =
+    !isLoading && !isRecording && !!recordedBlob && selectedModels.length > 0
   const modelGridTemplateColumns =
     selectedModels.length === 1
       ? "minmax(320px, 1fr)"
@@ -471,13 +477,16 @@ export default function Transcribe() {
         <Select
           label="Start model"
           placeholder="Select model to start"
-          data={audioDeploy.deployOptions.map(option => ({ value: option.id, label: option.label }))}
+          data={audioDeploy.deployOptions.map(option => ({
+            value: option.id,
+            label: option.label,
+          }))}
           value={audioDeploy.selectedDeployId}
           onChange={audioDeploy.setSelectedDeployId}
           searchable
           clearable
         />
-        
+
         {audioDeploy.deployOptions.length > 0 && (
           <>
             {audioDeploy.deployError && (
@@ -525,7 +534,7 @@ export default function Transcribe() {
           >
             <div
               style={{
-                border: "1px solid #ddd",
+                border: "1px solid var(--app-panel-border)",
                 borderRadius: "8px",
                 padding: "12px",
                 display: "flex",
@@ -553,7 +562,7 @@ export default function Transcribe() {
 
             <div
               style={{
-                border: "1px solid #ddd",
+                border: "1px solid var(--app-panel-border)",
                 borderRadius: "8px",
                 padding: "12px",
                 display: "flex",
@@ -576,10 +585,21 @@ export default function Transcribe() {
                       width: "100%",
                     }}
                   >
-                    <Button className="btn-primary app-transcribe-btn" onClick={startRecording} disabled={!canStartRecording} fullWidth>
+                    <Button
+                      className="btn-primary app-transcribe-btn"
+                      onClick={startRecording}
+                      disabled={!canStartRecording}
+                      fullWidth
+                    >
                       {recordingButtonText}
                     </Button>
-                    <Button className="app-transcribe-btn" color="orange" onClick={stopRecording} disabled={!canStopRecording} fullWidth>
+                    <Button
+                      className="app-transcribe-btn"
+                      color="orange"
+                      onClick={stopRecording}
+                      disabled={!canStopRecording}
+                      fullWidth
+                    >
                       Stop recording
                     </Button>
                     <Button
@@ -605,7 +625,11 @@ export default function Transcribe() {
                         width: "100%",
                       }}
                     >
-                      <audio controls src={recordedAudioUrl} style={{ width: "min(100%, 440px)" }} />
+                      <audio
+                        controls
+                        src={recordedAudioUrl}
+                        style={{ width: "min(100%, 440px)" }}
+                      />
                     </div>
                   ) : null}
 
@@ -669,7 +693,7 @@ export default function Transcribe() {
                       flex: 1,
                       minHeight: "300px",
                       maxHeight: "65vh",
-                      border: "1px solid #ddd",
+                      border: "1px solid var(--app-panel-border)",
                       borderRadius: "8px",
                       padding: "12px",
                       display: "flex",
@@ -692,7 +716,13 @@ export default function Transcribe() {
 
                     {modelResult?.data ? (
                       <>
-                        <Textarea value={modelResult.data.text} readOnly autosize minRows={6} maxRows={16} />
+                        <Textarea
+                          value={modelResult.data.text}
+                          readOnly
+                          autosize
+                          minRows={6}
+                          maxRows={16}
+                        />
 
                         <Text size="sm" c="dimmed">
                           Language: {modelResult.data.language ?? "unknown"}
@@ -702,13 +732,17 @@ export default function Transcribe() {
                         </Text>
                         {typeof modelResult.data.duration === "number" ? (
                           <Text size="sm" c="dimmed">
-                            Audio duration: {formatDurationMs(modelResult.data.duration * 1000, { compactMinutes: true })}
+                            Audio duration:{" "}
+                            {formatDurationMs(modelResult.data.duration * 1000, {
+                              compactMinutes: true,
+                            })}
                           </Text>
                         ) : null}
-                        {(typeof modelResult.data.transcription_time_ms === "number" ||
-                          typeof modelResult.elapsedMs === "number") ? (
+                        {typeof modelResult.data.transcription_time_ms === "number" ||
+                        typeof modelResult.elapsedMs === "number" ? (
                           <Text size="sm" c="dimmed">
-                            Transcription time: {formatDurationMs(
+                            Transcription time:{" "}
+                            {formatDurationMs(
                               modelResult.data.transcription_time_ms ?? modelResult.elapsedMs ?? 0,
                               { compactMinutes: true },
                             )}

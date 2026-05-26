@@ -40,7 +40,9 @@ function titleizeWhisperModel(modelId: string): string {
     const body = compact.slice("whisper-".length)
     const pretty = body
       .split("-")
-      .map(part => (part.match(/^v\d+$/i) ? part.toLowerCase() : part.charAt(0).toUpperCase() + part.slice(1)))
+      .map(part =>
+        part.match(/^v\d+$/i) ? part.toLowerCase() : part.charAt(0).toUpperCase() + part.slice(1),
+      )
       .join(" ")
     return `Whisper ${pretty}`
   }
@@ -53,7 +55,9 @@ export function formatAudioModelName(rawModel: string): string {
   if (!value) return "Unknown model"
 
   const withoutVendor = value.replace(/^openai\//i, "")
-  const modelId = withoutVendor.includes("/") ? withoutVendor.split("/").pop() ?? withoutVendor : withoutVendor
+  const modelId = withoutVendor.includes("/")
+    ? (withoutVendor.split("/").pop() ?? withoutVendor)
+    : withoutVendor
 
   if (/^whisper\s/i.test(value)) {
     return value

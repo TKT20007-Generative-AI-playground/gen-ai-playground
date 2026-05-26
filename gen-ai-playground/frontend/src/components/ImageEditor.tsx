@@ -12,7 +12,7 @@ import {
 } from "../api/imageRequests"
 import { formatDurationMs } from "../utils/time"
 import { editImageRequest, fetchBlobByUrl, isCanceledRequest } from "../services/imageService"
-import { notifications } from '@mantine/notifications'
+import { notifications } from "@mantine/notifications"
 
 type ImageToEdit = {
   id?: string
@@ -309,7 +309,11 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
 
       <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
         <FileButton onChange={handleUpload} accept="image/png,image/jpeg,image/webp">
-          {props => <Button className="btn-primary" {...props}>{userImage ? "Change image" : "Upload image"}</Button>}
+          {props => (
+            <Button className="btn-primary" {...props}>
+              {userImage ? "Change image" : "Upload image"}
+            </Button>
+          )}
         </FileButton>
       </div>
 
@@ -348,7 +352,11 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
             />
             {editedImageUrl && (
               <div style={{ display: "flex", justifyContent: "center" }}>
-                <Button className="btn-primary" mt="sm" onClick={() => startReeditFromUrl(originalImageUrl!)}>
+                <Button
+                  className="btn-primary"
+                  mt="sm"
+                  onClick={() => startReeditFromUrl(originalImageUrl!)}
+                >
                   Edit image
                 </Button>
               </div>
@@ -390,7 +398,11 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
             />
             {editedImageUrl && (
               <div style={{ display: "flex", justifyContent: "center" }}>
-                <Button className="btn-primary" mt="sm" onClick={() => startReeditFromUrl(editedImageUrl!)}>
+                <Button
+                  className="btn-primary"
+                  mt="sm"
+                  onClick={() => startReeditFromUrl(editedImageUrl!)}
+                >
                   Edit image
                 </Button>
               </div>
@@ -400,6 +412,5 @@ export default function ImageEditor({ imageToEdit }: { imageToEdit?: ImageToEdit
       )}
       <div ref={bottomRef} />
     </Stack>
-
   )
 }

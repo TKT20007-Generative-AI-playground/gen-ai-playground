@@ -39,7 +39,7 @@ export default function Playground({ historyOpen }: { historyOpen: boolean }) {
       <Group gap="md" p="md">
         <Select
           label="Select playground component"
-          data={PLAYGROUND_TABS.map((t) => ({ value: t, label: t }))}
+          data={PLAYGROUND_TABS.map(t => ({ value: t, label: t }))}
           value={selectedComponent}
           onChange={value => {
             if (value) navigate(`/playground/${value}`)

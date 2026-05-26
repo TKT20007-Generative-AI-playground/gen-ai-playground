@@ -1,7 +1,12 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import App from "./App.tsx"
-import { MantineProvider, createTheme } from "@mantine/core"
+import {
+  ColorSchemeScript,
+  MantineProvider,
+  createTheme,
+  localStorageColorSchemeManager,
+} from "@mantine/core"
 import { Notifications } from "@mantine/notifications"
 import "@mantine/core/styles.css"
 import "@mantine/dates/styles.css"
@@ -25,12 +30,19 @@ const theme = createTheme({
   },
 })
 
+const colorSchemeManager = localStorageColorSchemeManager({ key: "mantine-color-scheme" })
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <MantineProvider theme={theme} defaultColorScheme="light">
+    <ColorSchemeScript defaultColorScheme="light" />
+    <MantineProvider
+      theme={theme}
+      defaultColorScheme="light"
+      colorSchemeManager={colorSchemeManager}
+    >
       <Notifications
         position="top-right"
-        classNames={{ root: 'notifications-root', notification: 'notifications-notification' }}
+        classNames={{ root: "notifications-root", notification: "notifications-notification" }}
       />
       <AuthProvider>
         <App />

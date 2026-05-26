@@ -24,7 +24,9 @@ export default function DeployableModelChips({
 
   return (
     <div>
-      <Text size="sm" fw={500} c="dimmed" mt={titleMarginTop}>{title}</Text>
+      <Text size="sm" fw={500} c="dimmed" mt={titleMarginTop}>
+        {title}
+      </Text>
       <ScrollArea>
         <Group gap="xs" wrap="wrap">
           {models.map(model => (

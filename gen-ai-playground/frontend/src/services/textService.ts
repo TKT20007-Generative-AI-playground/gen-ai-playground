@@ -85,10 +85,7 @@ export async function createSharedConversation(payload: {
   return res.data
 }
 
-export async function joinConversation(
-  conversationId: string,
-  inviteCode: string,
-): Promise<void> {
+export async function joinConversation(conversationId: string, inviteCode: string): Promise<void> {
   await apiClient.post(
     `/text/conversations/${conversationId}/join`,
     { invite_code: inviteCode },

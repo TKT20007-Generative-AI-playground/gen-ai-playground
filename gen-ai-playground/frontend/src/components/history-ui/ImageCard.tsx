@@ -18,8 +18,10 @@ export default function ImageCard({ item, onClick }: { item: ImageRecord; onClic
         transition:
           "transform 0.25s cubic-bezier(.4,0,.2,1), box-shadow 0.25s cubic-bezier(.4,0,.2,1)",
         transform: hovered ? "translateY(-4px) scale(1.015)" : "none",
-        border: hovered ? "1px solid rgba(255,255,255,0.12)" : "1px solid rgba(255,255,255,0.06)",
-        background: "rgba(255,255,255,0.025)",
+        border: hovered
+          ? "1px solid var(--app-card-border-hover)"
+          : "1px solid var(--app-card-border)",
+        background: "var(--app-card-bg)",
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -66,7 +68,7 @@ export default function ImageCard({ item, onClick }: { item: ImageRecord; onClic
 
         {/* Hover overlay with prompt */}
         <Overlay
-          gradient="linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.35) 40%, transparent 70%)"
+          gradient="var(--app-image-overlay)"
           opacity={hovered ? 1 : 0}
           style={{
             transition: "opacity 0.3s ease",
@@ -84,7 +86,7 @@ export default function ImageCard({ item, onClick }: { item: ImageRecord; onClic
             style={{
               fontStyle: "italic",
               lineHeight: 1.5,
-              textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+              textShadow: "var(--app-image-shadow)",
             }}
           >
             "{item.prompt}"
@@ -93,7 +95,7 @@ export default function ImageCard({ item, onClick }: { item: ImageRecord; onClic
       </Box>
 
       {/* Info bar */}
-      <Box px={2} py={10} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
+      <Box px={2} py={10} style={{ borderTop: "1px solid var(--app-card-divider)" }}>
         <Group justify="space-between" align="center" wrap="nowrap">
           <Badge
             data-testid={`model-${item.prompt}-${item.model}`}

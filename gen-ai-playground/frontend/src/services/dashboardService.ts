@@ -31,9 +31,11 @@ export async function fetchInvitationCodes(): Promise<InvitationCode[]> {
   return res.data.codes
 }
 
-export async function createInvitationCode(
-  payload: { code: string; expiration_days: number; max_uses: number },
-): Promise<void> {
+export async function createInvitationCode(payload: {
+  code: string
+  expiration_days: number
+  max_uses: number
+}): Promise<void> {
   await apiClient.post("/dashboard/invitations/codes", payload)
 }
 
@@ -49,19 +51,13 @@ export async function reactivateInvitationCode(code: string): Promise<void> {
   await apiClient.post(`/dashboard/invitations/codes/${code}/reactivate`, {})
 }
 
-export async function addInvitationCodeUses(
-  code: string,
-  additionalUses: number,
-): Promise<void> {
+export async function addInvitationCodeUses(code: string, additionalUses: number): Promise<void> {
   await apiClient.post(`/dashboard/invitations/codes/${code}/add-uses`, {
     additional_uses: additionalUses,
   })
 }
 
-export async function extendInvitationCode(
-  code: string,
-  expirationDays: number,
-): Promise<void> {
+export async function extendInvitationCode(code: string, expirationDays: number): Promise<void> {
   await apiClient.post(`/dashboard/invitations/codes/${code}/extend`, {
     expiration_days: expirationDays,
   })
@@ -74,7 +70,9 @@ export type ContainerRecord = {
   container_id: string
 }
 
-export async function fetchDeployableTextModels(): Promise<Array<{ value: string; label: string }>> {
+export async function fetchDeployableTextModels(): Promise<
+  Array<{ value: string; label: string }>
+> {
   const res = await apiClient.get<{ available_models?: Array<{ value: string; label: string }> }>(
     "/text/models",
     {
@@ -84,7 +82,9 @@ export async function fetchDeployableTextModels(): Promise<Array<{ value: string
   return res.data.available_models ?? []
 }
 
-export async function fetchDeployableAudioModels(): Promise<Array<{ value: string; label: string }>> {
+export async function fetchDeployableAudioModels(): Promise<
+  Array<{ value: string; label: string }>
+> {
   const res = await apiClient.get<{ available_models?: Array<{ value: string; label: string }> }>(
     "/audio/models",
     {

@@ -35,7 +35,10 @@ export async function fetchMe(token: string): Promise<MeResponse> {
   return res.data
 }
 
-export async function loginRequest(values: { username: string; password: string }): Promise<LoginResponse> {
+export async function loginRequest(values: {
+  username: string
+  password: string
+}): Promise<LoginResponse> {
   const res = await apiClient.post<LoginResponse>("/login", values)
   return res.data
 }

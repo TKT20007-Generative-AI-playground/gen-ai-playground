@@ -52,15 +52,15 @@ export interface AudioRecord {
 export interface ConversationMessage {
   role: string
   content: string
-  sender: string 
+  sender: string
 }
 
 export interface ConversationRecord {
-    _id: string
-    title: string
-    participants: string[]
-    model: string
-    messages: ConversationMessage[]
-    invite_code: string
-    created_at: string
+  _id: string
+  title: string
+  participants: string[]
+  model: string
+  messages: ConversationMessage[]
+  invite_code: string
+  created_at: string
 }

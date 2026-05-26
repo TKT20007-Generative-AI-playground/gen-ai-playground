@@ -9,7 +9,7 @@ import {
 } from "react"
 import { PromptTextBox } from "./PromptTextBox"
 import { Text, SimpleGrid, Stack, Button } from "@mantine/core"
-import { notifications } from '@mantine/notifications'
+import { notifications } from "@mantine/notifications"
 import { MODELS, getModelDisplayName } from "../constants/models"
 import ModelSelector from "./ModelSelector"
 import PhotoArea from "./PhotoArea"
@@ -102,7 +102,6 @@ export default function ImageGenerator() {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" })
     }
   }, [imageUrl, imageUrl2])
-
 
   function replaceImageUrl(next: string | null) {
     setImageUrl(prev => {

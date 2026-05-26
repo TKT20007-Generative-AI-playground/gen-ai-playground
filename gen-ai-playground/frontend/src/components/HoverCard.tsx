@@ -43,9 +43,7 @@ const HoverCard = ({
       </Title>
 
       <Box className="hover-card-content" p="lg">
-        <Text size="sm">
-          {description}
-        </Text>
+        <Text size="sm">{description}</Text>
 
         <Button className="btn-primary" fullWidth mt="md" onClick={onClick}>
           {buttonText}

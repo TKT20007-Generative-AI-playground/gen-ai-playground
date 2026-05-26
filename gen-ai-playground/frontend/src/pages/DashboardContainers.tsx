@@ -186,7 +186,9 @@ export default function DashboardContainers() {
   return (
     <Stack>
       <Group justify="space-between">
-        <Text size="xl" fw={500}>Verda Deployments</Text>
+        <Text size="xl" fw={500}>
+          Verda Deployments
+        </Text>
         <Button className="app-btn-soft-blue" variant="light" onClick={fetchContainers}>
           Refresh
         </Button>
@@ -291,7 +293,6 @@ export default function DashboardContainers() {
 
           {/* Right content */}
           <Stack style={{ flex: 1, minWidth: 0 }}>
-            
             {containers.length === 0 ? (
               <Text c="dimmed">No deployments found.</Text>
             ) : (
@@ -349,7 +350,6 @@ export default function DashboardContainers() {
           </Stack>
         </Group>
       )}
-
-      </Stack>
+    </Stack>
   )
 }

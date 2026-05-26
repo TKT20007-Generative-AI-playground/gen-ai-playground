@@ -16,7 +16,15 @@ import type { ConversationRecord } from "./historyInterfaces"
 import { formatDate } from "./ImageUtils"
 import { ClockIcon, CopyIcon } from "./Icons"
 
-function MessageBubble({ role, content, sender }: { role: string; content: string; sender: string }) {
+function MessageBubble({
+  role,
+  content,
+  sender,
+}: {
+  role: string
+  content: string
+  sender: string
+}) {
   const isUser = role === "user"
   return (
     <Box
@@ -27,19 +35,31 @@ function MessageBubble({ role, content, sender }: { role: string; content: strin
         gap: 2,
       }}
     >
-      <Text style={{ fontSize: 9, color: "rgba(0,0,0,0.35)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+      <Text
+        style={{
+          fontSize: 9,
+          color: "var(--mantine-color-dimmed)",
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+        }}
+      >
         {isUser ? (sender ?? "You") : "Assistant"}
       </Text>
       <Box
         style={{
-          background: isUser ? "rgba(124,106,247,0.12)" : "rgba(0,0,0,0.05)",
-          border: isUser ? "1px solid rgba(124,106,247,0.2)" : "1px solid rgba(0,0,0,0.07)",
+          background: isUser ? "var(--app-bubble-user-bg)" : "var(--app-bubble-assistant-bg)",
+          border: isUser
+            ? "1px solid var(--app-bubble-user-border)"
+            : "1px solid var(--app-bubble-assistant-border)",
           borderRadius: isUser ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
           padding: "6px 10px",
           maxWidth: "90%",
         }}
       >
-        <Text size="xs" style={{ color: "black", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+        <Text
+          size="xs"
+          style={{ color: "var(--app-card-text)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}
+        >
           {content}
         </Text>
       </Box>
@@ -53,7 +73,8 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
 
   const messages = item.messages ?? []
   const firstMessage = messages[0]
-  const lastAssistantMessage = [...messages].reverse().find(m => m.role === "assistant")?.content ?? ""
+  const lastAssistantMessage =
+    [...messages].reverse().find(m => m.role === "assistant")?.content ?? ""
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -68,15 +89,15 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
       p="md"
       radius="lg"
       style={{
-        background: "rgba(255,255,255,0.025)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        background: "var(--app-card-bg)",
+        border: "1px solid var(--app-card-border)",
         transition: "border-color 0.2s ease, box-shadow 0.2s ease",
       }}
       styles={{
         root: {
           "&:hover": {
-            borderColor: "rgba(255,255,255,0.12)",
-            boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+            borderColor: "var(--app-card-border-hover)",
+            boxShadow: "var(--app-card-shadow)",
           },
         },
       }}
@@ -84,7 +105,11 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
       <Stack gap="sm">
         {/* Title + copy */}
         <Group justify="space-between" align="flex-start" wrap="nowrap">
-          <Text size="sm" fw={600} style={{ color: "black", lineHeight: 1.45, flex: 1 }}>
+          <Text
+            size="sm"
+            fw={600}
+            style={{ color: "var(--app-card-text)", lineHeight: 1.45, flex: 1 }}
+          >
             {item.title}
           </Text>
           <Tooltip label={copied ? "Copied!" : "Copy last response"} withArrow position="left">
@@ -105,12 +130,17 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
         {/* Messages */}
         <Stack gap={8}>
           {!showAll && firstMessage && (
-            <MessageBubble role={firstMessage.role} content={firstMessage.content} sender={firstMessage.sender} />
+            <MessageBubble
+              role={firstMessage.role}
+              content={firstMessage.content}
+              sender={firstMessage.sender}
+            />
           )}
 
-          {showAll && messages.map((msg, idx) => (
-            <MessageBubble key={idx} role={msg.role} content={msg.content} sender={msg.sender} />
-          ))}
+          {showAll &&
+            messages.map((msg, idx) => (
+              <MessageBubble key={idx} role={msg.role} content={msg.content} sender={msg.sender} />
+            ))}
         </Stack>
 
         {messages.length > 1 && (
@@ -162,20 +192,37 @@ export default function ConversationCard({ item }: { item: ConversationRecord })
             </Button>
           </Tooltip>
 
-          <CopyButton value={`${window.location.origin}/chat/conversations/${item._id}`} timeout={2000}>
+          <CopyButton
+            value={`${window.location.origin}/chat/conversations/${item._id}`}
+            timeout={2000}
+          >
             {({ copied, copy }) => (
               <Tooltip label="Copy conversation link to clipboard" withArrow>
-                <Button className={`app-history-small-action${copied ? "" : " app-btn-soft-blue"}`} color={copied ? "teal" : "blue"} onClick={copy} size="xs" variant="subtle" radius="sm">
+                <Button
+                  className={`app-history-small-action${copied ? "" : " app-btn-soft-blue"}`}
+                  color={copied ? "teal" : "blue"}
+                  onClick={copy}
+                  size="xs"
+                  variant="subtle"
+                  radius="sm"
+                >
                   Copy link
                 </Button>
               </Tooltip>
             )}
           </CopyButton>
-          
+
           <CopyButton value={item.invite_code}>
             {({ copied, copy }) => (
               <Tooltip label="Copy invite code to clipboard" withArrow>
-                <Button className={`app-history-small-action${copied ? "" : " app-btn-soft-blue"}`} color={copied ? "teal" : "blue"} onClick={copy} size="xs" variant="subtle" radius="sm">
+                <Button
+                  className={`app-history-small-action${copied ? "" : " app-btn-soft-blue"}`}
+                  color={copied ? "teal" : "blue"}
+                  onClick={copy}
+                  size="xs"
+                  variant="subtle"
+                  radius="sm"
+                >
                   Copy invite code
                 </Button>
               </Tooltip>

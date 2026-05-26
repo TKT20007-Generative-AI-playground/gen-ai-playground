@@ -9,29 +9,27 @@ import DashboardUsers from "./pages/DashboardUsers"
 import DashboardInvitations from "./pages/DashboardInvitations"
 import { ProtectedRoute } from "./components/ProtectedRoute"
 import { AdminRoute } from "./components/AdminRoute"
-import HistorySidebar from "./components/HistorySidebar";
-import { useState, useCallback, useEffect } from "react";
-import { useMediaQuery } from "@mantine/hooks";
-import { useAuth } from "./context/AuthContext";
+import HistorySidebar from "./components/HistorySidebar"
+import { useState, useCallback, useEffect } from "react"
+import { useMediaQuery } from "@mantine/hooks"
+import { useAuth } from "./context/AuthContext"
 import HistoryPage from "./pages/HistoryPage"
 import SharedChat from "./components/SharedChat"
 import NotFoundPage from "./pages/PageNotFound"
-
-
 
 function AppContent() {
   const location = useLocation()
 
   // Hide Header on dashboard routes
-  const isDashboardRoute = location.pathname.startsWith('/dashboard')
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const isHistoryOpen = historyOpen && !isDashboardRoute;
-  const [sidebarWidth, setSidebarWidth] = useState(420);
-  const [resizing, setResizing] = useState(false);
-  const auth = useAuth();
-  const isMobile = useMediaQuery("(max-width: 768px)");
+  const isDashboardRoute = location.pathname.startsWith("/dashboard")
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const isHistoryOpen = historyOpen && !isDashboardRoute
+  const [sidebarWidth, setSidebarWidth] = useState(420)
+  const [resizing, setResizing] = useState(false)
+  const auth = useAuth()
+  const isMobile = useMediaQuery("(max-width: 768px)")
 
-  const startResize = () => setResizing(true);
+  const startResize = () => setResizing(true)
 
   const onMouseMove = useCallback(
     (e: MouseEvent) => {
@@ -63,7 +61,7 @@ function AppContent() {
       {!isDashboardRoute && <Header />}
 
       {/* Sidebar toggle button */}
-      {auth.isLoggedIn && !isMobile && !isDashboardRoute && location.pathname !== '/' && (
+      {auth.isLoggedIn && !isMobile && !isDashboardRoute && location.pathname !== "/" && (
         <button
           type="button"
           aria-label="Toggle history sidebar"
@@ -74,8 +72,8 @@ function AppContent() {
             transform: "translateY(-50%)",
             left: isHistoryOpen ? `${sidebarWidth + 10}px` : "10px",
             zIndex: 2000,
-            background: "white",
-            border: "1px solid #ddd",
+            background: "var(--app-outline-bg)",
+            border: "1px solid var(--app-panel-border)",
             borderRadius: "4px",
             padding: "6px 10px",
             cursor: "pointer",
@@ -93,8 +91,8 @@ function AppContent() {
               width: sidebarWidth,
               height: "100dvh",
               overflow: "hidden",
-              borderRight: "1px solid #ddd",
-              background: "#f8f9fa",
+              borderRight: "1px solid var(--app-panel-border)",
+              background: "var(--app-sidebar-bg)",
               position: "sticky",
               top: 0,
               padding: 16,
@@ -113,7 +111,7 @@ function AppContent() {
                 width: 6,
                 height: "100%",
                 cursor: "ew-resize",
-                background: "#ccc",
+                background: "var(--app-sidebar-resizer)",
               }}
             />
           </div>
@@ -136,7 +134,7 @@ function AppContent() {
                 <ProtectedRoute>
                   <SharedChat />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route
               path="/playground/:tab"
@@ -177,7 +175,7 @@ function AppContent() {
         </div>
       </div>
     </>
-  );
+  )
 }
 
 function App() {

@@ -27,14 +27,18 @@ export default function DeployableModelList({
     <>
       <UnstyledButton onClick={onToggle} style={{ width: "100%" }}>
         <Group justify="space-between">
-          <Text size="sm" fw={600}>{title}</Text>
+          <Text size="sm" fw={600}>
+            {title}
+          </Text>
           {isOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
         </Group>
       </UnstyledButton>
       <Collapse in={isOpen}>
         <Stack gap={4}>
           {models.length === 0 && (
-            <Text size="xs" c="dimmed" py={4}>No models available</Text>
+            <Text size="xs" c="dimmed" py={4}>
+              No models available
+            </Text>
           )}
           {models.map(model => (
             <Group

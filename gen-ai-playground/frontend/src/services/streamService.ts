@@ -23,7 +23,7 @@ export function streamText(
   onToken: (token: string) => void,
   onReasoning?: (reasoningToken: string) => void,
   onDone?: () => void,
-  onError?: (err: unknown) => void
+  onError?: (err: unknown) => void,
 ): StreamTextHandle {
   const controller = new AbortController()
   let settled = false
@@ -114,7 +114,8 @@ export function streamText(
       }
 
       const authFromAxiosDefaults =
-        (apiClient.defaults.headers?.common as Record<string, unknown> | undefined)?.Authorization ??
+        (apiClient.defaults.headers?.common as Record<string, unknown> | undefined)
+          ?.Authorization ??
         (apiClient.defaults.headers?.common as Record<string, unknown> | undefined)?.authorization
 
       const headers: Record<string, string> = {

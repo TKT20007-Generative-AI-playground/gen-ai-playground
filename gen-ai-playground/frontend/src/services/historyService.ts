@@ -52,9 +52,12 @@ export async function fetchTextHistoryList(
 export async function fetchImagesHistoryList(
   params: URLSearchParams,
 ): Promise<{ history?: unknown[]; total_pages?: number }> {
-  const res = await apiClient.get<{ history?: unknown[]; total_pages?: number }>("/images/history", {
-    params,
-  })
+  const res = await apiClient.get<{ history?: unknown[]; total_pages?: number }>(
+    "/images/history",
+    {
+      params,
+    },
+  )
   return res.data
 }
 

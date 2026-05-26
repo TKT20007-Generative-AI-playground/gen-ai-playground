@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
-import { formatDateTime } from '../utils/date'
-import { getRequestErrorMessage } from '../utils/errors'
+import { useState, useEffect, useCallback } from "react"
+import { formatDateTime } from "../utils/date"
+import { getRequestErrorMessage } from "../utils/errors"
 import {
   addInvitationCodeUses,
   createInvitationCode,
@@ -9,7 +9,7 @@ import {
   extendInvitationCode,
   fetchInvitationCodes,
   reactivateInvitationCode,
-} from '../services/dashboardService'
+} from "../services/dashboardService"
 import {
   Table,
   Badge,
@@ -28,9 +28,16 @@ import {
   Tooltip,
   Input,
   ScrollArea,
-} from '@mantine/core'
-import { IconPlus, IconCopy, IconCheck, IconTrash, IconPower, IconCalendarPlus } from '@tabler/icons-react'
-import { useMediaQuery } from '@mantine/hooks'
+} from "@mantine/core"
+import {
+  IconPlus,
+  IconCopy,
+  IconCheck,
+  IconTrash,
+  IconPower,
+  IconCalendarPlus,
+} from "@tabler/icons-react"
+import { useMediaQuery } from "@mantine/hooks"
 
 interface InvitationCode {
   code: string
@@ -43,7 +50,7 @@ interface InvitationCode {
 }
 
 export default function DashboardInvitations() {
-  const isMobile = useMediaQuery('(max-width: 768px)')
+  const isMobile = useMediaQuery("(max-width: 768px)")
   const [codes, setCodes] = useState<InvitationCode[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -53,24 +60,24 @@ export default function DashboardInvitations() {
   const [createLoading, setCreateLoading] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [addUsesModalOpen, setAddUsesModalOpen] = useState(false)
-  const [selectedCode, setSelectedCode] = useState<string>('')
+  const [selectedCode, setSelectedCode] = useState<string>("")
   const [additionalUses, setAdditionalUses] = useState<number>(1)
   const [addUsesLoading, setAddUsesLoading] = useState(false)
-  
+
   // Extend expiration modal state
   const [extendModalOpen, setExtendModalOpen] = useState(false)
   const [extendDays, setExtendDays] = useState<number>(30)
   const [extendLoading, setExtendLoading] = useState(false)
-  
+
   // Create form state
-  const [customCode, setCustomCode] = useState<string>('')
+  const [customCode, setCustomCode] = useState<string>("")
   const [expirationDays, setExpirationDays] = useState<number>(30)
   const [maxUses, setMaxUses] = useState<number>(1)
-  
+
   // Search and sort state
-  const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<string>('created_at')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortBy, setSortBy] = useState<string>("created_at")
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
 
   // Used by collapse state (tracks expanded code IDs)
   const [expandedCodes, setExpandedCodes] = useState<Set<string>>(new Set())
@@ -81,7 +88,7 @@ export default function DashboardInvitations() {
       const codeList = await fetchInvitationCodes()
       setCodes(codeList)
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Failed to fetch invitation codes'))
+      setError(getRequestErrorMessage(err, "Failed to fetch invitation codes"))
     } finally {
       setLoading(false)
     }
@@ -93,28 +100,26 @@ export default function DashboardInvitations() {
 
   const handleCreateCode = async () => {
     if (!customCode || customCode.length < 5) {
-      setFormError('Please enter a valid invitation code (minimum 5 characters)')
+      setFormError("Please enter a valid invitation code (minimum 5 characters)")
       return
     }
     setCreateLoading(true)
     setFormError(null)
     setSuccess(null)
     try {
-      await createInvitationCode(
-        {
-          code: customCode,
-          expiration_days: expirationDays,
-          max_uses: maxUses,
-        },
-      )
-      setSuccess('Invitation code created successfully')
+      await createInvitationCode({
+        code: customCode,
+        expiration_days: expirationDays,
+        max_uses: maxUses,
+      })
+      setSuccess("Invitation code created successfully")
       setCreateModalOpen(false)
-      setCustomCode('')
+      setCustomCode("")
       setExpirationDays(30)
       setMaxUses(1)
       await fetchCodes()
     } catch (err: unknown) {
-      setFormError(getRequestErrorMessage(err, 'Failed to create invitation code'))
+      setFormError(getRequestErrorMessage(err, "Failed to create invitation code"))
     } finally {
       setCreateLoading(false)
     }
@@ -130,14 +135,15 @@ export default function DashboardInvitations() {
       setSuccess(`Invitation code "${code}" deleted successfully`)
       await fetchCodes()
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Failed to delete invitation code'))
+      setError(getRequestErrorMessage(err, "Failed to delete invitation code"))
     } finally {
       setActionLoading(null)
     }
   }
 
   const handleDeactivate = async (code: string) => {
-    if (!confirm(`Deactivate invitation code "${code}"? Users will no longer be able to use it.`)) return
+    if (!confirm(`Deactivate invitation code "${code}"? Users will no longer be able to use it.`))
+      return
     setActionLoading(code)
     setError(null)
     setSuccess(null)
@@ -146,7 +152,7 @@ export default function DashboardInvitations() {
       setSuccess(`Invitation code "${code}" deactivated successfully`)
       await fetchCodes()
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Failed to deactivate invitation code'))
+      setError(getRequestErrorMessage(err, "Failed to deactivate invitation code"))
     } finally {
       setActionLoading(null)
     }
@@ -162,7 +168,7 @@ export default function DashboardInvitations() {
       setSuccess(`Invitation code "${code}" reactivated successfully`)
       await fetchCodes()
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Failed to reactivate invitation code'))
+      setError(getRequestErrorMessage(err, "Failed to reactivate invitation code"))
     } finally {
       setActionLoading(null)
     }
@@ -176,7 +182,7 @@ export default function DashboardInvitations() {
 
   const submitAddUses = async () => {
     if (additionalUses < 1 || additionalUses > 100) {
-      setError('Please enter a valid number between 1 and 100')
+      setError("Please enter a valid number between 1 and 100")
       return
     }
     setAddUsesLoading(true)
@@ -188,7 +194,7 @@ export default function DashboardInvitations() {
       setAddUsesModalOpen(false)
       await fetchCodes()
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Failed to add uses to invitation code'))
+      setError(getRequestErrorMessage(err, "Failed to add uses to invitation code"))
     } finally {
       setAddUsesLoading(false)
     }
@@ -202,7 +208,7 @@ export default function DashboardInvitations() {
 
   const submitExtend = async () => {
     if (extendDays < 1 || extendDays > 365) {
-      setError('Please enter a valid number between 1 and 365')
+      setError("Please enter a valid number between 1 and 365")
       return
     }
     setExtendLoading(true)
@@ -214,7 +220,7 @@ export default function DashboardInvitations() {
       setExtendModalOpen(false)
       await fetchCodes()
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Failed to extend invitation code'))
+      setError(getRequestErrorMessage(err, "Failed to extend invitation code"))
     } finally {
       setExtendLoading(false)
     }
@@ -233,20 +239,20 @@ export default function DashboardInvitations() {
     const isFullyUsed = code.uses_count >= code.max_uses
     const isActive = code.is_active
 
-    let color = 'green'
-    let label = 'Active'
-    let variant: 'filled' | 'outline' = 'filled'
+    let color = "green"
+    let label = "Active"
+    let variant: "filled" | "outline" = "filled"
 
     if (isExpired) {
-      color = 'red'
-      label = 'Expired'
+      color = "red"
+      label = "Expired"
     } else if (isFullyUsed) {
-      color = 'gray'
-      label = 'Fully Used'
+      color = "gray"
+      label = "Fully Used"
     } else if (!isActive) {
-      color = 'gray'
-      label = 'Deactivated'
-      variant = 'outline'
+      color = "gray"
+      label = "Deactivated"
+      variant = "outline"
     }
 
     if (isMobile) {
@@ -256,25 +262,31 @@ export default function DashboardInvitations() {
         </Tooltip>
       )
     }
-    return <Badge color={color} variant={variant}>{label}</Badge>
+    return (
+      <Badge color={color} variant={variant}>
+        {label}
+      </Badge>
+    )
   }
 
   // Filter and sort codes
   const filteredCodes = codes
-    .filter(code => 
-      code.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (code.used_by && code.used_by.some(user => user.toLowerCase().includes(searchQuery.toLowerCase())))
+    .filter(
+      code =>
+        code.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (code.used_by &&
+          code.used_by.some(user => user.toLowerCase().includes(searchQuery.toLowerCase()))),
     )
     .sort((a, b) => {
       let aVal: string | number = a[sortBy as keyof InvitationCode] as string | number
       let bVal: string | number = b[sortBy as keyof InvitationCode] as string | number
-      
-      if (sortBy === 'created_at' || sortBy === 'expires_at') {
+
+      if (sortBy === "created_at" || sortBy === "expires_at") {
         aVal = new Date(aVal as string).getTime()
         bVal = new Date(bVal as string).getTime()
       }
-      
-      if (sortOrder === 'asc') {
+
+      if (sortOrder === "asc") {
         return aVal > bVal ? 1 : -1
       }
       return aVal < bVal ? 1 : -1
@@ -282,10 +294,10 @@ export default function DashboardInvitations() {
 
   const handleSort = (column: string) => {
     if (sortBy === column) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc")
     } else {
       setSortBy(column)
-      setSortOrder('desc')
+      setSortOrder("desc")
     }
   }
 
@@ -313,12 +325,18 @@ export default function DashboardInvitations() {
   return (
     <Stack>
       <Group justify="space-between">
-        <Text size="xl" fw={500}>Invitation Code Management</Text>
+        <Text size="xl" fw={500}>
+          Invitation Code Management
+        </Text>
         <Group gap="sm">
           <Button className="app-btn-soft-blue" variant="light" onClick={fetchCodes}>
             Refresh
           </Button>
-          <Button className="btn-primary" leftSection={<IconPlus size={16} />} onClick={() => setCreateModalOpen(true)}>
+          <Button
+            className="btn-primary"
+            leftSection={<IconPlus size={16} />}
+            onClick={() => setCreateModalOpen(true)}
+          >
             Create Code
           </Button>
         </Group>
@@ -340,7 +358,7 @@ export default function DashboardInvitations() {
       <Input
         placeholder="Search by code or user..."
         value={searchQuery}
-        onChange={(e) => setSearchQuery(e.target.value)}
+        onChange={e => setSearchQuery(e.target.value)}
         style={{ maxWidth: 300 }}
       />
 
@@ -348,44 +366,99 @@ export default function DashboardInvitations() {
         <Text c="dimmed">No invitation codes found.</Text>
       ) : isMobile ? (
         <Stack>
-          {filteredCodes.map((code) => (
+          {filteredCodes.map(code => (
             <Card key={code.code} withBorder radius="md" shadow="xs">
               <Stack gap="xs">
                 <Group justify="space-between">
-                  <Text fw={500} style={{ fontFamily: 'monospace' }}>{code.code}</Text>
+                  <Text fw={500} style={{ fontFamily: "monospace" }}>
+                    {code.code}
+                  </Text>
                   {getStatusBadge(code)}
                 </Group>
                 <Text size="sm" c="dimmed">
                   Usage: {code.uses_count} / {code.max_uses}
                 </Text>
-                <Text size="sm" c="dimmed" style={{ wordBreak: 'break-all' }}>
-                  Used by: {code.used_by && code.used_by.length > 0 ? (() => {
-                    const isExpanded = expandedCodes.has(code.code)
-                    const displayed = isExpanded ? code.used_by : code.used_by.slice(0, 3)
-                    const hasMore = code.used_by.length > 3
-                    return (
-                      <>
-                        {displayed.join(', ')}
-                        {hasMore && (
-                          <Button variant="subtle" size="xs" ml="xs" onClick={() => toggleExpanded(code.code)}>
-                            {isExpanded ? 'Show less' : `+${code.used_by.length - 3} more`}
-                          </Button>
-                        )}
-                      </>
-                    )
-                  })() : '—'}
+                <Text size="sm" c="dimmed" style={{ wordBreak: "break-all" }}>
+                  Used by:{" "}
+                  {code.used_by && code.used_by.length > 0
+                    ? (() => {
+                        const isExpanded = expandedCodes.has(code.code)
+                        const displayed = isExpanded ? code.used_by : code.used_by.slice(0, 3)
+                        const hasMore = code.used_by.length > 3
+                        return (
+                          <>
+                            {displayed.join(", ")}
+                            {hasMore && (
+                              <Button
+                                variant="subtle"
+                                size="xs"
+                                ml="xs"
+                                onClick={() => toggleExpanded(code.code)}
+                              >
+                                {isExpanded ? "Show less" : `+${code.used_by.length - 3} more`}
+                              </Button>
+                            )}
+                          </>
+                        )
+                      })()
+                    : "—"}
                 </Text>
                 <Group gap="xs" mt="xs" wrap="wrap">
                   {code.uses_count >= code.max_uses ? (
-                    <Button className="app-btn-soft-blue" size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleAddUses(code.code)}>Add Uses</Button>
+                    <Button
+                      className="app-btn-soft-blue"
+                      size="xs"
+                      variant="light"
+                      loading={actionLoading === code.code}
+                      disabled={actionLoading === code.code}
+                      onClick={() => handleAddUses(code.code)}
+                    >
+                      Add Uses
+                    </Button>
                   ) : isCodeExpired(code) ? (
-                    <Button className="app-btn-soft-blue" size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleExtend(code.code)}>Extend</Button>
+                    <Button
+                      className="app-btn-soft-blue"
+                      size="xs"
+                      variant="light"
+                      loading={actionLoading === code.code}
+                      disabled={actionLoading === code.code}
+                      onClick={() => handleExtend(code.code)}
+                    >
+                      Extend
+                    </Button>
                   ) : !code.is_active ? (
-                    <Button className="app-btn-soft-blue" size="xs" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleReactivate(code.code)}>Reactivate</Button>
+                    <Button
+                      className="app-btn-soft-blue"
+                      size="xs"
+                      variant="light"
+                      loading={actionLoading === code.code}
+                      disabled={actionLoading === code.code}
+                      onClick={() => handleReactivate(code.code)}
+                    >
+                      Reactivate
+                    </Button>
                   ) : (
-                    <Button size="xs" variant="light" color="yellow" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleDeactivate(code.code)}>Deactivate</Button>
+                    <Button
+                      size="xs"
+                      variant="light"
+                      color="yellow"
+                      loading={actionLoading === code.code}
+                      disabled={actionLoading === code.code}
+                      onClick={() => handleDeactivate(code.code)}
+                    >
+                      Deactivate
+                    </Button>
                   )}
-                  <Button size="xs" color="red" variant="light" loading={actionLoading === code.code} disabled={actionLoading === code.code} onClick={() => handleDelete(code.code)}>Delete</Button>
+                  <Button
+                    size="xs"
+                    color="red"
+                    variant="light"
+                    loading={actionLoading === code.code}
+                    disabled={actionLoading === code.code}
+                    onClick={() => handleDelete(code.code)}
+                  >
+                    Delete
+                  </Button>
                 </Group>
               </Stack>
             </Card>
@@ -394,163 +467,182 @@ export default function DashboardInvitations() {
       ) : (
         <ScrollArea>
           <Table striped highlightOnHover>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('code')}>
-                Code {sortBy === 'code' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </Table.Th>
-              {!isMobile && (
-                <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('created_at')}>
-                  Created {sortBy === 'created_at' && (sortOrder === 'asc' ? '↑' : '↓')}
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th style={{ cursor: "pointer" }} onClick={() => handleSort("code")}>
+                  Code {sortBy === "code" && (sortOrder === "asc" ? "↑" : "↓")}
                 </Table.Th>
-              )}
-              {!isMobile && (
-                <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('expires_at')}>
-                  Expires {sortBy === 'expires_at' && (sortOrder === 'asc' ? '↑' : '↓')}
-                </Table.Th>
-              )}
-              <Table.Th>Status</Table.Th>
-              <Table.Th style={{ cursor: 'pointer' }} onClick={() => handleSort('uses_count')}>
-                Usage {sortBy === 'uses_count' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </Table.Th>
-              <Table.Th>Used By</Table.Th>
-              <Table.Th>Actions</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {filteredCodes.map((code) => (
-              <Table.Tr 
-                key={code.code}
-                style={{
-                  opacity: !code.is_active ? 0.6 : 1,
-                }}
-              >
-                <Table.Td>
-                  <Group gap="xs">
-                    <Text fw={500} style={{ fontFamily: 'monospace' }}>{code.code}</Text>
-                    <CopyButton value={code.code} timeout={2000}>
-                      {({ copied, copy }) => (
-                        <Tooltip label={copied ? 'Copied' : 'Copy'} withArrow position="right">
-                          <ActionIcon color={copied ? 'teal' : 'gray'} variant="subtle" onClick={copy} size="sm">
-                            {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
-                          </ActionIcon>
-                        </Tooltip>
-                      )}
-                    </CopyButton>
-                  </Group>
-                </Table.Td>
                 {!isMobile && (
+                  <Table.Th style={{ cursor: "pointer" }} onClick={() => handleSort("created_at")}>
+                    Created {sortBy === "created_at" && (sortOrder === "asc" ? "↑" : "↓")}
+                  </Table.Th>
+                )}
+                {!isMobile && (
+                  <Table.Th style={{ cursor: "pointer" }} onClick={() => handleSort("expires_at")}>
+                    Expires {sortBy === "expires_at" && (sortOrder === "asc" ? "↑" : "↓")}
+                  </Table.Th>
+                )}
+                <Table.Th>Status</Table.Th>
+                <Table.Th style={{ cursor: "pointer" }} onClick={() => handleSort("uses_count")}>
+                  Usage {sortBy === "uses_count" && (sortOrder === "asc" ? "↑" : "↓")}
+                </Table.Th>
+                <Table.Th>Used By</Table.Th>
+                <Table.Th>Actions</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {filteredCodes.map(code => (
+                <Table.Tr
+                  key={code.code}
+                  style={{
+                    opacity: !code.is_active ? 0.6 : 1,
+                  }}
+                >
+                  <Table.Td>
+                    <Group gap="xs">
+                      <Text fw={500} style={{ fontFamily: "monospace" }}>
+                        {code.code}
+                      </Text>
+                      <CopyButton value={code.code} timeout={2000}>
+                        {({ copied, copy }) => (
+                          <Tooltip label={copied ? "Copied" : "Copy"} withArrow position="right">
+                            <ActionIcon
+                              color={copied ? "teal" : "gray"}
+                              variant="subtle"
+                              onClick={copy}
+                              size="sm"
+                            >
+                              {copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                      </CopyButton>
+                    </Group>
+                  </Table.Td>
+                  {!isMobile && (
+                    <Table.Td>
+                      <Text size="sm" c="dimmed">
+                        {formatDateTime(code.created_at, { fallback: "-" })}
+                      </Text>
+                    </Table.Td>
+                  )}
+                  {!isMobile && (
+                    <Table.Td>
+                      <Text size="sm" c={new Date(code.expires_at) < new Date() ? "red" : "dimmed"}>
+                        {formatDateTime(code.expires_at, { fallback: "-" })}
+                      </Text>
+                    </Table.Td>
+                  )}
+                  <Table.Td style={{ minWidth: 90 }}>{getStatusBadge(code)}</Table.Td>
+                  <Table.Td>
+                    <Text size="sm">
+                      {code.uses_count} / {code.max_uses}
+                    </Text>
+                  </Table.Td>
                   <Table.Td>
                     <Text size="sm" c="dimmed">
-                      {formatDateTime(code.created_at, { fallback: '-' })}
+                      {code.used_by && code.used_by.length > 0
+                        ? (() => {
+                            const isExpanded = expandedCodes.has(code.code)
+                            const displayed = isExpanded ? code.used_by : code.used_by.slice(0, 3)
+                            const hasMore = code.used_by.length > 3
+                            return (
+                              <>
+                                {displayed.join(", ")}
+                                {hasMore && (
+                                  <Button
+                                    variant="subtle"
+                                    size="xs"
+                                    ml="xs"
+                                    onClick={() => toggleExpanded(code.code)}
+                                  >
+                                    {isExpanded ? "Show less" : `+${code.used_by.length - 3} more`}
+                                  </Button>
+                                )}
+                              </>
+                            )
+                          })()
+                        : "—"}
                     </Text>
                   </Table.Td>
-                )}
-                {!isMobile && (
                   <Table.Td>
-                    <Text size="sm" c={new Date(code.expires_at) < new Date() ? 'red' : 'dimmed'}>
-                      {formatDateTime(code.expires_at, { fallback: '-' })}
-                    </Text>
-                  </Table.Td>
-                )}
-                <Table.Td style={{ minWidth: 90 }}>{getStatusBadge(code)}</Table.Td>
-                <Table.Td>
-                  <Text size="sm">
-                    {code.uses_count} / {code.max_uses}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Text size="sm" c="dimmed">
-                    {code.used_by && code.used_by.length > 0 ? (() => {
-                      const isExpanded = expandedCodes.has(code.code)
-                      const displayed = isExpanded ? code.used_by : code.used_by.slice(0, 3)
-                      const hasMore = code.used_by.length > 3
-                      return (
-                        <>
-                          {displayed.join(', ')}
-                          {hasMore && (
-                            <Button variant="subtle" size="xs" ml="xs" onClick={() => toggleExpanded(code.code)}>
-                              {isExpanded ? 'Show less' : `+${code.used_by.length - 3} more`}
-                            </Button>
-                          )}
-                        </>
-                      )
-                    })() : '—'}
-                  </Text>
-                </Table.Td>
-                <Table.Td>
-                  <Group gap="xs">
-                    {code.uses_count >= code.max_uses ? (
-                      <Tooltip label="Add Uses">
-                        <ActionIcon
-                          color="blue"
-                          variant="subtle"
-                          loading={actionLoading === code.code}
-                          onClick={() => handleAddUses(code.code)}
-                        >
-                          <IconPlus size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                    ) : isCodeExpired(code) ? (
-                      <Tooltip label="Extend">
-                        <ActionIcon
-                          color="blue"
-                          variant="subtle"
-                          loading={actionLoading === code.code}
-                          onClick={() => handleExtend(code.code)}
-                        >
-                          <IconCalendarPlus size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                    ) : (
-                      !code.is_active && (
-                        <Tooltip label="Reactivate">
+                    <Group gap="xs">
+                      {code.uses_count >= code.max_uses ? (
+                        <Tooltip label="Add Uses">
                           <ActionIcon
-                            color="green"
+                            color="blue"
                             variant="subtle"
                             loading={actionLoading === code.code}
-                            onClick={() => handleReactivate(code.code)}
+                            onClick={() => handleAddUses(code.code)}
                           >
-                            <IconPower size={16} />
+                            <IconPlus size={16} />
                           </ActionIcon>
                         </Tooltip>
-                      )
-                    )}
-                    {code.is_active && code.uses_count < code.max_uses && !isCodeExpired(code) && (
-                      <Tooltip label="Deactivate">
+                      ) : isCodeExpired(code) ? (
+                        <Tooltip label="Extend">
+                          <ActionIcon
+                            color="blue"
+                            variant="subtle"
+                            loading={actionLoading === code.code}
+                            onClick={() => handleExtend(code.code)}
+                          >
+                            <IconCalendarPlus size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                      ) : (
+                        !code.is_active && (
+                          <Tooltip label="Reactivate">
+                            <ActionIcon
+                              color="green"
+                              variant="subtle"
+                              loading={actionLoading === code.code}
+                              onClick={() => handleReactivate(code.code)}
+                            >
+                              <IconPower size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )
+                      )}
+                      {code.is_active &&
+                        code.uses_count < code.max_uses &&
+                        !isCodeExpired(code) && (
+                          <Tooltip label="Deactivate">
+                            <ActionIcon
+                              color="yellow"
+                              variant="subtle"
+                              loading={actionLoading === code.code}
+                              onClick={() => handleDeactivate(code.code)}
+                            >
+                              <IconPower size={16} />
+                            </ActionIcon>
+                          </Tooltip>
+                        )}
+                      <Tooltip label="Delete">
                         <ActionIcon
-                          color="yellow"
+                          color="red"
                           variant="subtle"
                           loading={actionLoading === code.code}
-                          onClick={() => handleDeactivate(code.code)}
+                          onClick={() => handleDelete(code.code)}
                         >
-                          <IconPower size={16} />
+                          <IconTrash size={16} />
                         </ActionIcon>
                       </Tooltip>
-                    )}
-                    <Tooltip label="Delete">
-                      <ActionIcon
-                        color="red"
-                        variant="subtle"
-                        loading={actionLoading === code.code}
-                        onClick={() => handleDelete(code.code)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Tooltip>
-                  </Group>
-                </Table.Td>
-              </Table.Tr>
-            ))}
-          </Table.Tbody>
-        </Table>
+                    </Group>
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+          </Table>
         </ScrollArea>
       )}
 
       {/* Create Code Modal */}
       <Modal
         opened={createModalOpen}
-        onClose={() => { setCreateModalOpen(false); setFormError(null); }}
+        onClose={() => {
+          setCreateModalOpen(false)
+          setFormError(null)
+        }}
         title="Create Invitation Code"
         centered
       >
@@ -564,7 +656,7 @@ export default function DashboardInvitations() {
             label="Invitation Code"
             description="Enter the invitation code (min 5 characters)"
             value={customCode}
-            onChange={(e) => setCustomCode(e.target.value)}
+            onChange={e => setCustomCode(e.target.value)}
             minLength={5}
             maxLength={64}
             required
@@ -573,7 +665,7 @@ export default function DashboardInvitations() {
             label="Expiration (days)"
             description="Days until the code expires"
             value={expirationDays}
-            onChange={(val) => setExpirationDays(typeof val === 'number' ? val : 30)}
+            onChange={val => setExpirationDays(typeof val === "number" ? val : 30)}
             min={1}
             max={365}
             required
@@ -582,7 +674,7 @@ export default function DashboardInvitations() {
             label="Max Uses"
             description="Maximum number of times this code can be used"
             value={maxUses}
-            onChange={(val) => setMaxUses(typeof val === 'number' ? val : 1)}
+            onChange={val => setMaxUses(typeof val === "number" ? val : 1)}
             min={1}
             max={100}
             required
@@ -610,7 +702,7 @@ export default function DashboardInvitations() {
             label="Additional Uses"
             description="Number of additional uses to add (1-100)"
             value={additionalUses}
-            onChange={(val) => setAdditionalUses(typeof val === 'number' ? val : 1)}
+            onChange={val => setAdditionalUses(typeof val === "number" ? val : 1)}
             min={1}
             max={100}
             required
@@ -638,7 +730,7 @@ export default function DashboardInvitations() {
             label="Extension (days)"
             description="Number of days to extend the expiration (1-365)"
             value={extendDays}
-            onChange={(val) => setExtendDays(typeof val === 'number' ? val : 30)}
+            onChange={val => setExtendDays(typeof val === "number" ? val : 30)}
             min={1}
             max={365}
             required

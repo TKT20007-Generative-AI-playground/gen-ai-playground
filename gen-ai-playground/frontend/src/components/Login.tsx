@@ -1,17 +1,9 @@
-import {
-  Modal,
-  TextInput,
-  PasswordInput,
-  Button,
-  Stack,
-  Text,
-  Anchor,
-} from '@mantine/core'
-import { useForm } from '@mantine/form'
-import { notifications } from '@mantine/notifications'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
-import { loginRequest } from '../services/authService'
+import { Modal, TextInput, PasswordInput, Button, Stack, Text, Anchor } from "@mantine/core"
+import { useForm } from "@mantine/form"
+import { notifications } from "@mantine/notifications"
+import { Link, useNavigate } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
+import { loginRequest } from "../services/authService"
 
 interface LoginModalProps {
   opened: boolean

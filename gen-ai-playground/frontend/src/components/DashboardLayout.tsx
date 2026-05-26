@@ -18,9 +18,9 @@ export default function DashboardLayout() {
 
   const handlePlaygroundClick = () => {
     const path = location.pathname
-    let currentTab: DashboardTab = 'containers'
-    if (path === '/dashboard/invitations') currentTab = 'invitations'
-    if (path === '/dashboard/users') currentTab = 'users'
+    let currentTab: DashboardTab = "containers"
+    if (path === "/dashboard/invitations") currentTab = "invitations"
+    if (path === "/dashboard/users") currentTab = "users"
 
     saveDashboardTab(currentTab)
     const targetTab = getTargetTab()
@@ -28,9 +28,13 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#f8f9fa" }}>
-      <Group justify="space-between" p="md" bg="linear-gradient(135deg, #000F65, #0b1328)" style={{ position: "sticky", top: 0, zIndex: 100 }}>
-        
+    <div style={{ minHeight: "100vh", backgroundColor: "var(--app-sidebar-bg)" }}>
+      <Group
+        justify="space-between"
+        p="md"
+        bg="var(--app-header-gradient)"
+        style={{ position: "sticky", top: 0, zIndex: 100 }}
+      >
         <Group gap="md">
           {!isMobile && (
             <Button variant="white" color="dark" onClick={handlePlaygroundClick}>
@@ -38,7 +42,9 @@ export default function DashboardLayout() {
             </Button>
           )}
 
-          <Text fw={500} c="white">Generative AI Playground</Text>
+          <Text fw={500} c="white">
+            Generative AI Playground
+          </Text>
 
           {/* DESKTOP NAVIGATION */}
           {!isMobile && (
@@ -71,7 +77,6 @@ export default function DashboardLayout() {
               </Button>
             </Group>
           )}
-
         </Group>
 
         {!isMobile && (
@@ -79,7 +84,9 @@ export default function DashboardLayout() {
             <Text fw={500} c="white">
               {formatUserGreeting(username)}
             </Text>
-            <Button variant="white" color="dark" onClick={logout}>Logout</Button>
+            <Button variant="white" color="dark" onClick={logout}>
+              Logout
+            </Button>
           </Group>
         )}
 
@@ -108,30 +115,67 @@ export default function DashboardLayout() {
         size="xs"
         position="right"
         styles={{
-          content: { backgroundColor: "white", border: "1px solid black" }
+          content: {
+            backgroundColor: "var(--app-drawer-bg)",
+            border: "1px solid var(--app-drawer-border)",
+          },
         }}
       >
         <Stack gap="sm">
-          <Button variant="default" fullWidth component={Link} to="/dashboard/containers" onClick={() => setOpened(false)}>
+          <Button
+            variant="default"
+            fullWidth
+            component={Link}
+            to="/dashboard/containers"
+            onClick={() => setOpened(false)}
+          >
             Containers
           </Button>
-          <Button variant="default" fullWidth component={Link} to="/dashboard/invitations" onClick={() => setOpened(false)}>
+          <Button
+            variant="default"
+            fullWidth
+            component={Link}
+            to="/dashboard/invitations"
+            onClick={() => setOpened(false)}
+          >
             Invitations
           </Button>
-          <Button variant="default" fullWidth component={Link} to="/dashboard/users" onClick={() => setOpened(false)}>
+          <Button
+            variant="default"
+            fullWidth
+            component={Link}
+            to="/dashboard/users"
+            onClick={() => setOpened(false)}
+          >
             Users
           </Button>
-          <Button variant="default" fullWidth onClick={() => { handlePlaygroundClick(); setOpened(false) }}>
+          <Button
+            variant="default"
+            fullWidth
+            onClick={() => {
+              handlePlaygroundClick()
+              setOpened(false)
+            }}
+          >
             Playground
           </Button>
-          <Button variant="default" fullWidth onClick={() => { logout(); setOpened(false) }}>
+          <Button
+            variant="default"
+            fullWidth
+            onClick={() => {
+              logout()
+              setOpened(false)
+            }}
+          >
             Logout
           </Button>
         </Stack>
       </Drawer>
 
       <div style={{ padding: "16px 20px 0" }}>
-        <Text size="xl" fw={500}>Dashboard</Text>
+        <Text size="xl" fw={500}>
+          Dashboard
+        </Text>
       </div>
 
       <div style={{ padding: "20px" }}>

@@ -1,17 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
-import { formatDateTime } from '../utils/date'
-import { getRequestErrorMessage } from '../utils/errors'
-import { deleteDashboardUser, fetchDashboardUsers } from '../services/dashboardService'
-import {
-  Table,
-  Badge,
-  Button,
-  Group,
-  Loader,
-  Text,
-  Stack,
-  Alert,
-} from '@mantine/core'
+import { useState, useEffect, useCallback } from "react"
+import { formatDateTime } from "../utils/date"
+import { getRequestErrorMessage } from "../utils/errors"
+import { deleteDashboardUser, fetchDashboardUsers } from "../services/dashboardService"
+import { Table, Badge, Button, Group, Loader, Text, Stack, Alert } from "@mantine/core"
 
 interface User {
   username: string
@@ -32,7 +23,7 @@ export default function DashboardUsers() {
       const usersData = await fetchDashboardUsers()
       setUsers(usersData)
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Failed to fetch users'))
+      setError(getRequestErrorMessage(err, "Failed to fetch users"))
     } finally {
       setLoading(false)
     }
@@ -52,7 +43,7 @@ export default function DashboardUsers() {
       setSuccess(`User "${username}" deleted successfully`)
       await fetchUsers()
     } catch (err) {
-      setError(getRequestErrorMessage(err, 'Failed to delete user'))
+      setError(getRequestErrorMessage(err, "Failed to delete user"))
     } finally {
       setActionLoading(null)
     }
@@ -70,7 +61,9 @@ export default function DashboardUsers() {
   return (
     <Stack>
       <Group justify="space-between">
-        <Text size="xl" fw={500}>User Management</Text>
+        <Text size="xl" fw={500}>
+          User Management
+        </Text>
         <Button className="app-btn-soft-blue" variant="light" onClick={fetchUsers}>
           Refresh
         </Button>
@@ -101,19 +94,19 @@ export default function DashboardUsers() {
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
-            {users.map((user) => (
+            {users.map(user => (
               <Table.Tr key={user.username}>
-                <Table.Td style={{ wordBreak: 'break-all', maxWidth: 200 }}>
+                <Table.Td style={{ wordBreak: "break-all", maxWidth: 200 }}>
                   <Text fw={500}>{user.username}</Text>
                 </Table.Td>
                 <Table.Td>
-                  <Badge color={user.is_admin ? 'blue' : 'gray'} variant="filled">
-                    {user.is_admin ? 'Admin' : 'User'}
+                  <Badge color={user.is_admin ? "blue" : "gray"} variant="filled">
+                    {user.is_admin ? "Admin" : "User"}
                   </Badge>
                 </Table.Td>
                 <Table.Td>
                   <Text size="sm" c="dimmed">
-                    {formatDateTime(user.created_at, { fallback: '-' })}
+                    {formatDateTime(user.created_at, { fallback: "-" })}
                   </Text>
                 </Table.Td>
                 <Table.Td>

@@ -59,7 +59,7 @@ export default function TextCard({ item }: { item: TextRecord }) {
             size="sm"
             fw={600}
             style={{
-              color: "black",
+              color: "var(--app-card-text)",
               lineHeight: 1.45,
               flex: 1,
             }}
@@ -86,7 +86,7 @@ export default function TextCard({ item }: { item: TextRecord }) {
         <Text
           size="xs"
           style={{
-            color: "black",
+            color: "var(--app-card-text)",
             lineHeight: 1.7,
             whiteSpace: "pre-wrap",
           }}

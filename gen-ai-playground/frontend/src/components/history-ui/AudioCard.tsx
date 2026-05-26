@@ -68,7 +68,7 @@ export default function AudioCard({ item }: { item: AudioRecord }) {
             size="sm"
             fw={600}
             style={{
-              color: "black",
+              color: "var(--app-card-text)",
               lineHeight: 1.45,
               flex: 1,
             }}
@@ -77,7 +77,13 @@ export default function AudioCard({ item }: { item: AudioRecord }) {
           </Text>
 
           <Tooltip
-            label={copyState === "copied" ? "Copied!" : copyState === "error" ? "Copy failed" : "Copy transcription"}
+            label={
+              copyState === "copied"
+                ? "Copied!"
+                : copyState === "error"
+                  ? "Copy failed"
+                  : "Copy transcription"
+            }
             withArrow
             position="left"
           >
@@ -94,7 +100,10 @@ export default function AudioCard({ item }: { item: AudioRecord }) {
           </Tooltip>
         </Group>
 
-        <Text size="sm" style={{ color: "black", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+        <Text
+          size="sm"
+          style={{ color: "var(--app-card-text)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}
+        >
           {displayText || "(No transcription text)"}
         </Text>
 
@@ -117,7 +126,13 @@ export default function AudioCard({ item }: { item: AudioRecord }) {
           </Badge>
 
           {item.language ? (
-            <Badge size="xs" variant="light" color="gray" radius="sm" style={{ textTransform: "none" }}>
+            <Badge
+              size="xs"
+              variant="light"
+              color="gray"
+              radius="sm"
+              style={{ textTransform: "none" }}
+            >
               {item.language}
             </Badge>
           ) : null}

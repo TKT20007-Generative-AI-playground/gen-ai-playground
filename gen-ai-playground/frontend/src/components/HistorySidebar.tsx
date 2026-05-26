@@ -117,7 +117,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
       (hasRunIdPair
         ? normalizedRunId === lastRunId
         : Math.abs(ts - lastAudioRun.timestamp) < 10000 &&
-        (lastAudioRun.source ?? null) === (item.source ?? null))
+          (lastAudioRun.source ?? null) === (item.source ?? null))
 
     if (isSameRun && lastAudioRun) {
       lastAudioRun.models.push({
@@ -147,9 +147,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
 
   audioRuns.sort((a, b) => b.timestamp - a.timestamp)
   const limitedAudioRuns = audioRuns.slice(0, limit)
-  const limitedImageItems = items
-    .filter(item => item.image_type !== "original")
-    .slice(0, limit)
+  const limitedImageItems = items.filter(item => item.image_type !== "original").slice(0, limit)
 
   const refetch = useCallback(async () => {
     setLoading(true)
@@ -165,11 +163,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
         setSharedConversations(res.history ?? [])
         setItems([])
       } else {
-        const res = await fetchSidebarHistory<HistoryRecord>(
-          historyType,
-          limit,
-          audioFetchLimit,
-        )
+        const res = await fetchSidebarHistory<HistoryRecord>(historyType, limit, audioFetchLimit)
         setItems(res.history ?? [])
         setSharedConversations([])
       }
@@ -222,7 +216,12 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
             label="Type: "
             value={historyType}
             onChange={(value: string | null) => {
-              if (value === "image" || value === "text" || value === "audio" || value === "shared-chat") {
+              if (
+                value === "image" ||
+                value === "text" ||
+                value === "audio" ||
+                value === "shared-chat"
+              ) {
                 setHistoryType(value)
               }
             }}
@@ -259,7 +258,14 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
               const startPrompt = item.startPrompt
 
               return (
-                <Paper key={i} p="md" radius="xl" shadow="sm" withBorder bg="rgba(0,0,0,0.06)">
+                <Paper
+                  key={i}
+                  p="md"
+                  radius="xl"
+                  shadow="sm"
+                  withBorder
+                  bg="var(--app-sidebar-card-bg)"
+                >
                   <Stack gap="xs">
                     <Text size="xs" c="dimmed">
                       {formatDate(item.timestamp)}
@@ -317,12 +323,21 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
               </Center>
             )}
             {sharedConversations.map((item, i) => {
-              const firstUserMessage = item.messages?.find(message => message.role === "user")?.content
+              const firstUserMessage = item.messages?.find(
+                message => message.role === "user",
+              )?.content
               const timestamp = item.updated_at ?? item.created_at
               const conversationTitle = item.title?.trim() || "Untitled Conversation"
 
               return (
-                <Paper key={i} p="md" radius="xl" shadow="sm" withBorder bg="rgba(0,0,0,0.06)">
+                <Paper
+                  key={i}
+                  p="md"
+                  radius="xl"
+                  shadow="sm"
+                  withBorder
+                  bg="var(--app-sidebar-card-bg)"
+                >
                   <Stack gap="xs">
                     {timestamp && (
                       <Text size="xs" c="dimmed">
@@ -341,7 +356,9 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
 
                       <Text size="sm" c="gray.6" mt={4}>
                         {firstUserMessage
-                          ? (firstUserMessage.length > 70 ? `${firstUserMessage.slice(0, 70)}...` : firstUserMessage)
+                          ? firstUserMessage.length > 70
+                            ? `${firstUserMessage.slice(0, 70)}...`
+                            : firstUserMessage
                           : "(no messages yet)"}
                       </Text>
 
@@ -392,7 +409,14 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
             )}
             {limitedAudioRuns.map((run, i) => {
               return (
-                <Paper key={i} p="md" radius="xl" shadow="sm" withBorder bg="rgba(0,0,0,0.06)">
+                <Paper
+                  key={i}
+                  p="md"
+                  radius="xl"
+                  shadow="sm"
+                  withBorder
+                  bg="var(--app-sidebar-card-bg)"
+                >
                   <Stack gap="xs">
                     <Text size="xs" c="dimmed">
                       {formatDate(run.timestamp)}
@@ -412,7 +436,9 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                                 ? m.response.slice(0, 50) + "..."
                                 : m.response
                               : "(no transcription)"}
-                            {typeof m.transcriptionTimeMs === "number" ? ` (${m.transcriptionTimeMs} ms)` : ""}
+                            {typeof m.transcriptionTimeMs === "number"
+                              ? ` (${m.transcriptionTimeMs} ms)`
+                              : ""}
                           </Text>
                         ))}
                       </Stack>
@@ -448,70 +474,77 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
               </Center>
             )}
             {limitedImageItems.map((item, i) => {
-                const base64 = item.image_data || item.user_base64_image
+              const base64 = item.image_data || item.user_base64_image
 
-                return (
-                  <Paper key={i} p="md" radius="xl" shadow="sm" withBorder bg="rgba(0,0,0,0.06)">
-                    <Stack gap="xs">
-                      {base64 && (
-                        <img
-                          src={`data:image/png;base64,${base64}`}
-                          alt={item.prompt}
-                          style={{
-                            width: "100%",
-                            aspectRatio: "1 / 1",
-                            objectFit: "cover",
-                            borderRadius: "6px",
-                          }}
-                        />
-                      )}
-
-                      <Text fw={500}>{item.prompt}</Text>
-
-                      <Badge variant="light">{item.model}</Badge>
-
-                      <Text size="xs" c="dimmed">
-                        {new Date(item.timestamp).toLocaleString()}
-                      </Text>
-
-                      <Text size="xs">Type: {item.image_type || "generated"}</Text>
-                      <Button
-                        className="app-btn-soft-blue"
-                        mt="xs"
-                        size="xs"
-                        variant="light"
-                        onClick={() =>
-                          navigate("/history", {
-                            state: {
-                              tab: "images",
-                              targetIndex: i,
-                            },
-                          })
-                        }
-                      >
-                        View in History
-                      </Button>
-                      <Button
-                        mt="xs"
-                        onClick={() => {
-                          navigate("/playground/ImageEditor", {
-                            state: {
-                              imageToEdit: {
-                                image_data: item.image_data || item.user_base64_image,
-                                image_type: item.image_type,
-                                prompt: item.prompt,
-                                model: item.model,
-                                id: item.id,
-                              },
-                            },
-                          })
+              return (
+                <Paper
+                  key={i}
+                  p="md"
+                  radius="xl"
+                  shadow="sm"
+                  withBorder
+                  bg="var(--app-sidebar-card-bg)"
+                >
+                  <Stack gap="xs">
+                    {base64 && (
+                      <img
+                        src={`data:image/png;base64,${base64}`}
+                        alt={item.prompt}
+                        style={{
+                          width: "100%",
+                          aspectRatio: "1 / 1",
+                          objectFit: "cover",
+                          borderRadius: "6px",
                         }}
-                      >
-                        Edit image
-                      </Button>
-                    </Stack>
-                  </Paper>
-                )
+                      />
+                    )}
+
+                    <Text fw={500}>{item.prompt}</Text>
+
+                    <Badge variant="light">{item.model}</Badge>
+
+                    <Text size="xs" c="dimmed">
+                      {new Date(item.timestamp).toLocaleString()}
+                    </Text>
+
+                    <Text size="xs">Type: {item.image_type || "generated"}</Text>
+                    <Button
+                      className="app-btn-soft-blue"
+                      mt="xs"
+                      size="xs"
+                      variant="light"
+                      onClick={() =>
+                        navigate("/history", {
+                          state: {
+                            tab: "images",
+                            targetIndex: i,
+                          },
+                        })
+                      }
+                    >
+                      View in History
+                    </Button>
+                    <Button
+                      mt="xs"
+                      onClick={() => {
+                        navigate("/playground/ImageEditor", {
+                          state: {
+                            imageToEdit: {
+                              image_data: item.image_data || item.user_base64_image,
+                              image_type: item.image_type,
+                              prompt: item.prompt,
+                              model: item.model,
+                              id: item.id,
+                            },
+                          },
+                        })
+                      }}
+                    >
+                      Edit image
+                    </Button>
+                  </Stack>
+                </Paper>
+              )
             })}
           </>
         )}

@@ -4,6 +4,136 @@ body {
   overflow-x: hidden;
 }
 
+:root {
+        --app-brand-700: #000f65;
+        --app-brand-600: #001a8a;
+        --app-brand-100: #d3d9ff;
+        --app-brand-50: #eaedf6;
+        --app-disabled-bg: #c5cada;
+        --app-disabled-border: #8d98b3;
+        --app-disabled-text: #23314f;
+        --app-outline-bg: #ffffff;
+        --app-outline-border: #000f65;
+        --app-outline-text: #000f65;
+        --app-outline-hover-bg: #d3d9ff;
+        --app-outline-hover-text: #000f65;
+        --app-soft-blue-bg: #dbeafe;
+        --app-soft-blue-hover-bg: #bfdbfe;
+        --app-soft-blue-text: #0b3f75;
+        --app-soft-blue-border: #93c5fd;
+        --app-soft-blue-hover-text: #082f5f;
+        --app-soft-blue-hover-border: #7fb5fb;
+        --app-notification-outline: rgb(177, 177, 177);
+        --app-sidebar-bg: #f8f9fa;
+        --app-sidebar-border: #ddd;
+        --app-sidebar-resizer: #ccc;
+        --app-badge-bg: rgba(0, 0, 0, 0.08);
+        --app-badge-text: #000000;
+        --app-card-text: #000000;
+        --app-chat-user-bg: #e3f2fd;
+        --app-chat-assistant-bg: #f5f5f5;
+        --app-panel-border: #ddd;
+        --app-drawer-bg: #ffffff;
+        --app-drawer-border: #000000;
+        --app-header-gradient: linear-gradient(135deg, #000f65, #0b1328);
+        --app-banner-gradient: linear-gradient(135deg, #000f65, #1a3a8a);
+        --app-hero-overlay: rgba(0, 0, 0, 0.4);
+        --app-divider: rgba(0, 0, 0, 0.08);
+        --app-card-bg: rgba(255, 255, 255, 0.025);
+        --app-card-border: rgba(255, 255, 255, 0.06);
+        --app-card-border-hover: rgba(255, 255, 255, 0.12);
+        --app-card-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+        --app-card-divider: rgba(255, 255, 255, 0.04);
+        --app-tab-text: rgba(5, 5, 5, 0.75);
+        --app-tab-text-hover: #000000;
+        --app-tab-bg-hover: rgba(0, 0, 0, 0.10);
+        --app-bubble-user-bg: rgba(124, 106, 247, 0.12);
+        --app-bubble-user-border: rgba(124, 106, 247, 0.2);
+        --app-bubble-assistant-bg: rgba(0, 0, 0, 0.05);
+        --app-bubble-assistant-border: rgba(0, 0, 0, 0.07);
+        --app-history-accent: linear-gradient(to bottom, #7c6af7, #4dabf7);
+        --app-image-overlay: linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.35) 40%, transparent 70%);
+        --app-image-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        --app-history-modal-bg: linear-gradient(180deg, #1c1c22 0%, #18181e 100%);
+        --app-history-modal-border: rgba(255, 255, 255, 0.08);
+        --app-history-modal-header-border: rgba(255, 255, 255, 0.05);
+        --app-history-modal-title: #ffffff;
+        --app-history-modal-close: rgba(255, 255, 255, 0.35);
+        --app-history-modal-close-hover: #ffffff;
+        --app-history-modal-prompt: rgba(255, 255, 255, 0.6);
+        --app-history-modal-image-border: rgba(255, 255, 255, 0.05);
+        --app-history-modal-image-bg: rgba(0, 0, 0, 0.2);
+        --app-sidebar-card-bg: rgba(0, 0, 0, 0.06);
+        --app-notfound-overlay: rgba(255, 255, 255, 0.4);
+        --app-notfound-title: #000000;
+        --app-logo-shadow-primary: rgba(100, 108, 255, 0.66);
+        --app-logo-shadow-react: rgba(97, 218, 251, 0.66);
+        --app-docs-text: #888888;
+}
+
+[data-mantine-color-scheme="dark"] {
+        --app-outline-bg: var(--mantine-color-dark-6);
+        --app-outline-border: var(--mantine-color-dark-3);
+        --app-outline-text: var(--mantine-color-gray-0);
+        --app-outline-hover-bg: var(--mantine-color-dark-5);
+        --app-outline-hover-text: var(--mantine-color-gray-0);
+        --app-disabled-bg: var(--mantine-color-dark-5);
+        --app-disabled-border: var(--mantine-color-dark-4);
+        --app-disabled-text: var(--mantine-color-dark-1);
+        --app-soft-blue-bg: rgba(59, 130, 246, 0.2);
+        --app-soft-blue-hover-bg: rgba(59, 130, 246, 0.28);
+        --app-soft-blue-text: var(--mantine-color-blue-1);
+        --app-soft-blue-border: rgba(59, 130, 246, 0.35);
+        --app-soft-blue-hover-text: var(--mantine-color-blue-1);
+        --app-soft-blue-hover-border: rgba(59, 130, 246, 0.5);
+        --app-notification-outline: var(--mantine-color-dark-4);
+        --app-sidebar-bg: var(--mantine-color-dark-7);
+        --app-sidebar-border: var(--mantine-color-dark-4);
+        --app-sidebar-resizer: var(--mantine-color-dark-4);
+        --app-badge-bg: rgba(255, 255, 255, 0.12);
+        --app-badge-text: var(--mantine-color-gray-0);
+        --app-card-text: var(--mantine-color-gray-0);
+        --app-chat-user-bg: rgba(56, 139, 253, 0.2);
+        --app-chat-assistant-bg: var(--mantine-color-dark-6);
+        --app-panel-border: var(--mantine-color-dark-4);
+        --app-drawer-bg: var(--mantine-color-dark-6);
+        --app-drawer-border: var(--mantine-color-dark-4);
+        --app-header-gradient: linear-gradient(135deg, #0a1460, #0b1328);
+        --app-banner-gradient: linear-gradient(135deg, #0a1460, #132b66);
+        --app-hero-overlay: rgba(0, 0, 0, 0.5);
+        --app-divider: rgba(255, 255, 255, 0.12);
+        --app-card-bg: rgba(255, 255, 255, 0.04);
+        --app-card-border: rgba(255, 255, 255, 0.08);
+        --app-card-border-hover: rgba(255, 255, 255, 0.16);
+        --app-card-shadow: 0 6px 28px rgba(0, 0, 0, 0.45);
+        --app-card-divider: rgba(255, 255, 255, 0.06);
+        --app-tab-text: rgba(255, 255, 255, 0.7);
+        --app-tab-text-hover: var(--mantine-color-gray-0);
+        --app-tab-bg-hover: rgba(255, 255, 255, 0.08);
+        --app-bubble-user-bg: rgba(124, 106, 247, 0.2);
+        --app-bubble-user-border: rgba(124, 106, 247, 0.35);
+        --app-bubble-assistant-bg: rgba(255, 255, 255, 0.06);
+        --app-bubble-assistant-border: rgba(255, 255, 255, 0.1);
+        --app-history-accent: linear-gradient(to bottom, #7c6af7, #4dabf7);
+        --app-image-overlay: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.45) 40%, transparent 70%);
+        --app-image-shadow: 0 1px 3px rgba(0,0,0,0.6);
+        --app-history-modal-bg: linear-gradient(180deg, #14141a 0%, #101015 100%);
+        --app-history-modal-border: rgba(255, 255, 255, 0.12);
+        --app-history-modal-header-border: rgba(255, 255, 255, 0.08);
+        --app-history-modal-title: var(--mantine-color-gray-0);
+        --app-history-modal-close: rgba(255, 255, 255, 0.45);
+        --app-history-modal-close-hover: var(--mantine-color-gray-0);
+        --app-history-modal-prompt: rgba(255, 255, 255, 0.7);
+        --app-history-modal-image-border: rgba(255, 255, 255, 0.08);
+        --app-history-modal-image-bg: rgba(0, 0, 0, 0.4);
+        --app-sidebar-card-bg: rgba(255, 255, 255, 0.06);
+        --app-notfound-overlay: rgba(0, 0, 0, 0.35);
+        --app-notfound-title: var(--mantine-color-gray-0);
+        --app-logo-shadow-primary: rgba(124, 106, 247, 0.6);
+        --app-logo-shadow-react: rgba(79, 196, 247, 0.6);
+        --app-docs-text: var(--mantine-color-dimmed);
+}
+
 /* Prevent iOS Safari from auto-zooming when focusing form fields.
    iOS zooms in whenever an input's font-size is below 16px. */
 @media (max-width: 768px) {
@@ -45,14 +175,14 @@ h1 {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: white;
+    color: var(--mantine-color-white);
     text-align: center;
     z-index: 1;
     text-shadow:
-        -1px -1px 0 black,
-        1px -1px 0 black,
-        -1px 1px 0 black,
-        1px 1px 0 black,
+        -1px -1px 0 var(--mantine-color-black),
+        1px -1px 0 var(--mantine-color-black),
+        -1px 1px 0 var(--mantine-color-black),
+        1px 1px 0 var(--mantine-color-black),
         0 0 10px rgba(0,0,0,0.8),
         0 0 20px rgba(0,0,0,0.6);
 }
@@ -62,7 +192,7 @@ h1 {
     bottom: 0;
     left: 0;
     right: 0;
-    background: white;
+    background: var(--app-outline-bg);
     transform: translateY(100%);
     transition: transform 0.3s ease;
 }
@@ -87,35 +217,35 @@ h1 {
 }
 
 .btn-primary {
-    background-color: #000F65;
+    background-color: var(--app-brand-700);
     border-radius: var(--mantine-radius-md);
-    color: white;
+    color: var(--mantine-color-white);
 }
 
 .btn-primary:hover {
-    background-color: #001a8a;
+    background-color: var(--app-brand-600);
 }
 
 .btn-primary:disabled,
 .btn-primary[aria-disabled="true"],
 .btn-primary[data-disabled="true"] {
-    background-color: #c5cada;
-    border: 1px solid #8d98b3;
-    color: #23314f;
+    background-color: var(--app-disabled-bg);
+    border: 1px solid var(--app-disabled-border);
+    color: var(--app-disabled-text);
     cursor: not-allowed;
     opacity: 1;
 }
 
 .btn-outline {
-    background-color: white;
-    border: 1px solid #000F65;
+    background-color: var(--app-outline-bg);
+    border: 1px solid var(--app-outline-border);
     border-radius: var(--mantine-radius-md);
-    color: #000F65;
+    color: var(--app-outline-text);
 }
 
 .btn-outline:hover {
-    background-color: #d3d9ff;
-    color: #000F65;
+    background-color: var(--app-outline-hover-bg);
+    color: var(--app-outline-hover-text);
 }
 
 .notifications-root[data-position^='top-'] {
@@ -125,16 +255,16 @@ h1 {
 .notifications-notification {
     box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
     outline: solid;
-    outline-color: rgb(177, 177, 177);
+    outline-color: var(--app-notification-outline);
     outline-width: thin;
 }
 
 .btn-outline:disabled,
 .btn-outline[aria-disabled="true"],
 .btn-outline[data-disabled="true"] {
-    background-color: #eaedf6;
-    border-color: #9ba6bf;
-    color: #334260;
+    background-color: var(--app-brand-50);
+    border-color: var(--app-disabled-border);
+    color: var(--app-disabled-text);
     cursor: not-allowed;
     opacity: 1;
 }
@@ -146,9 +276,9 @@ h1 {
 .app-transcribe-btn:disabled,
 .app-transcribe-btn[aria-disabled="true"],
 .app-transcribe-btn[data-disabled="true"] {
-    background-color: #c5cada;
-    border: 1px solid #8d98b3;
-    color: #23314f;
+    background-color: var(--app-disabled-bg);
+    border: 1px solid var(--app-disabled-border);
+    color: var(--app-disabled-text);
     cursor: not-allowed;
     opacity: 1;
 }
@@ -162,30 +292,30 @@ h1 {
 }
 
 .app-btn-soft-blue {
-    --button-bg: #dbeafe;
-    --button-hover: #bfdbfe;
-    --button-color: #0b3f75;
-    --button-bd: 1px solid #93c5fd;
-    background-color: #dbeafe;
-    color: #0b3f75;
-    border: 1px solid #93c5fd;
+    --button-bg: var(--app-soft-blue-bg);
+    --button-hover: var(--app-soft-blue-hover-bg);
+    --button-color: var(--app-soft-blue-text);
+    --button-bd: 1px solid var(--app-soft-blue-border);
+    background-color: var(--app-soft-blue-bg);
+    color: var(--app-soft-blue-text);
+    border: 1px solid var(--app-soft-blue-border);
     font-weight: 600;
     box-shadow: none;
     background-image: none;
 }
 
 .app-btn-soft-blue:hover {
-    background-color: #bfdbfe;
-    color: #082f5f;
-    border-color: #7fb5fb;
+    background-color: var(--app-soft-blue-hover-bg);
+    color: var(--app-soft-blue-hover-text);
+    border-color: var(--app-soft-blue-hover-border);
 }
 
 .app-btn-soft-blue:disabled,
 .app-btn-soft-blue[aria-disabled="true"],
 .app-btn-soft-blue[data-disabled="true"] {
-    background-color: #e5eaf3;
-    border-color: #9ba6bf;
-    color: #334260;
+    background-color: var(--app-brand-50);
+    border-color: var(--app-disabled-border);
+    color: var(--app-disabled-text);
     opacity: 1;
 }
 

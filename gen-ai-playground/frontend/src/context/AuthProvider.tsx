@@ -7,7 +7,7 @@ import {
   refreshAccessToken,
   setAuthHeader,
 } from "../services/authService"
-import { notifications } from '@mantine/notifications'
+import { notifications } from "@mantine/notifications"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [username, setUsername] = useState<string | null>(null)
@@ -142,7 +142,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (!isReady) return null // prevents flashing logged-out UI
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, username, isAdmin, login, logout, getAccessToken: () => accessTokenRef.current }}>
+    <AuthContext.Provider
+      value={{
+        isLoggedIn,
+        username,
+        isAdmin,
+        login,
+        logout,
+        getAccessToken: () => accessTokenRef.current,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

@@ -3,16 +3,8 @@ import { useNavigate, Navigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { getAxiosDetailMessage } from "../utils/errors"
 import { registerRequest } from "../services/authService"
-import {
-  Container,
-  Paper,
-  TextInput,
-  PasswordInput,
-  Button,
-  Title,
-  Stack,
-} from "@mantine/core"
-import { notifications } from '@mantine/notifications'
+import { Container, Paper, TextInput, PasswordInput, Button, Title, Stack } from "@mantine/core"
+import { notifications } from "@mantine/notifications"
 
 export default function Register() {
   const [username, setUsername] = useState("")

@@ -49,8 +49,6 @@ import {
 
 const HISTORY_PAGE_SIZE = 10
 
-
-
 export default function History() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -73,13 +71,12 @@ export default function History() {
   }
 
   const locationState = (location.state ?? {}) as HistoryLocationState
-  const normalizedTargetIndex = Number.isInteger(locationState.targetIndex) && (locationState.targetIndex as number) >= 0
-    ? (locationState.targetIndex as number)
-    : null
+  const normalizedTargetIndex =
+    Number.isInteger(locationState.targetIndex) && (locationState.targetIndex as number) >= 0
+      ? (locationState.targetIndex as number)
+      : null
 
-  const [activeTab, setActiveTab] = useState<Tab>(
-    locationState.tab ?? "images"
-  )
+  const [activeTab, setActiveTab] = useState<Tab>(locationState.tab ?? "images")
   const [scrollTarget, setScrollTarget] = useState<{
     tab: Tab
     targetIndex: number
@@ -100,9 +97,10 @@ export default function History() {
     }
     const targetTab: Tab = locationState.tab
 
-    const normalizedIndex = Number.isInteger(locationState.targetIndex) && (locationState.targetIndex as number) >= 0
-      ? (locationState.targetIndex as number)
-      : null
+    const normalizedIndex =
+      Number.isInteger(locationState.targetIndex) && (locationState.targetIndex as number) >= 0
+        ? (locationState.targetIndex as number)
+        : null
 
     if (normalizedIndex === null) {
       return
@@ -120,7 +118,9 @@ export default function History() {
       targetIndex: normalizedIndex,
       targetConversationId: locationState.targetConversationId,
       pageSize: HISTORY_PAGE_SIZE,
-      scrollBlock: locationState.scrollBlock ?? (normalizedIndex % HISTORY_PAGE_SIZE === HISTORY_PAGE_SIZE - 1 ? "end" : "start"),
+      scrollBlock:
+        locationState.scrollBlock ??
+        (normalizedIndex % HISTORY_PAGE_SIZE === HISTORY_PAGE_SIZE - 1 ? "end" : "start"),
     })
   }, [
     location.key,
@@ -129,7 +129,7 @@ export default function History() {
     locationState.targetConversationId,
     locationState.targetIndex,
   ])
-  
+
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null])
 
   const [totalItems, setTotalItems] = useState<Record<Tab, number>>({
@@ -138,7 +138,6 @@ export default function History() {
     audio: 0,
     conversations: 0,
   })
-
 
   const [pages, setPages] = useState<Record<Tab, number>>({
     images:
@@ -226,11 +225,11 @@ export default function History() {
       const imgRes = await fetchImagesHistoryList(params)
 
       const groups: { [prompt: string]: ImageRecord[] } = {}
-        ; ((imgRes.history || []) as ImageRecord[]).forEach((item: ImageRecord) => {
-          const key = item.prompt.trim().toLowerCase()
-          if (!groups[key]) groups[key] = []
-          groups[key].push(item)
-        })
+      ;((imgRes.history || []) as ImageRecord[]).forEach((item: ImageRecord) => {
+        const key = item.prompt.trim().toLowerCase()
+        if (!groups[key]) groups[key] = []
+        groups[key].push(item)
+      })
 
       return {
         grouped: Object.keys(groups).map(prompt => ({
@@ -350,9 +349,19 @@ export default function History() {
     return () => {
       isCancelled = true
     }
-  }, [activeTab, dateRange, currentPage,
-    fetchImagesHistory, fetchTextHistory, fetchAudioHistory, fetchConversationHistory,
-    getImagesLength, getTextLength, getAudioLength, getConversationLength])
+  }, [
+    activeTab,
+    dateRange,
+    currentPage,
+    fetchImagesHistory,
+    fetchTextHistory,
+    fetchAudioHistory,
+    fetchConversationHistory,
+    getImagesLength,
+    getTextLength,
+    getAudioLength,
+    getConversationLength,
+  ])
 
   const handleDateChange = (range: [Date | null, Date | null]) => {
     setDateRange(range)
@@ -383,17 +392,19 @@ export default function History() {
     }
 
     const executeFallbackScroll = () => {
-      const fallbackTop = scrollTarget.scrollBlock === "end"
-        ? Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
-        : 0
+      const fallbackTop =
+        scrollTarget.scrollBlock === "end"
+          ? Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)
+          : 0
       window.scrollTo({ top: fallbackTop, behavior: "smooth" })
     }
 
     const tryScroll = () => {
       const localIndex = scrollTarget.targetIndex % scrollTarget.pageSize
-      const selectorById = scrollTarget.tab === "conversations" && scrollTarget.targetConversationId
-        ? `[data-history-tab="conversations"][data-conversation-id="${scrollTarget.targetConversationId}"]`
-        : null
+      const selectorById =
+        scrollTarget.tab === "conversations" && scrollTarget.targetConversationId
+          ? `[data-history-tab="conversations"][data-conversation-id="${scrollTarget.targetConversationId}"]`
+          : null
       const selectorByTabAndIndex = `[data-history-tab="${scrollTarget.tab}"][data-history-local-index="${localIndex}"]`
 
       const targetElement = selectorById
@@ -425,15 +436,14 @@ export default function History() {
     <Box
       style={{
         minHeight: "100vh",
-
-        color: "rgba(255,255,255,0.85)",
+        color: "var(--mantine-color-text)",
       }}
     >
       <Box
         px={isMobile ? 16 : 40}
         pt={isMobile ? 24 : 44}
         pb={0}
-        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+        style={{ borderBottom: "1px solid var(--app-divider)" }}
       >
         <Stack gap={6} mb={28}>
           <Text
@@ -441,7 +451,7 @@ export default function History() {
               fontSize: isMobile ? 24 : 30,
               fontWeight: 800,
               letterSpacing: "-0.6px",
-              color: "black",
+              color: "var(--mantine-color-text)",
               lineHeight: 1.1,
             }}
           >
@@ -462,8 +472,8 @@ export default function History() {
                   variant="filled"
                   radius="xl"
                   style={{
-                    background: "rgba(0, 0, 0, 0.08)",
-                    color: "black",
+                    background: "var(--app-badge-bg)",
+                    color: "var(--app-badge-text)",
                     fontWeight: 600,
                     minWidth: 22,
                     height: 18,
@@ -483,8 +493,8 @@ export default function History() {
                   variant="filled"
                   radius="xl"
                   style={{
-                    background: "rgba(10, 10, 10, 0.08)",
-                    color: "black",
+                    background: "var(--app-badge-bg)",
+                    color: "var(--app-badge-text)",
                     fontWeight: 600,
                     minWidth: 22,
                     height: 18,
@@ -503,8 +513,8 @@ export default function History() {
                   variant="filled"
                   radius="xl"
                   style={{
-                    background: "rgba(10, 10, 10, 0.08)",
-                    color: "black",
+                    background: "var(--app-badge-bg)",
+                    color: "var(--app-badge-text)",
                     fontWeight: 600,
                     minWidth: 22,
                     height: 18,
@@ -524,8 +534,8 @@ export default function History() {
                   variant="filled"
                   radius="xl"
                   style={{
-                    background: "rgba(10, 10, 10, 0.08)",
-                    color: "black",
+                    background: "var(--app-badge-bg)",
+                    color: "var(--app-badge-text)",
                     fontWeight: 600,
                     minWidth: 22,
                     height: 18,
@@ -576,7 +586,7 @@ export default function History() {
                           width: 3,
                           height: 18,
                           borderRadius: 3,
-                          background: "linear-gradient(to bottom, #7c6af7, #4dabf7)",
+                          background: "var(--app-history-accent)",
                           flexShrink: 0,
                         }}
                       />
@@ -585,7 +595,7 @@ export default function History() {
                         size="sm"
                         fw={500}
                         style={{
-                          color: "black",
+                          color: "var(--mantine-color-text)",
                           fontStyle: "italic",
                           lineHeight: 1.4,
                         }}
@@ -740,8 +750,7 @@ export default function History() {
               </Group>
             </Stack>
           </ScrollArea>
-        )
-        }
+        )}
       </Box>
 
       {/* Image Modal */}
@@ -756,16 +765,19 @@ export default function History() {
         radius="lg"
         styles={{
           content: {
-            background: "linear-gradient(180deg, #1c1c22 0%, #18181e 100%)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            background: "var(--app-history-modal-bg)",
+            border: "1px solid var(--app-history-modal-border)",
           },
           header: {
             background: "transparent",
-            borderBottom: "1px solid rgba(255,255,255,0.05)",
+            borderBottom: "1px solid var(--app-history-modal-header-border)",
             paddingBottom: 14,
           },
-          title: { color: "white", fontWeight: 600 },
-          close: { color: "rgba(255,255,255,0.35)", "&:hover": { color: "white" } },
+          title: { color: "var(--app-history-modal-title)", fontWeight: 600 },
+          close: {
+            color: "var(--app-history-modal-close)",
+            "&:hover": { color: "var(--app-history-modal-close-hover)" },
+          },
           overlay: { backdropFilter: "blur(6px)" },
         }}
         title={
@@ -784,7 +796,7 @@ export default function History() {
                 size="sm"
                 style={{
                   fontStyle: "italic",
-                  color: "rgba(255,255,255,0.6)",
+                  color: "var(--app-history-modal-prompt)",
                 }}
                 lineClamp={1}
               >
@@ -801,8 +813,8 @@ export default function History() {
               style={{
                 borderRadius: 12,
                 overflow: "hidden",
-                border: "1px solid rgba(255,255,255,0.05)",
-                background: "rgba(0,0,0,0.2)",
+                border: "1px solid var(--app-history-modal-image-border)",
+                background: "var(--app-history-modal-image-bg)",
               }}
             >
               <img

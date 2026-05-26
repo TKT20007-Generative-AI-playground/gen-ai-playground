@@ -24,7 +24,7 @@ const titleStyle = {
   m: 0,
 }
 
-const headerColor = "#000F65"
+const headerColor = "var(--app-brand-700)"
 
 const Front = () => {
   const autoplay = useRef(
@@ -100,7 +100,7 @@ const Front = () => {
           style={{
             position: "relative",
             height: "100%",
-            background: "rgba(0,0,0,0.4)",
+            background: "var(--app-hero-overlay)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -200,7 +200,7 @@ const Front = () => {
           style={{
             width: "100%",
             maxWidth: 964,
-            background: "linear-gradient(135deg, #000F65, #1a3a8a)",
+            background: "var(--app-banner-gradient)",
             borderRadius: "var(--mantine-radius-md)",
             padding: "2rem 3rem",
             color: "white",
