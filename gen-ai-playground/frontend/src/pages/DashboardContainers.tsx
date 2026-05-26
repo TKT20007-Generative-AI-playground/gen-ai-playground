@@ -3,9 +3,11 @@ import { getRequestErrorMessage, isAxiosUnauthorized } from "../utils/errors"
 import {
   deployAudioModel,
   deployTextModel,
+  deployVideoModel,
   fetchDashboardContainers,
   fetchDeployableAudioModels,
   fetchDeployableTextModels,
+  fetchDeployableVideoModels,
   stopDashboardContainer,
 } from "../services/dashboardService"
 import {
@@ -38,7 +40,7 @@ interface DeployOption {
   id: string
   modelPath: string
   label: string
-  kind: "text" | "audio"
+  kind: "text" | "audio" | "video"
 }
 
 export default function DashboardContainers() {
@@ -51,10 +53,12 @@ export default function DashboardContainers() {
   const [deployOptions, setDeployOptions] = useState<DeployOption[]>([])
   const [textOpen, setTextOpen] = useState(true)
   const [audioOpen, setAudioOpen] = useState(true)
+  const [videoOpen, setVideoOpen] = useState(true)
 
   const isMobile = useMediaQuery("(max-width: 768px)")
   const textModels = deployOptions.filter(m => m.kind === "text")
   const audioModels = deployOptions.filter(m => m.kind === "audio")
+  const videoModels = deployOptions.filter(m => m.kind === "video")
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -82,6 +86,20 @@ export default function DashboardContainers() {
             modelPath: model.value,
             label: `Audio: ${model.label}`,
             kind: "audio",
+          })
+        }
+      } catch {
+        // silent
+      }
+
+      try {
+        const videoModels = await fetchDeployableVideoModels()
+        for (const model of videoModels) {
+          options.push({
+            id: `video::${model.value}`,
+            modelPath: model.value,
+            label: `Video: ${model.label}`,
+            kind: "video",
           })
         }
       } catch {
@@ -132,6 +150,8 @@ export default function DashboardContainers() {
     try {
       if (option.kind === "audio") {
         await deployAudioModel(option.modelPath)
+      } else if (option.kind === "video") {
+        await deployVideoModel(option.modelPath)
       } else {
         await deployTextModel(option.modelPath)
       }
@@ -230,6 +250,24 @@ export default function DashboardContainers() {
                         onChange={() => setSelectedModelId(selectedModelId === m.id ? null : m.id)}
                       >
                         {m.label.replace("Audio: ", "")}
+                      </Chip>
+                    ))}
+                  </Group>
+                </ScrollArea>
+              </>
+            )}
+            {videoModels.length > 0 && (
+              <>
+                <Text size="sm" fw={500} c="dimmed" mt="xs">Video Models</Text>
+                <ScrollArea>
+                  <Group gap="xs" wrap="wrap">
+                    {videoModels.map(m => (
+                      <Chip
+                        key={m.id}
+                        checked={selectedModelId === m.id}
+                        onChange={() => setSelectedModelId(selectedModelId === m.id ? null : m.id)}
+                      >
+                        {m.label.replace("Video: ", "")}
                       </Chip>
                     ))}
                   </Group>
@@ -355,6 +393,48 @@ export default function DashboardContainers() {
                     >
                       <Text size="sm" style={{ userSelect: "none" }}>
                         {m.label.replace("Audio: ", "")}
+                      </Text>
+                      <Button
+                        className="app-btn-soft-blue"
+                        size="xs"
+                        variant="light"
+                        loading={deployLoading}
+                        disabled={deployLoading}
+                        onClick={e => {
+                          e.stopPropagation()
+                          handleDeployById(m.id)
+                        }}
+                      >
+                        Deploy
+                      </Button>
+                    </Group>
+                  ))}
+                </Stack>
+              </Collapse>
+
+              <UnstyledButton onClick={() => setVideoOpen(o => !o)} style={{ width: "100%" }}>
+                <Group justify="space-between" mt="xs">
+                  <Text size="sm" fw={600}>Video Models</Text>
+                  {videoOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}
+                </Group>
+              </UnstyledButton>
+              <Collapse in={videoOpen}>
+                <Stack gap={4}>
+                  {videoModels.length === 0 && (
+                    <Text size="xs" c="dimmed" py={4}>No models available</Text>
+                  )}
+                  {videoModels.map(m => (
+                    <Group
+                      key={m.id}
+                      justify="space-between"
+                      style={{
+                        width: "100%",
+                        borderRadius: 6,
+                        padding: "6px 8px",
+                      }}
+                    >
+                      <Text size="sm" style={{ userSelect: "none" }}>
+                        {m.label.replace("Video: ", "")}
                       </Text>
                       <Button
                         className="app-btn-soft-blue"

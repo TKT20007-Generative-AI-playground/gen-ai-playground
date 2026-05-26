@@ -22,7 +22,7 @@ interface ChatMessage {
 }
 
 interface HistoryRecord {
-  type: "image" | "text" | "chat" | "transcription"
+  type: "image" | "text" | "chat" | "transcription" | "video"
   prompt?: string
   generated_text?: string
   messages?: ChatMessage[]
@@ -37,6 +37,9 @@ interface HistoryRecord {
   model: string
   timestamp: string
   image_data?: string
+  video_data?: string
+  mime_type?: string
+  generation_time_ms?: number
   user_base64_image?: string | null
   image_type: string | null | undefined
   id?: string
@@ -56,7 +59,7 @@ interface SharedConversationRecord {
   updated_at?: string
 }
 
-type SidebarHistoryType = "image" | "text" | "shared-chat" | "audio"
+type SidebarHistoryType = "image" | "text" | "shared-chat" | "audio" | "video"
 
 const AUDIO_SIDEBAR_MAX_FETCH = 200
 const AUDIO_RECORDS_PER_SESSION = 4
@@ -150,6 +153,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
   const limitedImageItems = items
     .filter(item => item.image_type !== "original")
     .slice(0, limit)
+  const limitedVideoItems = items.slice(0, limit)
 
   const refetch = useCallback(async () => {
     setLoading(true)
@@ -222,7 +226,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
             label="Type: "
             value={historyType}
             onChange={(value: string | null) => {
-              if (value === "image" || value === "text" || value === "audio" || value === "shared-chat") {
+              if (value === "image" || value === "text" || value === "audio" || value === "video" || value === "shared-chat") {
                 setHistoryType(value)
               }
             }}
@@ -231,6 +235,7 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
               { value: "text", label: "Generated text" },
               { value: "shared-chat", label: "Shared conversations" },
               { value: "audio", label: "Transcriptions" },
+              { value: "video", label: "Generated videos" },
             ]}
           />
 
@@ -433,6 +438,63 @@ export default function HistorySidebar({ opened }: { opened: boolean }) {
                         View in History
                       </Button>
                     </Stack>
+                  </Stack>
+                </Paper>
+              )
+            })}
+          </>
+        )}
+
+        {historyType === "video" && (
+          <>
+            {limitedVideoItems.length === 0 && (
+              <Center mt="md">
+                <Text c="dimmed">No recent video history.</Text>
+              </Center>
+            )}
+            {limitedVideoItems.map((item, i) => {
+              const videoSrc = item.video_data
+                ? `data:${item.mime_type || "video/mp4"};base64,${item.video_data}`
+                : null
+
+              return (
+                <Paper key={i} p="md" radius="xl" shadow="sm" withBorder bg="rgba(0,0,0,0.06)">
+                  <Stack gap="xs">
+                    {videoSrc && (
+                      <video
+                        src={videoSrc}
+                        controls
+                        style={{
+                          width: "100%",
+                          aspectRatio: "16 / 9",
+                          objectFit: "cover",
+                          borderRadius: "6px",
+                          background: "black",
+                        }}
+                      />
+                    )}
+
+                    <Text fw={500}>{item.prompt}</Text>
+                    <Badge variant="light">{item.model}</Badge>
+                    <Text size="xs" c="dimmed">
+                      {new Date(item.timestamp).toLocaleString()}
+                    </Text>
+                    <Button
+                      className="app-btn-soft-blue"
+                      mt="xs"
+                      size="xs"
+                      variant="light"
+                      onClick={() =>
+                        navigate("/history", {
+                          state: {
+                            tab: "video",
+                            targetIndex: i,
+                          },
+                        })
+                      }
+                    >
+                      View in History
+                    </Button>
                   </Stack>
                 </Paper>
               )

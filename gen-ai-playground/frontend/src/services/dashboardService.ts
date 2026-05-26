@@ -94,6 +94,16 @@ export async function fetchDeployableAudioModels(): Promise<Array<{ value: strin
   return res.data.available_models ?? []
 }
 
+export async function fetchDeployableVideoModels(): Promise<Array<{ value: string; label: string }>> {
+  const res = await apiClient.get<{ available_models?: Array<{ value: string; label: string }> }>(
+    "/video/models",
+    {
+      headers: getCsrfHeaders(),
+    },
+  )
+  return res.data.available_models ?? []
+}
+
 export type DashboardContainer = {
   name: string
   status: string
@@ -129,6 +139,16 @@ export async function deployTextModel(modelPath: string): Promise<{ name: string
 export async function deployAudioModel(modelPath: string): Promise<void> {
   await apiClient.post(
     "/audio/deploy",
+    { model_path: modelPath },
+    {
+      headers: getJsonCsrfHeaders(),
+    },
+  )
+}
+
+export async function deployVideoModel(modelPath: string): Promise<void> {
+  await apiClient.post(
+    "/video/deploy",
     { model_path: modelPath },
     {
       headers: getJsonCsrfHeaders(),

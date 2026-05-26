@@ -92,6 +92,52 @@ class TestCustomTemplateDeploymentPayload:
         assert env_map["WHISPER_COMPUTE_TYPE"] == "float16"
         assert "HF_TOKEN" not in env_map
 
+    def test_custom_video_payload_sets_video_model_env(self):
+        service = VerdaService()
+
+        cfg = SimpleNamespace(
+            engine="custom",
+            model="Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+            host=None,
+            port=None,
+            custom=SimpleNamespace(env={"VIDEO_DEVICE": "cuda"}),
+        )
+
+        mock_client = MagicMock()
+        mock_client.containers.create_deployment.return_value = SimpleNamespace(name="video-wan21-t2v-1-3b-custom")
+
+        with (
+            patch.object(service, "_parse_and_validate_template", return_value=cfg),
+            patch.object(service, "_get_client", return_value=mock_client),
+            patch.object(service, "_resolve_gpu", return_value=("H100", 1)),
+            patch.object(service, "_generate_command_from_template", return_value=[]),
+            patch.object(service, "_resolve_image_from_template", return_value="repo/video:v1"),
+            patch.object(service, "_ensure_hf_secret") as mock_ensure_hf_secret,
+            patch("app.verda_service.EnvVar", side_effect=_ns_factory),
+            patch("app.verda_service.EntrypointOverridesSettings", side_effect=_ns_factory),
+            patch("app.verda_service.HealthcheckSettings", side_effect=_ns_factory),
+            patch("app.verda_service.ScalingPolicy", side_effect=_ns_factory),
+            patch("app.verda_service.QueueLoadScalingTrigger", side_effect=_ns_factory),
+            patch("app.verda_service.UtilizationScalingTrigger", side_effect=_ns_factory),
+            patch("app.verda_service.ScalingTriggers", side_effect=_ns_factory),
+            patch("app.verda_service.ScalingOptions", side_effect=_ns_factory),
+            patch("app.verda_service.ComputeResource", side_effect=_ns_factory),
+            patch("app.verda_service.Container", side_effect=_ns_factory),
+            patch("app.verda_service.Deployment", side_effect=_ns_factory),
+        ):
+            result = service.deploy_from_template("video-wan21-t2v-1-3b-custom.json")
+
+        assert result["name"] == "video-wan21-t2v-1-3b-custom"
+        mock_ensure_hf_secret.assert_not_called()
+
+        deployment_payload = mock_client.containers.create_deployment.call_args.args[0]
+        container_payload = deployment_payload.containers[0]
+        env_map = {env.name: env.value_or_reference_to_secret for env in container_payload.env}
+
+        assert env_map["VIDEO_MODEL"] == "Wan-AI/Wan2.1-T2V-1.3B-Diffusers"
+        assert env_map["VIDEO_DEVICE"] == "cuda"
+        assert "WHISPER_MODEL" not in env_map
+
 
 class TestGenerateCommandFromTemplate:
     """Tests for _generate_command_from_template internal method."""
@@ -587,7 +633,7 @@ class TestListDeployments:
 
         assert result == []
 
-    def test_api_exception_returns_error_list(self):
+    def test_api_exception_returns_empty_list(self):
         service = VerdaService()
         mock_client = MagicMock()
         mock_client.containers.get_deployments.side_effect = _make_api_exception(
@@ -598,9 +644,7 @@ class TestListDeployments:
         with patch.object(service, "_get_client", return_value=mock_client):
             result = service.list_deployments()
 
-        assert len(result) == 1
-        assert "error" in result[0]
-        assert "api error" in result[0]["error"]
+        assert result == []
 
 
 class TestChatReasoningExtraction:

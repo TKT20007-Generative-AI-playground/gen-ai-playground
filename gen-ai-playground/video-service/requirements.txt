@@ -1,0 +1,8 @@
+fastapi[standard]==0.115.0
+diffusers==0.30.3
+transformers==4.44.2
+accelerate==0.34.2
+torch==2.4.1
+imageio==2.35.1
+imageio-ffmpeg==0.5.1
+python-multipart==0.0.9

@@ -52,7 +52,7 @@ class Settings:
         "FLUX2_KLEIN_4B": "https://inference.datacrunch.io/flux2-klein-4b/generate"
     }
 
-    # Audio
     MAX_AUDIO_UPLOAD_MB: int = int(os.getenv("MAX_AUDIO_UPLOAD_MB", os.getenv("MAX_UPLOAD_MB", "50")))
+    MAX_VIDEO_OUTPUT_MB: int = int(os.getenv("MAX_VIDEO_OUTPUT_MB", "12"))
 
 settings = Settings()

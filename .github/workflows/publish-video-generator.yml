@@ -1,0 +1,37 @@
+name: Video Generator Docker Build
+
+on:
+  push:
+    branches:
+      - video-generation
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push-video-generator:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set lower case owner name
+        run: |
+          echo "OWNER_LC=${OWNER,,}" >>${GITHUB_ENV}
+        env:
+          OWNER: '${{ github.repository_owner }}'
+
+      - name: Build and push Docker image for Video Generator
+        working-directory: ./gen-ai-playground/video-service
+        run: |
+          docker build . --tag ghcr.io/${{ env.OWNER_LC }}/video-generator:v1
+          docker push ghcr.io/${{ env.OWNER_LC }}/video-generator:v1
