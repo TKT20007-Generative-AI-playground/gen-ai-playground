@@ -245,6 +245,41 @@ class HistoryResponseAudio(BaseModel):
     total: int
     page: int
     total_pages: int
+
+
+class VideoGenerateRequest(BaseModel):
+    prompt: str
+    model_path: Optional[str] = None
+    negative_prompt: Optional[str] = None
+    height: Optional[int] = Field(default=None, ge=256, le=720)
+    width: Optional[int] = Field(default=None, ge=256, le=1280)
+    num_frames: Optional[int] = Field(default=None, ge=9, le=81)
+    num_inference_steps: Optional[int] = Field(default=None, ge=4, le=40)
+    guidance_scale: Optional[float] = Field(default=None, ge=1.0, le=12.0)
+    seed: Optional[int] = None
+
+
+class HistoryItemVideo(BaseModel):
+    type: str
+    prompt: str
+    model: str
+    timestamp: datetime
+    username: str
+    video_data: str
+    mime_type: str
+    generation_time_ms: Optional[int] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
+    num_frames: Optional[int] = None
+    fps: Optional[int] = None
+    seed: Optional[int] = None
+
+
+class HistoryResponseVideo(BaseModel):
+    history: List[HistoryItemVideo]
+    total: int
+    page: int
+    total_pages: int
     
 class ConversationCreateRequest(BaseModel):
     """Request model for creating a new conversation"""

@@ -6,13 +6,15 @@ import type {
   ImageRecord,
   PromptGroup,
   TextRecord,
+  VideoRecord,
 } from "./history-ui/historyInterfaces"
 import DateRangePicker from "./history-ui/DateRangePicker"
 import ImageCard from "./history-ui/ImageCard"
 import TextCard from "./history-ui/TextCard"
 import AudioCard from "./history-ui/AudioCard"
+import VideoCard from "./history-ui/VideoCard"
 import EmptyState from "./history-ui/EmptyState"
-import { TextIcon, ImageIcon, DownloadIcon, EditIcon, AudioIcon } from "./history-ui/Icons"
+import { TextIcon, ImageIcon, DownloadIcon, EditIcon, AudioIcon, VideoIcon } from "./history-ui/Icons"
 import { getTypeColor, getTypeIcon, getTypeLabel, formatDate } from "./history-ui/ImageUtils"
 import { HoverTab } from "./history-ui/HoverTab"
 import {
@@ -45,6 +47,8 @@ import {
   fetchImagesLength,
   fetchTextHistoryList,
   fetchTextLength,
+  fetchVideoHistoryList,
+  fetchVideoLength,
 } from "../services/historyService"
 
 const HISTORY_PAGE_SIZE = 10
@@ -60,11 +64,12 @@ export default function History() {
   const [imageHistory, setImageHistory] = useState<PromptGroup[]>([])
   const [textHistory, setTextHistory] = useState<TextRecord[]>([])
   const [audioHistory, setAudioHistory] = useState<AudioRecord[]>([])
+  const [videoHistory, setVideoHistory] = useState<VideoRecord[]>([])
   const [conversationHistory, setConversationHistory] = useState<ConversationRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedImage, setSelectedImage] = useState<ImageRecord | null>(null)
 
-  type Tab = "images" | "text" | "audio" | "conversations"
+  type Tab = "images" | "text" | "audio" | "video" | "conversations"
   type HistoryLocationState = {
     tab?: Tab
     targetIndex?: number
@@ -136,6 +141,7 @@ export default function History() {
     images: 0,
     text: 0,
     audio: 0,
+    video: 0,
     conversations: 0,
   })
 
@@ -153,6 +159,10 @@ export default function History() {
       locationState.tab === "audio" && normalizedTargetIndex !== null
         ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
         : 1,
+    video:
+      locationState.tab === "video" && normalizedTargetIndex !== null
+        ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
+        : 1,
     conversations:
       locationState.tab === "conversations" && normalizedTargetIndex !== null
         ? Math.floor(normalizedTargetIndex / HISTORY_PAGE_SIZE) + 1
@@ -162,6 +172,7 @@ export default function History() {
     images: 1,
     text: 1,
     audio: 1,
+    video: 1,
     conversations: 1,
   })
   const currentPage = pages[activeTab]
@@ -256,6 +267,19 @@ export default function History() {
     [],
   )
 
+  const fetchVideoHistory = useCallback(
+    async (range: [Date | null, Date | null], pageNum: number) => {
+      const params = buildParams(range, pageNum)
+      const res = await fetchVideoHistoryList(params)
+
+      return {
+        history: (res.history || []) as VideoRecord[],
+        totalPages: res.total_pages || 1,
+      }
+    },
+    [],
+  )
+
   const getImagesLength = useCallback(async () => {
     return fetchImagesLength()
   }, [])
@@ -266,6 +290,10 @@ export default function History() {
 
   const getAudioLength = useCallback(async () => {
     return fetchAudioLength()
+  }, [])
+
+  const getVideoLength = useCallback(async () => {
+    return fetchVideoLength()
   }, [])
 
   const getConversationLength = useCallback(async () => {
@@ -280,10 +308,11 @@ export default function History() {
     const run = async () => {
       setLoading(true)
 
-      const [imagesLength, textLength, audioLength, conversationLength] = await Promise.all([
+      const [imagesLength, textLength, audioLength, videoLength, conversationLength] = await Promise.all([
         getImagesLength(),
         getTextLength(),
         getAudioLength(),
+        getVideoLength(),
         getConversationLength(),
       ])
 
@@ -295,6 +324,7 @@ export default function History() {
         images: imagesLength,
         text: textLength,
         audio: audioLength,
+        video: videoLength,
         conversations: conversationLength,
       })
 
@@ -326,6 +356,15 @@ export default function History() {
             ...prev,
             audio: data.totalPages,
           }))
+        } else if (activeTab === "video") {
+          const data = await fetchVideoHistory(dateRange, currentPage)
+          if (isCancelled || requestIdRef.current !== requestId) return
+
+          setVideoHistory(data.history)
+          setTotalPages(prev => ({
+            ...prev,
+            video: data.totalPages,
+          }))
         } else if (activeTab === "conversations") {
           const data = await fetchConversationHistory(dateRange, currentPage)
           if (isCancelled || requestIdRef.current !== requestId) return
@@ -351,8 +390,8 @@ export default function History() {
       isCancelled = true
     }
   }, [activeTab, dateRange, currentPage,
-    fetchImagesHistory, fetchTextHistory, fetchAudioHistory, fetchConversationHistory,
-    getImagesLength, getTextLength, getAudioLength, getConversationLength])
+    fetchImagesHistory, fetchTextHistory, fetchAudioHistory, fetchVideoHistory, fetchConversationHistory,
+    getImagesLength, getTextLength, getAudioLength, getVideoLength, getConversationLength])
 
   const handleDateChange = (range: [Date | null, Date | null]) => {
     setDateRange(range)
@@ -360,6 +399,7 @@ export default function History() {
       images: 1,
       text: 1,
       audio: 1,
+      video: 1,
       conversations: 1,
     })
   }
@@ -376,6 +416,7 @@ export default function History() {
       (activeTab === "images" && imageHistory.length > 0) ||
       (activeTab === "text" && textHistory.length > 0) ||
       (activeTab === "audio" && audioHistory.length > 0) ||
+      (activeTab === "video" && videoHistory.length > 0) ||
       (activeTab === "conversations" && conversationHistory.length > 0)
 
     if (!hasRenderedDataForTab) {
@@ -418,6 +459,7 @@ export default function History() {
     imageHistory.length,
     textHistory.length,
     audioHistory.length,
+    videoHistory.length,
     conversationHistory.length,
   ])
 
@@ -532,6 +574,27 @@ export default function History() {
                   }}
                 >
                   {totalItems.audio}
+                </Badge>
+              )}
+            </HoverTab>
+
+            <HoverTab value="video" leftSection={<VideoIcon />}>
+              Video
+              {totalItems.video > 0 && (
+                <Badge
+                  ml={8}
+                  size="xs"
+                  variant="filled"
+                  radius="xl"
+                  style={{
+                    background: "rgba(10, 10, 10, 0.08)",
+                    color: "black",
+                    fontWeight: 600,
+                    minWidth: 22,
+                    height: 18,
+                  }}
+                >
+                  {totalItems.video}
                 </Badge>
               )}
             </HoverTab>
@@ -684,6 +747,42 @@ export default function History() {
                         data-history-local-index={idx}
                       >
                         <AudioCard item={item} />
+                      </div>
+                    )}
+                  </Transition>
+                ))}
+                <Group justify="center" mt="md">
+                  <Pagination
+                    total={totalPages[activeTab]}
+                    value={pages[activeTab]}
+                    onChange={newPage => {
+                      if (newPage == null) return
+                      setPages(prev => ({
+                        ...prev,
+                        [activeTab]: newPage,
+                      }))
+                      window.scrollTo({ top: 0, behavior: "smooth" })
+                    }}
+                  />
+                </Group>
+              </Stack>
+            </ScrollArea>
+          )
+        ) : activeTab === "video" ? (
+          videoHistory.length === 0 ? (
+            <EmptyState label="No video history yet. Generate a clip to see outputs here." />
+          ) : (
+            <ScrollArea>
+              <Stack gap={12}>
+                {videoHistory.map((item, idx) => (
+                  <Transition key={idx} mounted transition="fade" duration={200}>
+                    {styles => (
+                      <div
+                        style={{ ...styles, animationDelay: `${idx * 30}ms` }}
+                        data-history-tab="video"
+                        data-history-local-index={idx}
+                      >
+                        <VideoCard item={item} />
                       </div>
                     )}
                   </Transition>

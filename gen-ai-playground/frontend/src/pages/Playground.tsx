@@ -7,6 +7,7 @@ import ImageGenerator from "../components/ImageGenerator"
 import ImageEditor from "../components/ImageEditor"
 import TextGenerator from "../components/TextGenerator"
 import Transcribe from "../components/Transcribe"
+import VideoGenerator from "../components/VideoGenerator"
 import { PLAYGROUND_TABS } from "../constants/tabs"
 import NotFoundPage from "./PageNotFound"
 
@@ -27,6 +28,7 @@ export default function Playground({ historyOpen }: { historyOpen: boolean }) {
     ImageEditor: <ImageEditor imageToEdit={imageToEdit} />,
     TextGenerator: <TextGenerator opened={historyOpen} />,
     Transcribe: <Transcribe />,
+    VideoGenerator: <VideoGenerator />,
   }
 
   // If tab is invalid, redirect to default

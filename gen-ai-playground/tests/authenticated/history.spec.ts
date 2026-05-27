@@ -8,16 +8,18 @@ const DUMMY_BASE64_IMAGE =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
 
 
-type HistoryTab = "Images" | "Text" | "Conversations" | "Transcribe";
+type HistoryTab = "Images" | "Text" | "Conversations" | "Transcribe" | "Video";
 
 type HistoryPageMocks = {
   imagesLength?: number;
   textLength?: number;
   audioLength?: number;
+  videoLength?: number;
   conversationsLength?: number;
   imagesByPage?: Record<string, { history: any[]; total_pages: number }>;
   textByPage?: Record<string, { history: any[]; total_pages: number }>;
   audioByPage?: Record<string, { history: any[]; total_pages: number }>;
+  videoByPage?: Record<string, { history: any[]; total_pages: number }>;
   conversationsByPage?: Record<string, { conversations: any[]; total_pages: number }>;
 };
 
@@ -36,7 +38,7 @@ async function openHistorySidebar(page: Page) {
   await expect(page.getByRole("textbox", { name: "Type:" })).toBeVisible();
 }
 
-async function selectHistoryType(page: Page, label: "Generated images" | "Generated text" | "Shared conversations" | "Transcriptions") {
+async function selectHistoryType(page: Page, label: "Generated images" | "Generated text" | "Shared conversations" | "Transcriptions" | "Generated videos") {
   await page.getByRole("textbox", { name: "Type:" }).click();
   await page.getByRole("option", { name: label }).click();
 }
@@ -50,6 +52,7 @@ async function mockHistoryPageEndpoints(page: Page, config: HistoryPageMocks = {
     imagesLength = 1,
     textLength = 0,
     audioLength = 0,
+    videoLength = 0,
     conversationsLength = 0,
     imagesByPage = {
       "1": {
@@ -68,6 +71,7 @@ async function mockHistoryPageEndpoints(page: Page, config: HistoryPageMocks = {
     },
     textByPage = { "1": { history: [], total_pages: 1 } },
     audioByPage = { "1": { history: [], total_pages: 1 } },
+    videoByPage = { "1": { history: [], total_pages: 1 } },
     conversationsByPage = { "1": { conversations: [], total_pages: 1 } },
   } = config;
 
@@ -92,6 +96,14 @@ async function mockHistoryPageEndpoints(page: Page, config: HistoryPageMocks = {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ length: conversationsLength }),
+    });
+  });
+
+  await page.route("**/video/history-length*", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ length: videoLength }),
     });
   });
 
@@ -128,6 +140,18 @@ async function mockHistoryPageEndpoints(page: Page, config: HistoryPageMocks = {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ ...payload, total: audioLength }),
+    });
+  });
+
+  await page.route(/\/video\/history(?:\?.*)?$/, async route => {
+    const url = new URL(route.request().url());
+    const pageParam = url.searchParams.get("page") ?? "1";
+    const payload = videoByPage[pageParam] ?? { history: [], total_pages: 1 };
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ...payload, total: videoLength }),
     });
   });
 
@@ -187,6 +211,14 @@ test.describe("History sidebar flows", () => {
     });
 
     await page.route("**/audio/history-sidebar*", async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ history: [] }),
+      });
+    });
+
+    await page.route("**/video/history-sidebar*", async route => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",

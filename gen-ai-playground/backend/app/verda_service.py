@@ -385,13 +385,13 @@ class VerdaService:
             )
         elif cfg.engine == "custom":
             custom_plain_env: dict[str, str] = {}
-            if cfg.model:
+            if template_json.startswith("whisper-") and cfg.model:
                 custom_plain_env["WHISPER_MODEL"] = cfg.model
+            elif template_json.startswith("video-") and cfg.model:
+                custom_plain_env["VIDEO_MODEL"] = cfg.model
             if cfg.custom and cfg.custom.env:
                 custom_plain_env.update(cfg.custom.env)
 
-            # Safety fallback: keep Whisper custom templates on GPU even if
-            # a stale template payload does not include explicit env values.
             if template_json.startswith("whisper-"):
                 custom_plain_env.setdefault("WHISPER_DEVICE", "cuda")
                 custom_plain_env.setdefault("WHISPER_COMPUTE_TYPE", "float16")
@@ -433,7 +433,7 @@ class VerdaService:
 
         scaling_options = ScalingOptions(
             min_replica_count=1,
-            max_replica_count=3,
+            max_replica_count=1,
             scale_down_policy=ScalingPolicy(delay_seconds=300),
             scale_up_policy=ScalingPolicy(delay_seconds=0),
             queue_message_ttl_seconds=500,
@@ -547,7 +547,7 @@ class VerdaService:
         # Create scaling configuration (minimal for dev/playground use)
         scaling_options = ScalingOptions(
             min_replica_count=1,
-            max_replica_count=3,
+            max_replica_count=1,
             scale_down_policy=ScalingPolicy(delay_seconds=300),
             scale_up_policy=ScalingPolicy(delay_seconds=0),
             queue_message_ttl_seconds=500,
@@ -848,8 +848,9 @@ class VerdaService:
                 }
                 for d in deployments
             ]
-        except APIException as e:
-            return [{"error": str(e)}]
+        except Exception as e:
+            print(f"Error fetching deployments: {e}")
+            return []
 
     def connect_to_existing(self, deployment_name: str, model_path: str = DEFAULT_MODEL) -> dict:
         """

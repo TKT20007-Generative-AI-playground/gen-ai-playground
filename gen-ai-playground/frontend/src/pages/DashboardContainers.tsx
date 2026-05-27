@@ -3,9 +3,11 @@ import { getRequestErrorMessage, isAxiosUnauthorized } from "../utils/errors"
 import {
   deployAudioModel,
   deployTextModel,
+  deployVideoModel,
   fetchDashboardContainers,
   fetchDeployableAudioModels,
   fetchDeployableTextModels,
+  fetchDeployableVideoModels,
   stopDashboardContainer,
 } from "../services/dashboardService"
 import {
@@ -36,7 +38,7 @@ interface DeployOption {
   id: string
   modelPath: string
   label: string
-  kind: "text" | "audio"
+  kind: "text" | "audio" | "video"
 }
 
 export default function DashboardContainers() {
@@ -49,6 +51,7 @@ export default function DashboardContainers() {
   const [deployOptions, setDeployOptions] = useState<DeployOption[]>([])
   const [textOpen, setTextOpen] = useState(true)
   const [audioOpen, setAudioOpen] = useState(true)
+  const [videoOpen, setVideoOpen] = useState(true)
 
   const isMobile = useMediaQuery("(max-width: 768px)")
   const textModels = deployOptions
@@ -84,6 +87,20 @@ export default function DashboardContainers() {
             modelPath: model.value,
             label: `Audio: ${model.label}`,
             kind: "audio",
+          })
+        }
+      } catch {
+        // silent
+      }
+
+      try {
+        const videoModels = await fetchDeployableVideoModels()
+        for (const model of videoModels) {
+          options.push({
+            id: `video::${model.value}`,
+            modelPath: model.value,
+            label: `Video: ${model.label}`,
+            kind: "video",
           })
         }
       } catch {
@@ -134,6 +151,8 @@ export default function DashboardContainers() {
     try {
       if (option.kind === "audio") {
         await deployAudioModel(option.modelPath)
+      } else if (option.kind === "video") {
+        await deployVideoModel(option.modelPath)
       } else {
         await deployTextModel(option.modelPath)
       }

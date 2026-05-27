@@ -1,0 +1,25 @@
+{
+  "engine": "custom",
+  "display_name": "Wan2.1 T2V 1.3B",
+  "model": "Wan-AI/Wan2.1-T2V-1.3B-Diffusers",
+  "explanation": "Deploy a custom text-to-video FastAPI container using the lightweight Wan2.1 T2V 1.3B Diffusers model.",
+  "short_explanation": "Lightweight Wan2.1 text-to-video custom container",
+  "gpu_types": ["h100", "h200", "b200"],
+  "custom": {
+    "image": "ghcr.io/tkt20007-generative-ai-playground/video-generator:v1",
+    "env": {
+      "VIDEO_DEVICE": "cuda",
+      "VIDEO_DTYPE": "float16",
+      "VIDEO_HEIGHT": "480",
+      "VIDEO_WIDTH": "832",
+      "VIDEO_NUM_FRAMES": "49",
+      "VIDEO_NUM_INFERENCE_STEPS": "20",
+      "VIDEO_GUIDANCE_SCALE": "5.0",
+      "VIDEO_FPS": "16",
+      "VIDEO_MAX_OUTPUT_MB": "12",
+      "VIDEO_CPU_OFFLOAD": "true",
+      "VIDEO_PRELOAD": "true"
+    }
+  },
+  "port": 9000
+}

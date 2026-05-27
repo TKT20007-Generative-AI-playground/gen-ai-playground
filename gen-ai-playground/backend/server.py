@@ -51,6 +51,7 @@ app.include_router(text.router)
 app.include_router(dashboard.router)
 app.include_router(invitations.router)
 app.include_router(audio.router)
+app.include_router(video.router)
 
 
 @app.get("/")
