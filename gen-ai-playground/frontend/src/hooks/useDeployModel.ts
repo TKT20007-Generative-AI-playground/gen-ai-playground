@@ -12,7 +12,7 @@ interface DeployModelService {
 export function useDeployModel(isLoggedIn: boolean, service: DeployModelService) {
     const [deployOptions, setDeployOptions] = useState<DeployOption[]>([])
     const [selectedDeployId, setSelectedDeployId] = useState<string | null>(null)
-    const [deployLoading, setDeployLoading] = useState(false)
+    const [deployLoadingById, setDeployLoadingById] = useState<Record<string, boolean>>({})
     const [deployError, setDeployError] = useState<string | null>(null)
 
     useEffect(() => {
@@ -33,11 +33,13 @@ export function useDeployModel(isLoggedIn: boolean, service: DeployModelService)
     }, [isLoggedIn, service])
 
 
-    const handleDeployModel = async () => {
-      if (!selectedDeployId) return
-      const selected = deployOptions.find(o => o.id === selectedDeployId)
+    const runDeploy = async (targetId: string | null) => {
+      if (!isLoggedIn) return
+      if (!targetId) return
+      if (deployLoadingById[targetId]) return
+      const selected = deployOptions.find(o => o.id === targetId)
       if (!selected) return
-      setDeployLoading(true)
+      setDeployLoadingById(prev => ({ ...prev, [targetId]: true }))
       setDeployError(null)
       try {
         await service.deploy(selected.modelPath)
@@ -48,10 +50,21 @@ export function useDeployModel(isLoggedIn: boolean, service: DeployModelService)
         setDeployError(detail)
         notifications.show({ title: "Start failed", message: detail || "Please try again.", color: "red" })
       } finally {
-        setDeployLoading(false)
+        setDeployLoadingById(prev => ({ ...prev, [targetId]: false }))
       }
     }
 
-    return { deployOptions, selectedDeployId, setSelectedDeployId, deployLoading, deployError, handleDeployModel }
+    const handleDeployModel = (overrideId?: string) => {
+      return (event?: { preventDefault?: () => void; stopPropagation?: () => void }) => {
+        event?.preventDefault?.()
+        event?.stopPropagation?.()
+        void runDeploy(overrideId ?? selectedDeployId)
+      }
+    }
+
+    const isDeploying = (id?: string | null) => !!(id && deployLoadingById[id])
+    const deployLoading = Object.values(deployLoadingById).some(Boolean)
+
+    return { deployOptions, selectedDeployId, setSelectedDeployId, deployLoading, deployError, handleDeployModel, isDeploying }
 
 }

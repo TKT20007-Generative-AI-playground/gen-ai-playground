@@ -76,7 +76,6 @@ function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string,
       return {
         value: m.value,
         label: `${emoji} ${m.label}`,
-        disabled: !isLive,
       }
     })
     .sort((a, b) => {
@@ -760,39 +759,6 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         Select up to {MAX_MODELS} models for text generation.
       </Text>
 
-      <>
-        <Select
-          label="Start model"
-          placeholder="Select model to start"
-          data={textDeploy.deployOptions.map(option => ({ value: option.id, label: option.label }))}
-          value={textDeploy.selectedDeployId}
-          onChange={textDeploy.setSelectedDeployId}
-          searchable
-          clearable
-        />
-
-        {textDeploy.deployOptions.length > 0 && (
-          <>
-            {textDeploy.deployError && (
-              <Alert color="red" variant="light" p="xs">
-                {textDeploy.deployError}
-              </Alert>
-            )}
-            {textDeploy.selectedDeployId && (
-              <Button
-                className="app-btn-soft-blue"
-                variant="light"
-                onClick={textDeploy.handleDeployModel}
-                loading={textDeploy.deployLoading}
-                disabled={textDeploy.deployLoading}
-              >
-                Start model
-              </Button>
-            )}
-          </>
-        )}
-      </>
-
       <MultiSelect
         label="Models"
         placeholder={selectedModels.length > 0 ? "" : "Select models"}
@@ -802,9 +768,28 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         searchable
         clearable
         disabled={isBusy}
-        onChange={(models) => {
-          setSelectedModels(models)
+         onChange={next => {
+          const liveOnly = next.filter(model => (modelStatuses[model] ?? "unknown") === "live")
+          setSelectedModels(liveOnly)
         }}
+          renderOption={({ option }) => (
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <span>{option.label}</span>
+            {(modelStatuses[option.value] ?? "unknown") !== "live" ? (
+              <Button
+                type="button"
+                variant="filled"
+                size="xs"
+                color="green"
+                loading={textDeploy.isDeploying(option.value)}
+                disabled={textDeploy.isDeploying(option.value) || (modelStatuses[option.value] ?? "unknown") === "starting"}
+                onClick={textDeploy.handleDeployModel(option.value)}
+              >
+                Start model
+              </Button>
+            ) : null}
+          </div>
+        )}
       />
       <Tooltip label="Join an existing conversation. You will need a conversation link and an invite code (If they didn't add you as a participant) from the person who created it." withArrow multiline w={280}>
         <Button className="app-btn-soft-blue" variant="light" onClick={() => setJoinModalOpen(true)}>

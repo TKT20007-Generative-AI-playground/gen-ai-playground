@@ -64,7 +64,6 @@ function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string,
       return {
         value: model.value,
         label: `${emoji} ${model.label}`,
-        disabled: !isLive,
       }
     })
     .sort((a, b) => {
@@ -467,50 +466,45 @@ export default function Transcribe() {
         Select up to {MAX_AUDIO_MODELS} models for transcription.
       </Text>
 
-      <>
-        <Select
-          label="Start model"
-          placeholder="Select model to start"
-          data={audioDeploy.deployOptions.map(option => ({ value: option.id, label: option.label }))}
-          value={audioDeploy.selectedDeployId}
-          onChange={audioDeploy.setSelectedDeployId}
-          searchable
-          clearable
-        />
-        
-        {audioDeploy.deployOptions.length > 0 && (
-          <>
-            {audioDeploy.deployError && (
-              <Alert color="red" variant="light" p="xs">
-                {audioDeploy.deployError}
-              </Alert>
-            )}
-            {audioDeploy.selectedDeployId && (
-              <Button
-                className="app-btn-soft-blue"
-                variant="light"
-                onClick={audioDeploy.handleDeployModel}
-                loading={audioDeploy.deployLoading}
-                disabled={audioDeploy.deployLoading}
-              >
-                Start model
-              </Button>
-            )}
-          </>
-        )}
-      </>
-
       <MultiSelect
         label="Models"
         placeholder={selectedModels.length > 0 ? "" : "Select models"}
         data={dropdownData}
         value={selectedModels}
-        onChange={setSelectedModels}
+        onChange={next => {
+          const liveOnly = next.filter(model => (modelStatuses[model] ?? "unknown") === "live")
+          setSelectedModels(liveOnly)
+        }}
         maxValues={MAX_AUDIO_MODELS}
         searchable
         clearable
         disabled={isLoading || isRecording}
+        renderOption={({ option }) => (
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <span>{option.label}</span>
+            {(modelStatuses[option.value] ?? "unknown") !== "live" ? (
+              <Button
+                type="button"
+                variant="filled"
+                size="xs"
+                color="green"
+                loading={audioDeploy.isDeploying(option.value)}
+                disabled={audioDeploy.isDeploying(option.value) || (modelStatuses[option.value] ?? "unknown") === "starting"}
+                onClick={audioDeploy.handleDeployModel(option.value)}
+              >
+                Start model
+              </Button>
+            ) : null}
+          </div>
+        )}
+       
       />
+
+      {audioDeploy.deployError && (
+        <Alert color="red" variant="light" p="xs">
+          {audioDeploy.deployError}
+        </Alert>
+      )}
 
       {selectedModels.length > 0 ? (
         <>
