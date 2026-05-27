@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
-from app.routers import auth, images, text, dashboard, invitations, audio
+from app.routers import auth, images, text, dashboard, invitations, audio, video
 from app.container_handler import ContainerHandler
 
 

@@ -60,6 +60,9 @@ export default function DashboardContainers() {
   const audioModels = deployOptions
     .filter(m => m.kind === "audio")
     .map(m => ({ id: m.id, label: m.label.replace("Audio: ", "") }))
+  const videoModels = deployOptions
+    .filter(m => m.kind === "video")
+    .map(m => ({ id: m.id, label: m.label.replace("Video: ", "") }))
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -234,6 +237,13 @@ export default function DashboardContainers() {
               onSelect={setSelectedModelId}
               titleMarginTop="xs"
             />
+            <DeployableModelChips
+              title="Video Models"
+              models={videoModels}
+              selectedId={selectedModelId}
+              onSelect={setSelectedModelId}
+              titleMarginTop="xs"
+            />
           </Stack>
 
           {selectedModelId && (
@@ -301,6 +311,17 @@ export default function DashboardContainers() {
                   models={audioModels}
                   isOpen={audioOpen}
                   onToggle={() => setAudioOpen(o => !o)}
+                  onDeploy={handleDeployById}
+                  deployLoading={deployLoading}
+                />
+              </Box>
+
+              <Box mt="xs">
+                <DeployableModelList
+                  title="Video Models"
+                  models={videoModels}
+                  isOpen={videoOpen}
+                  onToggle={() => setVideoOpen(o => !o)}
                   onDeploy={handleDeployById}
                   deployLoading={deployLoading}
                 />
