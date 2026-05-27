@@ -8,7 +8,6 @@ import {
   MultiSelect,
   NumberInput,
   Paper,
-  Select,
   Switch,
   Text,
   ScrollArea,

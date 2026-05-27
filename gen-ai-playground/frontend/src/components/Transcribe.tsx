@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { Alert, Button, FileInput, MultiSelect, Select, Text, Textarea } from "@mantine/core"
+import { Alert, Button, FileInput, MultiSelect, Text, Textarea } from "@mantine/core"
 
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
