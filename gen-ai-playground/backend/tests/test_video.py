@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.config import settings
 from server import app
+from app.container_handler import ContainerHandler
 
 
 @pytest.fixture
@@ -61,6 +62,7 @@ def auth_headers(auth_token):
 
 @pytest.fixture
 def client(mock_db):
+    app.state.container_handler = ContainerHandler()
     with patch("app.database.db_manager.db", mock_db):
         with patch("app.database.get_database", return_value=mock_db):
             yield TestClient(app)
@@ -119,6 +121,7 @@ def test_video_deploy_uses_resolved_template(
     mock_verda_service.deploy_from_template.assert_called_once_with(
         template_json="video-a.json",
         deployment_name=None,
+        container_handler=app.state.container_handler,
     )
 
 
@@ -147,6 +150,7 @@ def test_video_deploy_accepts_wan_human_label_alias(
     mock_verda_service.deploy_from_template.assert_called_once_with(
         template_json="video-wan21-t2v-1-3b-custom.json",
         deployment_name=None,
+        container_handler=app.state.container_handler,
     )
 
 
