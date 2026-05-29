@@ -36,6 +36,7 @@ const Front = () => {
   const hoverCard2 = useFadeIn(300)
   const hoverCard3 = useFadeIn(400)
   const hoverCard4 = useFadeIn(500)
+  const videoGenCard = useFadeIn(600)
   const bannerFade = useFadeIn(600)
   const carouselFade = useFadeIn(400)
   const { isLoggedIn } = useAuth()
@@ -187,6 +188,15 @@ const Front = () => {
             cardRef={hoverCard4.ref}
             isVisible={hoverCard4.isVisible}
             onClick={() => handleLoggedIn("Transcribe")}
+          />
+          <HoverCard
+            image="/videos/videogenerator.mp4"
+            title="Video Generator"
+            description="Generate videos from text prompts using state-of-the-art video generation models."
+            buttonText="Go to video generator"
+            cardRef={videoGenCard.ref}
+            isVisible={videoGenCard.isVisible}
+            onClick={() => handleLoggedIn("VideoGenerator")}
           />
         </Group>
       </Box>
