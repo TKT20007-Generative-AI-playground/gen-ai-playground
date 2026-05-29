@@ -7,10 +7,18 @@
 
 ## Gen-AI-Playground
 
-This project is a generative AI playground for comparing both text-to-image and text generation models. You can provide a desired image description to compare different image models, compare various text models, and also edit images using different models.
+This project is a generative AI playground for exploring and comparing generative AI workflows across text, image, audio, and video.
 
 The project is carried out in cooperation with Verda
 
+## Features
+- Compare text generation models.
+- Compare text-to-image models.
+- Edit images using multiple models.
+- Generate short videos from text prompts.
+- Transcribe audio from uploads or recordings using Whisper models.
+- Admin dashboard: deploy, view status, and stop model containers.
+- Admin dashboard: manage users and invitation codes.
 
 ## Contents
 
