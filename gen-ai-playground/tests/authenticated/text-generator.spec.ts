@@ -22,7 +22,7 @@ async function selectTextModel(page: Page, modelLabel: string) {
   const modelInput = page.getByPlaceholder('Select models');
   await modelInput.click();
 
-  const option = page.locator('div[role="option"][data-combobox-option="true"]', {
+  const option = page.locator('div[role="option"][data-combobox-option="true"]:visible', {
     hasText: modelLabel,
   }).first();
   await option.click();
@@ -135,19 +135,19 @@ test.describe('Text Generator flows', () => {
     const modelInput = page.locator('input[data-type="visible"][aria-haspopup="listbox"]');
 
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model A' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model A' }).first().click();
     await expect(page.getByRole('button', { name: 'Clear' })).toHaveCount(1);
 
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model B' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model B' }).first().click();
     await expect(page.getByRole('button', { name: 'Clear' })).toHaveCount(2);
 
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model C' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model C' }).first().click();
     await expect(page.getByRole('button', { name: 'Clear' })).toHaveCount(3);
 
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model D' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model D' }).first().click();
     await expect(page.getByRole('button', { name: 'Clear' })).toHaveCount(4);
 
     await expect(page.getByText('No messages yet.')).toHaveCount(4);
@@ -158,18 +158,18 @@ test.describe('Text Generator flows', () => {
     const modelInput = page.locator('input[data-type="visible"][aria-haspopup="listbox"]');
 
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model A' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model A' }).first().click();
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model B' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model B' }).first().click();
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model C' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model C' }).first().click();
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model D' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model D' }).first().click();
 
     await expect(page.getByRole('button', { name: 'Clear' })).toHaveCount(4);
 
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model E' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model E' }).first().click();
 
     await expect(page.getByRole('button', { name: 'Clear' })).toHaveCount(4);
     await expect(page.getByText('No messages yet.')).toHaveCount(4);
@@ -179,17 +179,17 @@ test.describe('Text Generator flows', () => {
     const modelInput = page.locator('input[data-type="visible"][aria-haspopup="listbox"]');
 
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model A' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model A' }).first().click();
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model B' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model B' }).first().click();
 
     await expect(page.getByRole('button', { name: 'Clear' })).toHaveCount(2);
     await expect(page.getByPlaceholder('Type your message to send to selected models...')).toBeVisible();
 
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model A' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model A' }).first().click();
     await modelInput.click();
-    await page.locator('div[role="option"][data-combobox-option="true"]', { hasText: 'Model B' }).first().click();
+    await page.locator('div[role="option"][data-combobox-option="true"]:visible', { hasText: 'Model B' }).first().click();
 
     await expect(page.getByRole('button', { name: 'Clear' })).toHaveCount(0);
     await expect(page.getByPlaceholder('Type your message to send to selected models...')).toHaveCount(0);

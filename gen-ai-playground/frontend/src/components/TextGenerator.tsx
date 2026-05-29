@@ -1,5 +1,5 @@
 import { useAuth } from "../context/AuthContext"
-import { useState, useEffect, useRef, useCallback, type KeyboardEvent } from "react"
+import { useState, useEffect, useRef, useCallback, type KeyboardEvent, useMemo } from "react"
 
 import {
   Alert,
@@ -21,8 +21,10 @@ import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
 import { ShareConversationModal } from "./SharedConversationsModal"
 import { fetchTextModels, fetchTextModelStatuses, fetchTextDeployments } from "../services/textService"
+import { deployTextModel} from "../services/dashboardService"
 import { useNavigate } from "react-router-dom"
 import { streamText, type StreamTextHandle } from "../services/streamService"
+import { useDeployModel } from "../hooks/useDeployModel"
 
 type ModelOption = {
   value: string
@@ -73,7 +75,6 @@ function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string,
       return {
         value: m.value,
         label: `${emoji} ${m.label}`,
-        disabled: !isLive,
       }
     })
     .sort((a, b) => {
@@ -428,6 +429,8 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
     fetchModels()
   }, [enableTestModel, isLoggedIn])
 
+
+
   // Poll model statuses (background, for dropdown indicators)
   const fetchStatuses = useCallback(async () => {
     try {
@@ -445,10 +448,34 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
 
   useEffect(() => {
     if (!isLoggedIn) return
+
     fetchStatuses()
-    const id = setInterval(fetchStatuses, 30000)
-    return () => clearInterval(id)
+    const interval = window.setInterval(fetchStatuses, 30000)
+    return () => window.clearInterval(interval)
   }, [fetchStatuses, isLoggedIn])
+
+
+  const textService = useMemo(() => ({
+    fetchOptions: async () => {
+      const availableModels = await fetchTextModels()
+      return availableModels.map(model => ({ value: model.value, label: model.label }))
+    },
+    deploy: async (modelPath: string) => {
+      await deployTextModel(modelPath)
+    },
+    fetchStatuses: async () => {
+      const statuses = await fetchTextModelStatuses()
+      if (enableTestModel) {
+        setModelStatuses({ ...statuses, test_model: "live" })
+      } else {
+        setModelStatuses({ ...statuses })
+      }
+    }
+  }), [enableTestModel])
+
+  const textDeploy = useDeployModel(isLoggedIn, textService)
+
+
 
   const getModelLabel = (value: string) => modelOptions.find((m) => m.value === value)?.label ?? value
   const getModelOption = (value: string) => modelOptions.find((m) => m.value === value)
@@ -740,9 +767,28 @@ export default function TextGenerator({ opened }: { opened: boolean }) {
         searchable
         clearable
         disabled={isBusy}
-        onChange={(models) => {
-          setSelectedModels(models)
+         onChange={next => {
+          const liveOnly = next.filter(model => (modelStatuses[model] ?? "unknown") === "live")
+          setSelectedModels(liveOnly)
         }}
+          renderOption={({ option }) => (
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <span>{option.label}</span>
+            {(modelStatuses[option.value] ?? "unknown") !== "live" ? (
+              <Button
+                type="button"
+                variant="filled"
+                size="xs"
+                color="green"
+                loading={textDeploy.isDeploying(option.value)}
+                disabled={textDeploy.isDeploying(option.value) || (modelStatuses[option.value] ?? "unknown") === "starting"}
+                onClick={textDeploy.handleDeployModel(option.value)}
+              >
+                Start model
+              </Button>
+            ) : null}
+          </div>
+        )}
       />
       <Tooltip label="Join an existing conversation. You will need a conversation link and an invite code (If they didn't add you as a participant) from the person who created it." withArrow multiline w={280}>
         <Button className="app-btn-soft-blue" variant="light" onClick={() => setJoinModalOpen(true)}>

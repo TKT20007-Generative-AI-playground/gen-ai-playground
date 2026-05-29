@@ -11,6 +11,7 @@ import mongomock
 
 from server import app
 from app.config import settings
+from app.container_handler import ContainerHandler
 
 
 # ---------------------------------------------------------------------------
@@ -65,6 +66,7 @@ def admin_client(mock_db, admin_user):
     """TestClient whose requests carry a valid admin JWT."""
     with patch("app.database.db_manager.db", mock_db), \
          patch("app.database.get_database", return_value=mock_db):
+        app.state.container_handler = ContainerHandler()
         client = TestClient(app)
         token = _make_token("admin", is_admin=True)
         client.headers.update({"Authorization": f"Bearer {token}"})
@@ -76,6 +78,7 @@ def regular_client(mock_db, regular_user):
     """TestClient whose requests carry a valid non-admin JWT."""
     with patch("app.database.db_manager.db", mock_db), \
          patch("app.database.get_database", return_value=mock_db):
+        app.state.container_handler = ContainerHandler()
         client = TestClient(app)
         token = _make_token("regularuser", is_admin=False)
         client.headers.update({"Authorization": f"Bearer {token}"})
@@ -87,6 +90,7 @@ def unauthenticated_client(mock_db):
     """TestClient with no Authorization header."""
     with patch("app.database.db_manager.db", mock_db), \
          patch("app.database.get_database", return_value=mock_db):
+        app.state.container_handler = ContainerHandler()
         yield TestClient(app)
 
 

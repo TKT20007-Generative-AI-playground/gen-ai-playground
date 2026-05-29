@@ -13,6 +13,9 @@ import {
   type VideoModelApiItem,
   type VideoModelStatuses,
 } from "../services/videoService"
+import { deployVideoModel } from "../services/dashboardService"
+import { useDeployModel } from "../hooks/useDeployModel"
+import { useAuth } from "../context/AuthContext"
 
 type ModelStatus = "live" | "starting" | "offline" | "unknown"
 
@@ -31,7 +34,6 @@ function buildDropdownData(modelOptions: VideoModelApiItem[], statuses: VideoMod
       return {
         value: model.value,
         label: `${emoji} ${model.label}`,
-        disabled: status !== "live",
       }
     })
     .sort((a, b) => {
@@ -189,6 +191,24 @@ export default function VideoGenerator() {
     link.click()
   }
 
+
+  const { isLoggedIn } = useAuth()
+  const videoService = useMemo(() => ({
+    fetchOptions: async () => {
+      const models = await fetchVideoModels()
+      return models.map(m => ({ value: m.value, label: m.label }))
+    },
+    deploy: async (modelPath: string) => {
+      await deployVideoModel(modelPath)
+    },
+    fetchStatuses: async () => {
+        const statuses = await fetchVideoModelStatuses()
+        setModelStatuses(statuses)
+      }
+  }), [])
+
+  const videoDeploy = useDeployModel(isLoggedIn, videoService)
+
   return (
     <Stack maw={1100} mx="auto" p="md" gap="md">
       <Text c="dimmed" size="sm">
@@ -200,10 +220,31 @@ export default function VideoGenerator() {
         placeholder="Select a live video model"
         data={dropdownData}
         value={selectedModel}
-        onChange={setSelectedModel}
+        onChange={next => {
+          const liveOnly = next && (modelStatuses[next] ?? "unknown") === "live" ? next : null
+          setSelectedModel(liveOnly)
+        }}
         searchable
         clearable
         disabled={loading}
+        renderOption={({ option }) => (
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <span>{option.label}</span>
+            {(modelStatuses[option.value] ?? "unknown") !== "live" ? (
+              <Button
+                type="button"
+                variant="filled"
+                size="xs"
+                color="green"
+                loading={videoDeploy.isDeploying(option.value)}
+                disabled={videoDeploy.isDeploying(option.value) || (modelStatuses[option.value] ?? "unknown") === "starting"}
+                onClick={videoDeploy.handleDeployModel(option.value)}
+              >
+                Start model
+              </Button>
+            ) : null}
+          </div>
+        )}
       />
 
       {selectedModel && selectedStatus !== "live" ? (

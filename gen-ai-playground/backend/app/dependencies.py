@@ -1,12 +1,14 @@
 """
 FastAPI dependencies for authentication and authorization
 """
-from fastapi import HTTPException, Header, Depends, Cookie, WebSocket
+from fastapi import HTTPException, Header, Depends, Cookie, WebSocket, Request
 from pymongo.database import Database
 import jwt
 from app.config import settings
 from app.database import get_database
 from app.models import UserInfo
+from app.container_handler import ContainerHandler
+
 
 
 def get_current_user(
@@ -125,3 +127,6 @@ def get_admin_user(
             detail="Admin access required"
         )
     return current_user
+
+def get_container_handler(request: Request) -> ContainerHandler:
+    return request.app.state.container_handler

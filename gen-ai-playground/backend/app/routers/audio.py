@@ -13,10 +13,11 @@ from pymongo.errors import PyMongoError
 
 from app.config import settings
 from app.database import get_database
-from app.dependencies import get_admin_user, get_current_user, validate_csrf_token
+from app.dependencies import get_admin_user, get_container_handler, get_current_user, validate_csrf_token
 from app.models import DeployModelRequest, DeploymentStatusResponse, HistoryResponseAudio, UserInfo
 from app.template_discovery import _deployment_name_from_filename, get_audio_template_map
 from app.verda_service import verda_service
+from app.container_handler import ContainerHandler
 
 
 router = APIRouter(prefix="/audio", tags=["audio"])
@@ -315,8 +316,9 @@ def get_audio_model_statuses(_current_user: UserInfo = Depends(get_current_user)
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_audio_model(
     request: DeployModelRequest,
-    current_user: UserInfo = Depends(get_admin_user),
+    current_user: UserInfo = Depends(get_current_user),
     _: None = Depends(validate_csrf_token),
+    container_handler: ContainerHandler = Depends(get_container_handler),
 ):
     """Deploy an audio transcription model template on Verda."""
     print(f"User {current_user.username} requesting audio model deployment: {request.model_path}")
@@ -332,6 +334,7 @@ def deploy_audio_model(
         result = verda_service.deploy_from_template(
             template_json=template,
             deployment_name=request.deployment_name,
+            container_handler=container_handler,
         )
         return DeploymentStatusResponse(**result)
     except RuntimeError as exc:
@@ -400,6 +403,7 @@ async def transcribe_audio(
     vad_filter: bool = Form(True),
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
+    container_handler: ContainerHandler = Depends(get_container_handler),
     _: None = Depends(validate_csrf_token),
 ) -> dict[str, Any]:
     """Proxy file transcription to a selected deployed Verda audio container."""
@@ -420,6 +424,9 @@ async def transcribe_audio(
     if language:
         form_data["language"] = language
 
+    
+    container_handler.set_latest_request_timestamp(deployment_name)
+    
     started_at = time.perf_counter()
     try:
         result = await _post_with_fallback_paths(

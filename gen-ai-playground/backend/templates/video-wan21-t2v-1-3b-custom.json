@@ -6,7 +6,7 @@
   "short_explanation": "Lightweight Wan2.1 text-to-video custom container",
   "gpu_types": ["h100", "h200", "b200"],
   "custom": {
-    "image": "ghcr.io/tkt20007-generative-ai-playground/video-generator:v1",
+    "image": "ghcr.io/tkt20007-generative-ai-playground/video-generator:v2",
     "env": {
       "VIDEO_DEVICE": "cuda",
       "VIDEO_DTYPE": "float16",

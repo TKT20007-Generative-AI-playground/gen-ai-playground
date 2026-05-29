@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Alert, Button, FileInput, MultiSelect, Text, Textarea } from "@mantine/core"
 
 import ActionStatus from "./ActionStatus"
@@ -10,6 +10,9 @@ import {
   transcribeAudio,
 } from "../services/audioService"
 import { notifications } from '@mantine/notifications'
+import { useDeployModel } from "../hooks/useDeployModel"
+import { useAuth } from "../context/AuthContext"
+import { deployAudioModel, fetchDeployableAudioModels} from "../services/dashboardService"
 
 type TranscriptionSegment = {
   start: number
@@ -61,7 +64,6 @@ function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string,
       return {
         value: model.value,
         label: `${emoji} ${model.label}`,
-        disabled: !isLive,
       }
     })
     .sort((a, b) => {
@@ -102,6 +104,26 @@ export default function Transcribe() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const recordingChunksRef = useRef<Blob[]>([])
+
+
+  const { isLoggedIn } = useAuth()
+  
+  const audioService = useMemo(() => ({
+    fetchOptions: async () => {
+      const availableModels = await fetchDeployableAudioModels()
+      return availableModels.map(model => ({ value: model.value, label: model.label }))
+    },
+    deploy: async (modelPath: string) => {
+      await deployAudioModel(modelPath)
+    },
+    fetchStatuses: async () => {
+      const statuses = await fetchAudioModelStatusesRequest()
+      setModelStatuses(statuses)
+    }
+  }), [])
+
+  const audioDeploy = useDeployModel(isLoggedIn, audioService)
+
 
   const stopActiveStream = () => {
     if (!streamRef.current) return
@@ -449,12 +471,40 @@ export default function Transcribe() {
         placeholder={selectedModels.length > 0 ? "" : "Select models"}
         data={dropdownData}
         value={selectedModels}
-        onChange={setSelectedModels}
+        onChange={next => {
+          const liveOnly = next.filter(model => (modelStatuses[model] ?? "unknown") === "live")
+          setSelectedModels(liveOnly)
+        }}
         maxValues={MAX_AUDIO_MODELS}
         searchable
         clearable
         disabled={isLoading || isRecording}
+        renderOption={({ option }) => (
+          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+            <span>{option.label}</span>
+            {(modelStatuses[option.value] ?? "unknown") !== "live" ? (
+              <Button
+                type="button"
+                variant="filled"
+                size="xs"
+                color="green"
+                loading={audioDeploy.isDeploying(option.value)}
+                disabled={audioDeploy.isDeploying(option.value) || (modelStatuses[option.value] ?? "unknown") === "starting"}
+                onClick={audioDeploy.handleDeployModel(option.value)}
+              >
+                Start model
+              </Button>
+            ) : null}
+          </div>
+        )}
+       
       />
+
+      {audioDeploy.deployError && (
+        <Alert color="red" variant="light" p="xs">
+          {audioDeploy.deployError}
+        </Alert>
+      )}
 
       {selectedModels.length > 0 ? (
         <>

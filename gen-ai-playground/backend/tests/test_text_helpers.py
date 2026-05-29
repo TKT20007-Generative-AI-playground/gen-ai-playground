@@ -105,13 +105,15 @@ class TestTextHelpers:
         monkeypatch.setattr(
             text_router.verda_service,
             "deploy_from_template",
-            lambda template_json: {"status": "ok", "template": template_json},
+            lambda template_json, container_handler: {"status": "ok", "template": template_json},
         )
-        assert text_router._deploy_model_internal("Model A") == {"status": "ok", "template": "a.json"}
+        fake_handler = object()
+        assert text_router._deploy_model_internal("Model A", fake_handler) == {"status": "ok", "template": "a.json"}
 
     def test_deploy_model_internal_unknown(self, monkeypatch):
         monkeypatch.setattr(text_router, "_resolve_template_name", lambda _model: None)
-        result = text_router._deploy_model_internal("Unknown")
+        fake_handler = object()
+        result = text_router._deploy_model_internal("Unknown", fake_handler)
         assert "error" in result
 
     def test_check_deployment_health(self, monkeypatch):
@@ -150,6 +152,9 @@ class TestHandleLlmReply:
                 model_key="Model A",
                 db=mock_db,
                 cur_user=UserInfo(username="alice", is_admin=False),
+                container_handler=SimpleNamespace(
+                    set_latest_request_timestamp=lambda *_args, **_kwargs: None
+                ),
             )
         )
 
@@ -181,6 +186,9 @@ class TestHandleLlmReply:
                 model_key="Model A",
                 db=mock_db,
                 cur_user=UserInfo(username="alice", is_admin=False),
+                container_handler=SimpleNamespace(
+                    set_latest_request_timestamp=lambda *_args, **_kwargs: None
+                ),
             )
         )
 
@@ -258,6 +266,9 @@ class TestHandleLlmReply:
                 model_key="Model A",
                 db=mock_db,
                 cur_user=UserInfo(username="alice", is_admin=False),
+                container_handler=SimpleNamespace(
+                    set_latest_request_timestamp=lambda *_args, **_kwargs: None
+                ),
             )
         )
 

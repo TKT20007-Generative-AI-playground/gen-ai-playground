@@ -35,6 +35,10 @@ def _make_api_exception(code: str, message: str):
         return APIException(500, code, message)
 
 
+def _dummy_container_handler():
+    return SimpleNamespace(add_container=lambda *_args, **_kwargs: None)
+
+
 class TestCustomTemplateDeploymentPayload:
     def test_custom_whisper_payload_sets_expected_env_and_skips_hf_secret(self):
         service = VerdaService()
@@ -69,7 +73,10 @@ class TestCustomTemplateDeploymentPayload:
             patch("app.verda_service.Container", side_effect=_ns_factory),
             patch("app.verda_service.Deployment", side_effect=_ns_factory),
         ):
-            result = service.deploy_from_template("whisper-faster-small-custom.json")
+            result = service.deploy_from_template(
+                "whisper-faster-small-custom.json",
+                container_handler=_dummy_container_handler(),
+            )
 
         assert result["name"] == "whisper-faster-small-custom"
         assert result["status"] == "deploying"
@@ -125,7 +132,10 @@ class TestCustomTemplateDeploymentPayload:
             patch("app.verda_service.Container", side_effect=_ns_factory),
             patch("app.verda_service.Deployment", side_effect=_ns_factory),
         ):
-            result = service.deploy_from_template("video-wan21-t2v-1-3b-custom.json")
+            result = service.deploy_from_template(
+                "video-wan21-t2v-1-3b-custom.json",
+                container_handler=_dummy_container_handler(),
+            )
 
         assert result["name"] == "video-wan21-t2v-1-3b-custom"
         mock_ensure_hf_secret.assert_not_called()
@@ -409,7 +419,10 @@ class TestDeployFromTemplateEngines:
             patch("app.verda_service.VolumeMount", side_effect=_ns_factory),
             patch("app.verda_service.VolumeMountType", side_effect=_ns_factory),
         ):
-            service.deploy_from_template("deepseek-sglang-fp8.json")
+            service.deploy_from_template(
+                "deepseek-sglang-fp8.json",
+                container_handler=_dummy_container_handler(),
+            )
 
         mock_ensure_hf.assert_called_once()
 
@@ -453,7 +466,10 @@ class TestDeployFromTemplateEngines:
             patch("app.verda_service.VolumeMount", side_effect=_ns_factory),
             patch("app.verda_service.VolumeMountType", side_effect=_ns_factory),
         ):
-            service.deploy_from_template("qwen-vllm.json")
+            service.deploy_from_template(
+                "qwen-vllm.json",
+                container_handler=_dummy_container_handler(),
+            )
 
         mock_ensure_hf.assert_called_once()
 
@@ -493,7 +509,10 @@ class TestDeployFromTemplateEngines:
             patch("app.verda_service.Deployment", side_effect=_ns_factory),
         ):
             with pytest.raises(NoComputeResourcesError, match="No compute resources available for 8 GPUs"):
-                service.deploy_from_template("big-model.json")
+                service.deploy_from_template(
+                    "big-model.json",
+                    container_handler=_dummy_container_handler(),
+                )
 
 
 class TestGetDeploymentStatus:

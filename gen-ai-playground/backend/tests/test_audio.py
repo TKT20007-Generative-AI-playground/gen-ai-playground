@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 
 from app.config import settings
 from server import app
+from app.container_handler import ContainerHandler
 
 
 @pytest.fixture
@@ -67,6 +68,7 @@ def auth_headers(auth_token):
 
 @pytest.fixture
 def client(mock_db):
+    app.state.container_handler = ContainerHandler()
     with patch("app.database.db_manager.db", mock_db):
         with patch("app.database.get_database", return_value=mock_db):
             yield TestClient(app)

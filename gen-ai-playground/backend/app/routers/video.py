@@ -12,7 +12,7 @@ from pymongo.errors import PyMongoError
 
 from app.config import settings
 from app.database import get_database
-from app.dependencies import get_admin_user, get_current_user, validate_csrf_token
+from app.dependencies import get_admin_user, get_current_user, validate_csrf_token, get_container_handler
 from app.models import (
     DeployModelRequest,
     DeploymentStatusResponse,
@@ -22,6 +22,7 @@ from app.models import (
 )
 from app.template_discovery import _deployment_name_from_filename, get_video_template_map
 from app.verda_service import verda_service
+from app.container_handler import ContainerHandler
 
 
 router = APIRouter(prefix="/video", tags=["video"])
@@ -238,6 +239,7 @@ def deploy_video_model(
     request: DeployModelRequest,
     current_user: UserInfo = Depends(get_admin_user),
     _: None = Depends(validate_csrf_token),
+    container_handler: ContainerHandler = Depends(get_container_handler),
 ):
     print(f"User {current_user.username} requesting video model deployment: {request.model_path}")
     template = _resolve_video_template_name(request.model_path)
@@ -252,6 +254,7 @@ def deploy_video_model(
         result = verda_service.deploy_from_template(
             template_json=template,
             deployment_name=request.deployment_name,
+            container_handler=container_handler,
         )
         return DeploymentStatusResponse(**result)
     except Exception as exc:
@@ -264,6 +267,7 @@ async def generate_video(
     current_user: UserInfo = Depends(get_current_user),
     db: Database = Depends(get_database),
     _: None = Depends(validate_csrf_token),
+    container_handler: ContainerHandler = Depends(get_container_handler),
 ) -> dict[str, Any]:
     prompt = request.prompt.strip()
     if not prompt:
@@ -274,6 +278,9 @@ async def generate_video(
     payload.pop("model_path", None)
 
     start = time.perf_counter()
+    
+    #set latest request timestamp for the vid container 
+    container_handler.set_latest_request_timestamp(deployment_name)
     try:
         result = await _post_video_generate(endpoint_url, payload)
     except httpx.HTTPStatusError as exc:
