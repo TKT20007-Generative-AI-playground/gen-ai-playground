@@ -31,12 +31,25 @@ const HoverCard = ({
       h={400}
       className={`hover-card fade-in ${isVisible ? "visible" : ""}`}
     >
-      <Box
-        className="hover-card-bg"
-        style={{
-          backgroundImage: `url(${image})`,
-        }}
-      />
+      {image && image.endsWith('.mp4') ? (
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="hover-card-bg"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+        >
+          <source src={image} type="video/mp4" />
+        </video>
+      ) : (
+        <Box
+          className="hover-card-bg"
+          style={{
+            backgroundImage: `url(${image})`,
+          }}
+        />
+      )}
 
       <Title order={3} className="hover-card-title">
         {title}

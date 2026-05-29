@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Alert, Badge, Button, Card, Group, Loader, NumberInput, Select, SimpleGrid, Stack, Text, Textarea } from "@mantine/core"
+import { Alert, Badge, Button, Card, Group, Loader, NumberInput, Select, SimpleGrid, Stack, Text, Textarea, Tooltip } from "@mantine/core"
+import { IconInfoCircle } from "@tabler/icons-react"
 import { notifications } from "@mantine/notifications"
 
 import ActionStatus from "./ActionStatus"
@@ -56,6 +57,15 @@ function getErrorDetail(err: unknown): string {
   }
   return "Video generation failed. Please try again."
 }
+
+const LabelWithTooltip = ({ label, tooltip }: { label: string; tooltip: string }) => (
+  <Group gap="xs" align="center" style={{ marginBottom: 4 }}>
+    <Text size="sm" fw={500}>{label}</Text>
+    <Tooltip label={tooltip} withArrow multiline w={250}>
+      <IconInfoCircle size={16} color="gray" style={{ cursor: 'help' }} />
+    </Tooltip>
+  </Group>
+);
 
 export default function VideoGenerator() {
   const [modelOptions, setModelOptions] = useState<VideoModelApiItem[]>([])
@@ -205,7 +215,7 @@ export default function VideoGenerator() {
       ) : null}
 
       <Textarea
-        label="Prompt"
+        label={<LabelWithTooltip label="Prompt" tooltip="Description of what should appear in the video." />}
         placeholder="A quiet Nordic forest at dawn, low mist, slow cinematic camera movement"
         minRows={4}
         maxLength={1500}
@@ -215,7 +225,7 @@ export default function VideoGenerator() {
       />
 
       <Textarea
-        label="Negative prompt"
+        label={<LabelWithTooltip label="Negative prompt" tooltip="Description of what to avoid in the video." />}
         placeholder="Optional"
         minRows={2}
         maxLength={1500}
@@ -225,15 +235,15 @@ export default function VideoGenerator() {
       />
 
       <SimpleGrid cols={{ base: 1, sm: 2, md: 5 }} spacing="sm">
-        <NumberInput label="Height" min={256} max={720} allowDecimal={false} clampBehavior="strict" value={height} onChange={value => setHeight(value as number | "")} disabled={loading} />
-        <NumberInput label="Width" min={256} max={1280} allowDecimal={false} clampBehavior="strict" value={width} onChange={value => setWidth(value as number | "")} disabled={loading} />
-        <NumberInput label="Frames" min={9} max={81} allowDecimal={false} clampBehavior="strict" value={numFrames} onChange={value => setNumFrames(value as number | "")} disabled={loading} />
-        <NumberInput label="Steps" min={4} max={40} allowDecimal={false} clampBehavior="strict" value={steps} onChange={value => setSteps(value as number | "")} disabled={loading} />
-        <NumberInput label="Seed" allowDecimal={false} value={seed} onChange={value => setSeed(value as number | "")} disabled={loading} />
+        <NumberInput label={<LabelWithTooltip label="Height" tooltip="Height of the generated video in pixels." />} min={256} max={720} allowDecimal={false} clampBehavior="strict" value={height} onChange={value => setHeight(value as number | "")} disabled={loading} />
+        <NumberInput label={<LabelWithTooltip label="Width" tooltip="Width of the generated video in pixels." />} min={256} max={1280} allowDecimal={false} clampBehavior="strict" value={width} onChange={value => setWidth(value as number | "")} disabled={loading} />
+        <NumberInput label={<LabelWithTooltip label="Frames" tooltip="Number of frames generated for the video." />} min={9} max={81} allowDecimal={false} clampBehavior="strict" value={numFrames} onChange={value => setNumFrames(value as number | "")} disabled={loading} />
+        <NumberInput label={<LabelWithTooltip label="Steps" tooltip="Number of denoising steps (higher = potentially better quality but slower)." />} min={4} max={40} allowDecimal={false} clampBehavior="strict" value={steps} onChange={value => setSteps(value as number | "")} disabled={loading} />
+        <NumberInput label={<LabelWithTooltip label="Seed" tooltip="Random seed for reproducibility. Leave empty for random." />} allowDecimal={false} value={seed} onChange={value => setSeed(value as number | "")} disabled={loading} />
       </SimpleGrid>
 
       <NumberInput
-        label="Guidance scale"
+        label={<LabelWithTooltip label="Guidance scale" tooltip="How closely the model reflects the prompt." />}
         min={1}
         max={12}
         step={0.5}
