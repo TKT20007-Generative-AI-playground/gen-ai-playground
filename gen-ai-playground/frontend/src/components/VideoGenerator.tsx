@@ -210,8 +210,9 @@ export default function VideoGenerator() {
         placeholder="Select a live video model"
         data={dropdownData}
         value={selectedModel}
-         onChange={next => {
-            setSelectedModel(next)         
+        onChange={next => {
+          const liveOnly = next && (modelStatuses[next] ?? "unknown") === "live" ? next : null
+          setSelectedModel(liveOnly)
         }}
         searchable
         clearable
