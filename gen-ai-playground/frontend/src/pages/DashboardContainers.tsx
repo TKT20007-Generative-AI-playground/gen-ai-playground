@@ -4,10 +4,12 @@ import {
   deployAudioModel,
   deployTextModel,
   deployVideoModel,
+  deployVisionModel,
   fetchDashboardContainers,
   fetchDeployableAudioModels,
   fetchDeployableTextModels,
   fetchDeployableVideoModels,
+  fetchDeployableVisionModels,
   stopDashboardContainer,
 } from "../services/dashboardService"
 import {
@@ -38,7 +40,7 @@ interface DeployOption {
   id: string
   modelPath: string
   label: string
-  kind: "text" | "audio" | "video"
+  kind: "text" | "audio" | "video" | "vision"
 }
 
 export default function DashboardContainers() {
@@ -52,6 +54,7 @@ export default function DashboardContainers() {
   const [textOpen, setTextOpen] = useState(true)
   const [audioOpen, setAudioOpen] = useState(true)
   const [videoOpen, setVideoOpen] = useState(true)
+  const [visionOpen, setVisionOpen] = useState(true)
 
   const isMobile = useMediaQuery("(max-width: 768px)")
   const textModels = deployOptions
@@ -63,6 +66,9 @@ export default function DashboardContainers() {
   const videoModels = deployOptions
     .filter(m => m.kind === "video")
     .map(m => ({ id: m.id, label: m.label.replace("Video: ", "") }))
+  const visionModels = deployOptions
+    .filter(m => m.kind === "vision")
+    .map(m => ({ id: m.id, label: m.label.replace("Vision: ", "") }))
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -104,6 +110,20 @@ export default function DashboardContainers() {
             modelPath: model.value,
             label: `Video: ${model.label}`,
             kind: "video",
+          })
+        }
+      } catch {
+        // silent
+      }
+
+      try {
+        const visionModels = await fetchDeployableVisionModels()
+        for (const model of visionModels) {
+          options.push({
+            id: `vision::${model.value}`,
+            modelPath: model.value,
+            label: `Vision: ${model.label}`,
+            kind: "vision",
           })
         }
       } catch {
@@ -156,6 +176,8 @@ export default function DashboardContainers() {
         await deployAudioModel(option.modelPath)
       } else if (option.kind === "video") {
         await deployVideoModel(option.modelPath)
+      } else if (option.kind === "vision") {
+        await deployVisionModel(option.modelPath)
       } else {
         await deployTextModel(option.modelPath)
       }
@@ -244,6 +266,13 @@ export default function DashboardContainers() {
               onSelect={setSelectedModelId}
               titleMarginTop="xs"
             />
+            <DeployableModelChips
+              title="Vision Models"
+              models={visionModels}
+              selectedId={selectedModelId}
+              onSelect={setSelectedModelId}
+              titleMarginTop="xs"
+            />
           </Stack>
 
           {selectedModelId && (
@@ -322,6 +351,17 @@ export default function DashboardContainers() {
                   models={videoModels}
                   isOpen={videoOpen}
                   onToggle={() => setVideoOpen(o => !o)}
+                  onDeploy={handleDeployById}
+                  deployLoading={deployLoading}
+                />
+              </Box>
+
+              <Box mt="xs">
+                <DeployableModelList
+                  title="Vision Models"
+                  models={visionModels}
+                  isOpen={visionOpen}
+                  onToggle={() => setVisionOpen(o => !o)}
                   onDeploy={handleDeployById}
                   deployLoading={deployLoading}
                 />

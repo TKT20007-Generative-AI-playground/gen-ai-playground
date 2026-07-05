@@ -293,4 +293,21 @@ class StreamRequest(BaseModel):
     deployment_name: str
     max_tokens: int = Field(default=256, ge=1, le=32768)
     model_path: Optional[str] = None
+
+
+# ---- Vision Models ----
+
+class VisionChatMessage(BaseModel):
+    """A single vision chat message"""
+    role: str  # 'user', 'assistant', or 'system'
+    content: List[Dict[str, Any]]
+
+class VisionChatRequest(BaseModel):
+    """Request model for vision chat completions"""
+    deployment_name: str
+    model_path: Optional[str] = None
+    messages: List[VisionChatMessage]
+    max_tokens: int = 512
+    temperature: float = 0.7
+    top_p: float = 0.9
     enable_thinking: bool = False

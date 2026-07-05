@@ -96,7 +96,7 @@ class TemplateConfig(BaseModel):
     display_name: Optional[str] = None
     explanation: Optional[str] = None
     short_explanation: Optional[str] = None
-    model_mode: Optional[Literal["thinking", "hybrid", "instruct"]] = None
+    model_mode: Optional[Literal["thinking", "hybrid", "instruct", "vision"]] = None
     trust_remote_code: Optional[bool] = None
     quantization: Optional[str] = None
     gpu_types: List[str] = Field(default_factory=list)

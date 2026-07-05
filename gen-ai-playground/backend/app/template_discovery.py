@@ -27,8 +27,12 @@ def _is_video_template(filename: str) -> bool:
     return filename.startswith("video-")
 
 
+def _is_vision_template(filename: str) -> bool:
+    return filename.startswith("vision-")
+
+
 def _is_text_template(filename: str) -> bool:
-    return not _is_audio_template(filename) and not _is_video_template(filename)
+    return not _is_audio_template(filename) and not _is_video_template(filename) and not _is_vision_template(filename)
 
 
 def _display_name_from_filename(filename: str) -> str:
@@ -131,10 +135,17 @@ def discover_video_templates() -> dict[str, str]:
     return names
 
 
+def discover_vision_templates() -> dict[str, str]:
+    names, _configs = _discover_templates_with_predicate(_is_vision_template)
+    return names
+
+
 _cache: dict[str, str] | None = None
 _config_cache: dict[str, TemplateConfig] | None = None
 _audio_cache: dict[str, str] | None = None
 _video_cache: dict[str, str] | None = None
+_vision_cache: dict[str, str] | None = None
+_vision_config_cache: dict[str, TemplateConfig] | None = None
 
 
 def _ensure_cache() -> None:
@@ -171,12 +182,32 @@ def get_video_template_map() -> dict[str, str]:
     return _video_cache
 
 
+def get_vision_template_map() -> dict[str, str]:
+    global _vision_cache, _vision_config_cache
+    if _vision_cache is None:
+        _vision_cache, _vision_config_cache = _discover_templates_with_predicate(
+            _is_vision_template
+        )
+    return _vision_cache
+
+
+def get_vision_template_configs() -> dict[str, TemplateConfig]:
+    """Return cached {template_filename: TemplateConfig} mapping for vision templates."""
+    global _vision_cache, _vision_config_cache
+    if _vision_cache is None:
+        _vision_cache, _vision_config_cache = _discover_templates_with_predicate(
+            _is_vision_template
+        )
+    return _vision_config_cache  # type: ignore[return-value]
+
+
 def refresh() -> dict[str, str]:
     """Re-scan the templates directory and update all caches."""
-    global _cache, _config_cache, _audio_cache, _video_cache
+    global _cache, _config_cache, _audio_cache, _video_cache, _vision_cache
     _cache, _config_cache = _discover_templates_with_predicate(
         _is_text_template
     )
     _audio_cache = discover_audio_templates()
     _video_cache = discover_video_templates()
+    _vision_cache = discover_vision_templates()
     return _cache

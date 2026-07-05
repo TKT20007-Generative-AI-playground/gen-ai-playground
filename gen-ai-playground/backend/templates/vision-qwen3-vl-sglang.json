@@ -1,0 +1,14 @@
+{
+  "engine": "sglang",
+  "model": "Qwen/Qwen3-VL-8B-Instruct",
+  "display_name": "Qwen3 VL 8B · SGLang",
+  "explanation": "Qwen3 VL model for vision-language tasks.",
+  "short_explanation": "Qwen3 VL SGLang",
+  "gpu_types": ["b200", "h100", "h200"],
+  "trust_remote_code": true,
+  "model_mode": "vision",
+  "sglang": {
+    "tp": 1,
+    "chat_template": "qwen2-vl"
+  }
+}
