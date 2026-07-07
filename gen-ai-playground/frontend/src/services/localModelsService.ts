@@ -74,13 +74,24 @@ function toUnreachable(err: unknown): never {
   throw err
 }
 
-/** Returns true if a local Ollama server answers. Never throws. */
-export async function pingOllama(signal?: AbortSignal): Promise<boolean> {
+/**
+ * Returns true if a local Ollama server answers. Never throws.
+ * Times out after `timeoutMs` so a reachable-but-silent host (e.g. a firewalled
+ * remote IP) doesn't hang the "checking" state forever.
+ */
+export async function pingOllama(signal?: AbortSignal, timeoutMs = 4000): Promise<boolean> {
+  const timeout = new AbortController()
+  const timer = setTimeout(() => timeout.abort(), timeoutMs)
+  const onAbort = () => timeout.abort()
+  signal?.addEventListener("abort", onAbort)
   try {
-    const res = await fetch(url("/api/tags"), { method: "GET", signal })
+    const res = await fetch(url("/api/tags"), { method: "GET", signal: timeout.signal })
     return res.ok
   } catch {
     return false
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener("abort", onAbort)
   }
 }
 
@@ -256,21 +267,25 @@ export async function pullModel(
   const emit = (line: string) => {
     const trimmed = line.trim()
     if (!trimmed) return
-    try {
-      const parsed = JSON.parse(trimmed) as {
-        status?: string
-        total?: number
-        completed?: number
-        error?: string
-      }
-      if (parsed.error) throw new Error(parsed.error)
-      const fraction =
-        parsed.total && parsed.completed ? parsed.completed / parsed.total : undefined
-      onProgress?.({ status: parsed.status ?? "downloading", fraction })
-    } catch (err) {
-      if (err instanceof Error && err.message) throw err
-      // Non-JSON keep-alive line — ignore.
+    let parsed: {
+      status?: string
+      total?: number
+      completed?: number
+      error?: string
     }
+    try {
+      parsed = JSON.parse(trimmed)
+    } catch {
+      // Non-JSON keep-alive / truncated partial line — ignore.
+      return
+    }
+    // Only a genuine Ollama error object aborts the pull; parse failures don't.
+    if (parsed.error) throw new Error(parsed.error)
+    const fraction =
+      parsed.total != null && parsed.completed != null && parsed.total > 0
+        ? parsed.completed / parsed.total
+        : undefined
+    onProgress?.({ status: parsed.status ?? "downloading", fraction })
   }
 
   // Ollama's /api/pull streams newline-delimited JSON objects (not SSE).

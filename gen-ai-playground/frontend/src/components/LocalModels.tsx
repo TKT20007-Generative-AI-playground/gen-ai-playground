@@ -41,6 +41,8 @@ type Message = {
   role: "user" | "assistant"
   content: string
   isPending?: boolean
+  /** A failed assistant turn (error text) — shown to the user but never sent back as history. */
+  isError?: boolean
 }
 
 const makeId = () => {
@@ -202,6 +204,7 @@ export default function LocalModels() {
 
   const streamHandleRef = useRef<ChatStreamHandle | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([])
 
   const setMessagesTracked = useCallback(
@@ -252,7 +255,15 @@ export default function LocalModels() {
     }
   }, [])
 
+  // Auto-scroll to the newest message, but only when the user is already near the
+  // bottom — otherwise streaming tokens would keep yanking them down while they
+  // try to read earlier messages.
   useEffect(() => {
+    const viewport = viewportRef.current
+    if (viewport) {
+      const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight
+      if (distanceFromBottom > 80) return
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, isStreaming])
 
@@ -284,7 +295,9 @@ export default function LocalModels() {
       })
       notifications.show({ title: "Model ready", message: `${label} downloaded.`, color: "green" })
       await refresh()
-      setSelectedModel(name)
+      // Don't hijack the selection (and the streaming bubble's label) if a chat is
+      // mid-stream — the user can pick the freshly downloaded model themselves.
+      if (!streamHandleRef.current) setSelectedModel(name)
       // Warm the model into memory so the first chat is fast; failures here are non-fatal.
       warmupModel(name).catch(() => {})
     } catch (err) {
@@ -308,7 +321,7 @@ export default function LocalModels() {
     const pending: Message = { id: pendingId, role: "assistant", content: "", isPending: true }
 
     const history: ChatMessage[] = messagesRef.current
-      .filter(m => !m.isPending)
+      .filter(m => !m.isPending && !m.isError)
       .map(m => ({ role: m.role, content: m.content }))
       .concat({ role: "user", content: text })
 
@@ -335,7 +348,7 @@ export default function LocalModels() {
       err => {
         const message = err instanceof Error ? err.message : "Failed to get a response."
         setMessagesTracked(prev =>
-          prev.map(m => (m.id === pendingId ? { ...m, content: message, isPending: false } : m)),
+          prev.map(m => (m.id === pendingId ? { ...m, content: message, isPending: false, isError: true } : m)),
         )
         setIsStreaming(false)
         streamHandleRef.current = null
@@ -486,6 +499,7 @@ export default function LocalModels() {
           </Group>
 
           <ScrollArea
+            viewportRef={viewportRef}
             style={{
               minHeight: isMobile ? 200 : 300,
               maxHeight: isMobile ? "50vh" : "60vh",
