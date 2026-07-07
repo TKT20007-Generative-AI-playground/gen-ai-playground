@@ -78,68 +78,51 @@ type OsKey = "macos" | "windows" | "linux"
 type SetupStepData = { label: string; command?: string; note?: React.ReactNode }
 
 // Per-OS setup instructions. Only the wording/commands differ — the app itself is
-// identical across platforms (it just talks to http://localhost:11434).
-const OS_SETUP: Record<OsKey, { label: string; steps: SetupStepData[] }> = {
-  macos: {
-    label: "macOS",
-    steps: [
-      { label: "Install Ollama (Homebrew or ollama.com):", command: "brew install ollama" },
-      { label: "Start the Ollama service (or open the Ollama app):", command: "ollama serve" },
-      {
-        label: "Allow the browser to reach Ollama (CORS), then restart Ollama:",
-        command: 'launchctl setenv OLLAMA_ORIGINS "*"',
-        note: (
-          <>
-            Without <Code>OLLAMA_ORIGINS</Code>, the browser blocks requests from this page's
-            origin. Use <Code>"*"</Code> for local development.
-          </>
-        ),
-      },
-      { label: "Download a model (or use “Download” below once connected):", command: "ollama pull llama3.2:3b" },
-    ],
-  },
-  windows: {
-    label: "Windows",
-    steps: [
-      {
-        label: "Install Ollama (winget, or download the installer from ollama.com/download):",
-        command: "winget install Ollama.Ollama",
-      },
-      { label: "Ollama then runs automatically as a background service on port 11434." },
-      {
-        label: "Allow the browser to reach Ollama (CORS), then restart Ollama from the tray:",
-        command: 'setx OLLAMA_ORIGINS "*"',
-        note: (
-          <>
-            Open a new terminal / restart Ollama after <Code>setx</Code> so the variable takes
-            effect.
-          </>
-        ),
-      },
-      { label: "Download a model (or use “Download” below once connected):", command: "ollama pull llama3.2:3b" },
-    ],
-  },
-  linux: {
-    label: "Linux / WSL",
-    steps: [
-      { label: "Install Ollama:", command: "curl -fsSL https://ollama.com/install.sh | sh" },
-      {
-        label: "Start it, binding to all interfaces (important for WSL) and allowing CORS:",
-        command: "OLLAMA_HOST=0.0.0.0:11434 OLLAMA_ORIGINS=* ollama serve",
-      },
-      {
-        label: "Download a model (or use “Download” below once connected):",
-        command: "ollama pull llama3.2:3b",
-        note: (
-          <>
-            On WSL, <Code>localhost:11434</Code> usually reaches Ollama from the Windows browser via
-            port forwarding. If not, set <Code>VITE_OLLAMA_URL</Code> to the WSL IP
-            (<Code>hostname -I</Code>).
-          </>
-        ),
-      },
-    ],
-  },
+// identical across platforms (it just talks to http://localhost:11434). The CORS
+// commands are scoped to `origin` (this page's own origin) instead of a wildcard.
+function buildOsSetup(origin: string): Record<OsKey, { label: string; steps: SetupStepData[] }> {
+  return {
+    macos: {
+      label: "macOS",
+      steps: [
+        { label: "Install Ollama (Homebrew or ollama.com):", command: "brew install ollama" },
+        {
+          label: "Start Ollama, allowing only this app to reach it (CORS):",
+          command: `OLLAMA_ORIGINS="${origin}" ollama serve`,
+        },
+        { label: "Download a model (or use “Download” below once connected):", command: "ollama pull llama3.2:3b" },
+      ],
+    },
+    windows: {
+      label: "Windows",
+      steps: [
+        {
+          label: "Install Ollama (winget, or download the installer from ollama.com/download):",
+          command: "winget install Ollama.Ollama",
+        },
+        { label: "Ollama then runs automatically as a background service on port 11434." },
+        {
+          label: "Allow only this app to reach Ollama (CORS), then restart Ollama from the tray:",
+          command: `setx OLLAMA_ORIGINS "${origin}"`,
+        },
+        { label: "Download a model (or use “Download” below once connected):", command: "ollama pull llama3.2:3b" },
+      ],
+    },
+    linux: {
+      label: "Linux / WSL",
+      steps: [
+        { label: "Install Ollama:", command: "curl -fsSL https://ollama.com/install.sh | sh" },
+        {
+          label: "Start it, binding to all interfaces (important for WSL) and allowing only this app (CORS):",
+          command: `OLLAMA_HOST=0.0.0.0:11434 OLLAMA_ORIGINS="${origin}" ollama serve`,
+        },
+        {
+          label: "Download a model (or use “Download” below once connected):",
+          command: "ollama pull llama3.2:3b",
+        },
+      ],
+    },
+  }
 }
 
 /** Best-effort detection of the current OS so the right tab is pre-selected. */
@@ -153,7 +136,9 @@ function detectOs(): OsKey {
 
 function OnboardingPanel({ checking, onRetry }: { checking: boolean; onRetry: () => void }) {
   const [os, setOs] = useState<OsKey>(detectOs)
-  const setup = OS_SETUP[os]
+  const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:5173"
+  const osSetup = useMemo(() => buildOsSetup(origin), [origin])
+  const setup = osSetup[os]
 
   return (
     <Paper p="lg" style={{ border: "1px solid #ddd", borderRadius: 8, maxWidth: 720 }}>
@@ -165,8 +150,8 @@ function OnboardingPanel({ checking, onRetry }: { checking: boolean; onRetry: ()
 
       <Tabs value={os} onChange={value => value && setOs(value as OsKey)} mb="md">
         <Tabs.List>
-          {(Object.keys(OS_SETUP) as OsKey[]).map(key => (
-            <Tabs.Tab key={key} value={key}>{OS_SETUP[key].label}</Tabs.Tab>
+          {(Object.keys(osSetup) as OsKey[]).map(key => (
+            <Tabs.Tab key={key} value={key}>{osSetup[key].label}</Tabs.Tab>
           ))}
         </Tabs.List>
       </Tabs>
@@ -206,6 +191,17 @@ export default function LocalModels() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([])
+
+  //slower pace streaming
+  const typewriterTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const streamCtrlRef = useRef<{ pendingId: string; target: string; shown: number; done: boolean } | null>(null)
+
+  const clearTypewriter = useCallback(() => {
+    if (typewriterTimerRef.current != null) {
+      clearInterval(typewriterTimerRef.current)
+      typewriterTimerRef.current = null
+    }
+  }, [])
 
   const setMessagesTracked = useCallback(
     (updater: Message[] | ((prev: Message[]) => Message[])) => {
@@ -252,6 +248,10 @@ export default function LocalModels() {
     return () => {
       streamHandleRef.current?.cancel()
       streamHandleRef.current = null
+      if (typewriterTimerRef.current != null) {
+        clearInterval(typewriterTimerRef.current)
+        typewriterTimerRef.current = null
+      }
     }
   }, [])
 
@@ -329,24 +329,54 @@ export default function LocalModels() {
     setPrompt("")
     setIsStreaming(true)
 
+    const ctrl = { pendingId, target: "", shown: 0, done: false }
+    streamCtrlRef.current = ctrl
+
+    const finalize = () => {
+      clearTypewriter()
+      setMessagesTracked(prev =>
+        prev.map(m => (m.id === pendingId ? { ...m, content: ctrl.target, isPending: false } : m)),
+      )
+      streamCtrlRef.current = null
+      streamHandleRef.current = null
+      setIsStreaming(false)
+    }
+
+    // Reveal buffered text a little at a time. ~100 chars/s at rest, but accelerate
+    // when we've fallen far behind so long replies don't lag seconds behind the model.
+    const TICK_MS = 20
+    const BASE_STEP = 2
+    const CATCHUP_AT = 240
+    clearTypewriter()
+    typewriterTimerRef.current = setInterval(() => {
+      const remaining = ctrl.target.length - ctrl.shown
+      if (remaining > 0) {
+        const step = remaining > CATCHUP_AT ? Math.ceil(remaining / 30) : BASE_STEP
+        ctrl.shown = Math.min(ctrl.target.length, ctrl.shown + step)
+        const text = ctrl.target.slice(0, ctrl.shown)
+        setMessagesTracked(prev =>
+          prev.map(m => (m.id === pendingId ? { ...m, content: text } : m)),
+        )
+      } else if (ctrl.done) {
+        finalize()
+      }
+    }, TICK_MS)
+
     const handle = chatLocalStream(
       selectedModel,
       history,
       { temperature, maxTokens },
       token => {
-        setMessagesTracked(prev =>
-          prev.map(m => (m.id === pendingId ? { ...m, content: m.content + token } : m)),
-        )
+        ctrl.target += token
       },
       () => {
-        setMessagesTracked(prev =>
-          prev.map(m => (m.id === pendingId ? { ...m, isPending: false } : m)),
-        )
-        setIsStreaming(false)
-        streamHandleRef.current = null
+        // Let the typewriter drain the remaining buffer; the interval finalizes.
+        ctrl.done = true
       },
       err => {
         const message = err instanceof Error ? err.message : "Failed to get a response."
+        clearTypewriter()
+        streamCtrlRef.current = null
         setMessagesTracked(prev =>
           prev.map(m => (m.id === pendingId ? { ...m, content: message, isPending: false, isError: true } : m)),
         )
@@ -355,14 +385,23 @@ export default function LocalModels() {
       },
     )
     streamHandleRef.current = handle
-  }, [prompt, selectedModel, isStreaming, temperature, maxTokens, setMessagesTracked])
+  }, [prompt, selectedModel, isStreaming, temperature, maxTokens, setMessagesTracked, clearTypewriter])
 
   const stop = useCallback(() => {
     streamHandleRef.current?.cancel()
     streamHandleRef.current = null
-    setMessagesTracked(prev => prev.map(m => (m.isPending ? { ...m, isPending: false } : m)))
+    clearTypewriter()
+    // Flush whatever was already received so no text is lost on stop.
+    const ctrl = streamCtrlRef.current
+    setMessagesTracked(prev =>
+      prev.map(m => {
+        if (ctrl && m.id === ctrl.pendingId) return { ...m, content: ctrl.target, isPending: false }
+        return m.isPending ? { ...m, isPending: false } : m
+      }),
+    )
+    streamCtrlRef.current = null
     setIsStreaming(false)
-  }, [setMessagesTracked])
+  }, [setMessagesTracked, clearTypewriter])
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
