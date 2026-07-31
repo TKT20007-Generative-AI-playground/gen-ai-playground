@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
-from app.dependencies import get_current_user, get_admin_user, get_container_handler, validate_csrf_token
+from app.dependencies import get_current_user, get_container_handler, validate_csrf_token
 from app.models import UserInfo, VisionChatRequest, DeployModelRequest, DeploymentStatusResponse
 from app.template_discovery import _deployment_name_from_filename, get_vision_template_configs, get_vision_template_map
 from app.verda_service import verda_service
@@ -87,7 +87,7 @@ def get_vision_model_statuses(current_user: UserInfo = Depends(get_current_user)
 @router.post("/deploy", response_model=DeploymentStatusResponse)
 def deploy_vision_model(
     request: DeployModelRequest,
-    current_user: UserInfo = Depends(get_admin_user),
+    current_user: UserInfo = Depends(get_current_user),
     _: None = Depends(validate_csrf_token),
     container_handler: ContainerHandler = Depends(get_container_handler),
 ):

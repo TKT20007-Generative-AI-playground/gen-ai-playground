@@ -184,7 +184,7 @@ def get_video_template_map() -> dict[str, str]:
 
 def get_vision_template_map() -> dict[str, str]:
     global _vision_cache, _vision_config_cache
-    if _vision_cache is None:
+    if _vision_cache is None or _vision_config_cache is None:
         _vision_cache, _vision_config_cache = _discover_templates_with_predicate(
             _is_vision_template
         )
@@ -194,7 +194,7 @@ def get_vision_template_map() -> dict[str, str]:
 def get_vision_template_configs() -> dict[str, TemplateConfig]:
     """Return cached {template_filename: TemplateConfig} mapping for vision templates."""
     global _vision_cache, _vision_config_cache
-    if _vision_cache is None:
+    if _vision_cache is None or _vision_config_cache is None:
         _vision_cache, _vision_config_cache = _discover_templates_with_predicate(
             _is_vision_template
         )
@@ -203,11 +203,13 @@ def get_vision_template_configs() -> dict[str, TemplateConfig]:
 
 def refresh() -> dict[str, str]:
     """Re-scan the templates directory and update all caches."""
-    global _cache, _config_cache, _audio_cache, _video_cache, _vision_cache
+    global _cache, _config_cache, _audio_cache, _video_cache, _vision_cache, _vision_config_cache
     _cache, _config_cache = _discover_templates_with_predicate(
         _is_text_template
     )
     _audio_cache = discover_audio_templates()
     _video_cache = discover_video_templates()
-    _vision_cache = discover_vision_templates()
+    _vision_cache, _vision_config_cache = _discover_templates_with_predicate(
+        _is_vision_template
+    )
     return _cache

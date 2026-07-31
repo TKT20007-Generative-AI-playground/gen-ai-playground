@@ -89,7 +89,7 @@ export default function WebcamAIAnalysis(_props: WebcamAIAnalysisProps) {
   // Auto-select first live model
   useEffect(() => {
     if (selectedModel) return
-    const liveModel = modelOptions.find(model => modelStatuses[model.value] === "live")
+    const liveModel = modelOptions.find((model: VisionModelApiItem) => modelStatuses[model.value] === "live")
     if (liveModel) setSelectedModel(liveModel.value)
   }, [modelOptions, modelStatuses, selectedModel])
 
@@ -148,7 +148,7 @@ export default function WebcamAIAnalysis(_props: WebcamAIAnalysisProps) {
     setIsActive(false)
     loopRef.current = false
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current.getTracks().forEach((track: MediaStreamTrack) => track.stop())
       streamRef.current = null
     }
   }
@@ -246,14 +246,14 @@ export default function WebcamAIAnalysis(_props: WebcamAIAnalysisProps) {
         placeholder="Select a live vision model"
         data={dropdownData}
         value={selectedModel}
-        onChange={next => {
+        onChange={(next: string | null) => {
           const liveOnly = next && (modelStatuses[next] ?? "unknown") === "live" ? next : null
           setSelectedModel(liveOnly)
         }}
         searchable
         clearable
         disabled={isActive}
-        renderOption={({ option }) => (
+        renderOption={({ option }: { option: { label: string; value: string } }) => (
           <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
             <span>{option.label}</span>
             {(modelStatuses[option.value] ?? "unknown") !== "live" ? (
@@ -277,7 +277,7 @@ export default function WebcamAIAnalysis(_props: WebcamAIAnalysisProps) {
         <Alert color={selectedStatus === "starting" ? "yellow" : "gray"} variant="light">
           {selectedStatus === "starting"
             ? "This model is starting up. Please wait and try again."
-            : "This model is not live. Ask an admin to deploy it from the dashboard."}
+            : "This model is not live yet. Start it from here and wait for it to boot."}
         </Alert>
       ) : null}
 
@@ -287,7 +287,7 @@ export default function WebcamAIAnalysis(_props: WebcamAIAnalysisProps) {
           label="Enable Analysis"
           checked={isActive}
           disabled={!canAnalyze && !isActive}
-          onChange={(e) => e.currentTarget.checked ? startWebcam() : stopWebcam()}
+          onChange={(e: { currentTarget: { checked: boolean } }) => e.currentTarget.checked ? startWebcam() : stopWebcam()}
         />
       </Group>
 
