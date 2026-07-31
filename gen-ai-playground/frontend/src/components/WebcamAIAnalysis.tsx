@@ -192,27 +192,22 @@ export default function WebcamAIAnalysis({}: WebcamAIAnalysisProps) {
     try {
       setOutput("")
 
-      console.log("[Vision] Starting stream request...")
-      const iterator = await streamVision({
-        deployment_name: selectedModel || "",
-        messages,
-        max_tokens: 256,
-        temperature: 0.1
-      }, loopRef)
-      console.log("[Vision] Got iterator, starting to read chunks...")
+      const iterator = await streamVision(
+        {
+          deployment_name: selectedModel || "",
+          messages,
+          max_tokens: 256,
+          temperature: 0.1,
+        },
+        loopRef,
+      )
 
       let currentReply = ""
-      let chunkCount = 0
       for await (const chunk of iterator) {
         if (!loopRef.current) break
-        chunkCount++
-        if (chunkCount <= 3) {
-          console.log(`[Vision] chunk[${chunkCount}]:`, chunk.substring(0, 80))
-        }
         currentReply += chunk
         setOutput(currentReply)
       }
-      console.log(`[Vision] Stream ended, total chunks: ${chunkCount}, reply length: ${currentReply.length}`)
     } catch (e) {
       console.error("[Vision] Stream failed", e)
       setOutput(`Error: ${e instanceof Error ? e.message : String(e)}`)
