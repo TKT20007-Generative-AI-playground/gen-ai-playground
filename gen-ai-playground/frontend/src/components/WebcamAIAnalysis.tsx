@@ -37,7 +37,7 @@ function buildDropdownData(modelOptions: VisionModelApiItem[], statuses: VisionM
     })
 }
 
-export default function WebcamAIAnalysis({}: WebcamAIAnalysisProps) {
+export default function WebcamAIAnalysis(_props: WebcamAIAnalysisProps) {
   const [isActive, setIsActive] = useState(false)
   const [output, setOutput] = useState<string>("")
   const [modelOptions, setModelOptions] = useState<VisionModelApiItem[]>([])
