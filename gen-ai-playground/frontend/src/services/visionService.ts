@@ -85,9 +85,8 @@ export async function streamVision(request: StreamVisionRequest, ref: { current:
         if (!line) continue
         if (!line.startsWith("data: ")) continue;
         if (line === "data: [DONE]") {
-          console.log("[VisionService] Got [DONE] signal");
-          reader.cancel();
-          return;
+          reader.cancel()
+          return
         }
 
         const dataStr = line.replace("data: ", "").trim();
