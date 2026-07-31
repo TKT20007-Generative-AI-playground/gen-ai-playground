@@ -74,25 +74,17 @@ export async function streamVision(request: StreamVisionRequest, ref: { current:
   console.log("[VisionService] Stream response received, status:", response.status);
 
   async function* generate(): AsyncIterableIterator<string> {
-    let rawLineCount = 0;
     while (ref.current) {
-      const { done, value } = await reader.read();
-      if (done) {
-        console.log(`[VisionService] Reader done, total raw lines: ${rawLineCount}`);
-        break;
-      }
+      const { done, value } = await reader.read()
+      if (done) break
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split("\n")
       // Keep the last (potentially incomplete) line in the buffer
-      buffer = lines.pop() || "";
+      buffer = lines.pop() || ""
 
       for (const line of lines) {
-        if (!line) continue;
-        rawLineCount++;
-        if (rawLineCount <= 5) {
-          console.log(`[VisionService] raw line[${rawLineCount}]:`, line.substring(0, 150));
-        }
+        if (!line) continue
         if (!line.startsWith("data: ")) continue;
         if (line === "data: [DONE]") {
           console.log("[VisionService] Got [DONE] signal");
