@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { Box, Group, Paper, Text, ScrollArea, Switch, Select, Button, Alert, Stack, Slider } from "@mantine/core"
 import { streamVision, type VisionChatMessagePayload, fetchVisionModels, fetchVisionModelStatuses, type VisionModelApiItem, type VisionModelStatuses } from "../services/visionService"
-import { deployVisionModel, stopDashboardContainer } from "../services/dashboardService"
+import { deployVisionModel } from "../services/dashboardService"
 import { useDeployModel } from "../hooks/useDeployModel"
 import { useAuth } from "../context/AuthContext"
 
@@ -37,7 +37,9 @@ function buildDropdownData(modelOptions: VisionModelApiItem[], statuses: VisionM
     })
 }
 
-export default function WebcamAIAnalysis(_props: WebcamAIAnalysisProps) {
+export default function WebcamAIAnalysis({ opened }: WebcamAIAnalysisProps) {
+  void opened
+
   const [isActive, setIsActive] = useState(false)
   const [output, setOutput] = useState<string>("")
   const [modelOptions, setModelOptions] = useState<VisionModelApiItem[]>([])
@@ -101,7 +103,7 @@ export default function WebcamAIAnalysis(_props: WebcamAIAnalysisProps) {
   const selectedStatus = selectedModel ? modelStatuses[selectedModel] ?? "unknown" : null
   const canAnalyze = !!selectedModel && selectedStatus === "live"
 
-  const { isLoggedIn, isAdmin } = useAuth()
+  const { isLoggedIn } = useAuth()
   const visionService = useMemo(() => ({
     fetchOptions: async () => {
       const models = await fetchVisionModels()
