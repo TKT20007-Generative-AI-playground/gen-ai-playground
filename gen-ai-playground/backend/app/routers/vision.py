@@ -1,9 +1,6 @@
 """Vision endpoints."""
 import json
 import re
-import time
-from typing import Any
-
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
