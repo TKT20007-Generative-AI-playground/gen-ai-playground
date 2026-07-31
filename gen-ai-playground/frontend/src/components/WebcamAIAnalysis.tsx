@@ -123,12 +123,8 @@ export default function WebcamAIAnalysis({}: WebcamAIAnalysisProps) {
     return () => {
       mountedRef.current = false
       stopWebcam()
-      const model = selectedModelRef.current
-      if (model) {
-        stopDashboardContainer(model).catch(err =>
-          console.error("Failed to stop model on unmount:", err)
-        )
-      }
+      // Do not stop deployments automatically on unmount; deployments are admin-managed/shared.
+
     }
   }, [])
 
