@@ -22,12 +22,6 @@ def _inference_headers() -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def _vision_deployment_names() -> set[str]:
-    return {
-        _deployment_name_from_filename(template_name)
-        for template_name in get_vision_template_map().keys()
-    }
-
 
 def _resolve_vision_template_name(model: str) -> str | None:
     """Resolve a display name or deployment name to a template filename."""
