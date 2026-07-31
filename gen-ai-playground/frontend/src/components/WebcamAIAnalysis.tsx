@@ -101,7 +101,7 @@ export default function WebcamAIAnalysis({}: WebcamAIAnalysisProps) {
   const selectedStatus = selectedModel ? modelStatuses[selectedModel] ?? "unknown" : null
   const canAnalyze = !!selectedModel && selectedStatus === "live"
 
-  const { isLoggedIn } = useAuth()
+  const { isLoggedIn, isAdmin } = useAuth()
   const visionService = useMemo(() => ({
     fetchOptions: async () => {
       const models = await fetchVisionModels()
