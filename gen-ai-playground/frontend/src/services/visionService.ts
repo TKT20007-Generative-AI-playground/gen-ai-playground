@@ -71,8 +71,6 @@ export async function streamVision(request: StreamVisionRequest, ref: { current:
   const decoder = new TextDecoder();
   let buffer = "";
 
-  console.log("[VisionService] Stream response received, status:", response.status);
-
   async function* generate(): AsyncIterableIterator<string> {
     while (ref.current) {
       const { done, value } = await reader.read()
