@@ -45,8 +45,6 @@ export default function WebcamAIAnalysis({ opened }: WebcamAIAnalysisProps) {
   const streamRef = useRef<MediaStream | null>(null)
   const loopRef = useRef<boolean>(false)
   const mountedRef = useRef<boolean>(true)
-  const selectedModelRef = useRef<string | null>(null)
-
   const fetchModels = useCallback(async () => {
     try {
       const models = await fetchVisionModels()
@@ -74,11 +72,6 @@ export default function WebcamAIAnalysis({ opened }: WebcamAIAnalysisProps) {
     const intervalId = window.setInterval(fetchStatuses, 30000)
     return () => window.clearInterval(intervalId)
   }, [fetchStatuses])
-
-  // Keep ref in sync with selectedModel for unmount cleanup
-  useEffect(() => {
-    selectedModelRef.current = selectedModel
-  }, [selectedModel])
 
   // Auto-select first live model
   useEffect(() => {
