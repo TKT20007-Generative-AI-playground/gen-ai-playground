@@ -3,9 +3,9 @@ import { test, expect, Page } from '@playwright/test';
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173/';
 const TRANSCRIBE_URL = new URL('playground/Transcribe', FRONTEND_URL).toString();
 
-test.use({ storageState: 'playwright/.auth/user.json' });
+import type { ModelStatus } from '../../frontend/src/utils/types';
 
-type ModelStatus = 'live' | 'starting' | 'offline' | 'unknown';
+test.use({ storageState: 'playwright/.auth/user.json' });
 
 function createDeferred() {
   let resolve!: () => void;

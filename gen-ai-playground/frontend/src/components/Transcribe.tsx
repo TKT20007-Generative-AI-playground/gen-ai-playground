@@ -3,6 +3,7 @@ import { Alert, Button, FileInput, MultiSelect, Text, Textarea } from "@mantine/
 
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
+import { modelStatusPriority, type ModelStatus } from "../utils/types"
 import { formatAudioModelName } from "./history-ui/audioHistoryUtils"
 import {
   fetchAudioModels as fetchAudioModelsRequest,
@@ -30,7 +31,6 @@ type TranscriptionResponse = {
 }
 
 type TranscribeSource = "uploaded" | "recording"
-type ModelStatus = "live" | "starting" | "offline" | "unknown"
 
 type ModelOption = {
   value: string
@@ -46,13 +46,6 @@ type ModelTranscriptionState = {
 }
 
 const MAX_AUDIO_MODELS = 4
-
-const modelStatusPriority: Record<ModelStatus, number> = {
-  live: 0,
-  starting: 1,
-  unknown: 2,
-  offline: 3,
-}
 
 function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string, ModelStatus>) {
   return modelOptions

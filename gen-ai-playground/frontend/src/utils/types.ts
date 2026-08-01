@@ -8,3 +8,13 @@ export interface DeployOption {
   label: string
   modelPath: string
 }
+
+// ModelStatus represents the lifecycle state of a deployed model as reported by the backend.
+export type ModelStatus = "live" | "starting" | "offline" | "unknown"
+
+export const modelStatusPriority: Record<ModelStatus, number> = {
+  live: 0,
+  starting: 1,
+  unknown: 2,
+  offline: 3,
+}

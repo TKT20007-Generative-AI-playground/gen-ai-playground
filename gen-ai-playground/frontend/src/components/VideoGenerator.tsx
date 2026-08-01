@@ -5,6 +5,7 @@ import { notifications } from "@mantine/notifications"
 
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
+import { modelStatusPriority } from "../utils/types"
 import {
   fetchVideoModels,
   fetchVideoModelStatuses,
@@ -16,15 +17,6 @@ import {
 import { deployVideoModel } from "../services/dashboardService"
 import { useDeployModel } from "../hooks/useDeployModel"
 import { useAuth } from "../context/AuthContext"
-
-type ModelStatus = "live" | "starting" | "offline" | "unknown"
-
-const modelStatusPriority: Record<ModelStatus, number> = {
-  live: 0,
-  starting: 1,
-  unknown: 2,
-  offline: 3,
-}
 
 function buildDropdownData(modelOptions: VideoModelApiItem[], statuses: VideoModelStatuses) {
   return modelOptions

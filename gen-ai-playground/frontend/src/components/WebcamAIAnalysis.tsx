@@ -4,18 +4,10 @@ import { streamVision, type VisionChatMessagePayload, fetchVisionModels, fetchVi
 import { deployVisionModel } from "../services/dashboardService"
 import { useDeployModel } from "../hooks/useDeployModel"
 import { useAuth } from "../context/AuthContext"
+import { modelStatusPriority } from "../utils/types"
 
 interface WebcamAIAnalysisProps {
   opened?: boolean
-}
-
-type ModelStatus = "live" | "starting" | "offline" | "unknown"
-
-const modelStatusPriority: Record<ModelStatus, number> = {
-  live: 0,
-  starting: 1,
-  unknown: 2,
-  offline: 3,
 }
 
 function buildDropdownData(modelOptions: VisionModelApiItem[], statuses: VisionModelStatuses) {
