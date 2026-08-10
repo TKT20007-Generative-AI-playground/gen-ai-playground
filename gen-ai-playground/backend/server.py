@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
-from app.routers import auth, images, text, dashboard, invitations, audio, video
+from app.routers import auth, images, text, dashboard, invitations, audio, video, local_models_history
 from app.container_handler import ContainerHandler
 
 
@@ -52,6 +52,7 @@ app.include_router(dashboard.router)
 app.include_router(invitations.router)
 app.include_router(audio.router)
 app.include_router(video.router)
+app.include_router(local_models_history.router)
 
 
 @app.get("/")

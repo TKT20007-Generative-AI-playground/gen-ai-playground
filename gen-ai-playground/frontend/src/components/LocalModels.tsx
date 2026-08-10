@@ -27,6 +27,7 @@ import {
   listLocalModels,
   pingOllama,
   pullModel,
+  saveHistoryItems,
   warmupModel,
   type ChatMessage,
   type ChatStreamHandle,
@@ -340,6 +341,11 @@ export default function LocalModels() {
       streamCtrlRef.current = null
       streamHandleRef.current = null
       setIsStreaming(false)
+      // Save the chat history to the backend
+      saveHistoryItems(selectedModel, [
+        { role: "user", content: text },
+        { role: "assistant", content: ctrl.target },
+      ]).catch(() => {})
     }
 
     // Reveal buffered text a little at a time. ~100 chars/s at rest, but accelerate

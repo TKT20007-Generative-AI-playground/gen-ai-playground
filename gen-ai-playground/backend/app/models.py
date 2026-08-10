@@ -3,7 +3,7 @@ Pydantic models for request and response validation
 """
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 
 
 class ImageRequestBody(BaseModel):
@@ -294,3 +294,11 @@ class StreamRequest(BaseModel):
     max_tokens: int = Field(default=256, ge=1, le=32768)
     model_path: Optional[str] = None
     enable_thinking: bool = False
+
+class LocalChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+
+class SaveLocalHistoryRequest(BaseModel):
+    model: str
+    historyItems: List[LocalChatMessage]

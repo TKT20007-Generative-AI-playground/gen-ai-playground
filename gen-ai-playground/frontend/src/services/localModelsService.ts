@@ -1,4 +1,5 @@
 import { ollamaBaseUrl } from "../utils/env"
+import { apiClient } from "./httpClient"
 
 /**
  * Talks DIRECTLY to a locally running Ollama instance (e.g. on the user's own Mac).
@@ -317,6 +318,21 @@ export async function warmupModel(model: string, signal?: AbortSignal): Promise<
       }),
       signal,
     })
+  } catch (err) {
+    toUnreachable(err)
+  }
+}
+
+export async function saveHistoryItems(model: string, historyItems: ChatMessage[], signal?: AbortSignal): Promise<void> {
+  try {
+    await apiClient.post(
+      "/local-models/save-history",
+      {
+        model,
+        historyItems,
+      },
+      { signal },
+    )
   } catch (err) {
     toUnreachable(err)
   }
