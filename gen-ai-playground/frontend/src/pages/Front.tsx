@@ -37,7 +37,8 @@ const Front = () => {
   const hoverCard3 = useFadeIn(400)
   const hoverCard4 = useFadeIn(500)
   const videoGenCard = useFadeIn(600)
-  const bannerFade = useFadeIn(600)
+  const webcamCard = useFadeIn(700)
+  const bannerFade = useFadeIn(800)
   const carouselFade = useFadeIn(400)
   const { isLoggedIn } = useAuth()
   const navigate = useNavigate()
@@ -197,6 +198,15 @@ const Front = () => {
             cardRef={videoGenCard.ref}
             isVisible={videoGenCard.isVisible}
             onClick={() => handleLoggedIn("VideoGenerator")}
+          />
+          <HoverCard
+            image="/images/text-generate.png"
+            title="Webcam AI Analysis"
+            description="Connect your webcam and use vision-language models to describe the live feed."
+            buttonText="Go to live webcam analysis"
+            cardRef={webcamCard.ref}
+            isVisible={webcamCard.isVisible}
+            onClick={() => handleLoggedIn("WebcamAnalysis")}
           />
         </Group>
       </Box>

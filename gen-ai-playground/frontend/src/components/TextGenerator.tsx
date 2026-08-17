@@ -19,6 +19,7 @@ import {
 import { useMediaQuery } from "@mantine/hooks"
 import ActionStatus from "./ActionStatus"
 import { formatDurationMs } from "../utils/time"
+import { modelStatusPriority, type ModelStatus } from "../utils/types"
 import { ShareConversationModal } from "./SharedConversationsModal"
 import { fetchTextModels, fetchTextModelStatuses, fetchTextDeployments } from "../services/textService"
 import { deployTextModel} from "../services/dashboardService"
@@ -45,8 +46,6 @@ type Message = {
 }
 
 
-type ModelStatus = "live" | "starting" | "offline" | "unknown"
-
 const makeMessageId = () => {
   // Prefer crypto.randomUUID when available; fall back for older browsers.
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -56,13 +55,6 @@ const makeMessageId = () => {
 }
 
 const MAX_MODELS = 4
-
-const modelStatusPriority: Record<ModelStatus, number> = {
-  live: 0,
-  starting: 1,
-  unknown: 2,
-  offline: 3,
-}
 
 // Build dropdown data with colored status dots; disable non-live models
 function buildDropdownData(modelOptions: ModelOption[], statuses: Record<string, ModelStatus>) {

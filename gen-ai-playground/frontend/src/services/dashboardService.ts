@@ -104,6 +104,16 @@ export async function fetchDeployableVideoModels(): Promise<Array<{ value: strin
   return res.data.available_models ?? []
 }
 
+export async function fetchDeployableVisionModels(): Promise<Array<{ value: string; label: string }>> {
+  const res = await apiClient.get<{ available_models?: Array<{ value: string; label: string }> }>(
+    "/vision/models",
+    {
+      headers: getCsrfHeaders(),
+    },
+  )
+  return res.data.available_models ?? []
+}
+
 export type DashboardContainer = {
   name: string
   status: string
@@ -149,6 +159,16 @@ export async function deployAudioModel(modelPath: string): Promise<void> {
 export async function deployVideoModel(modelPath: string): Promise<void> {
   await apiClient.post(
     "/video/deploy",
+    { model_path: modelPath },
+    {
+      headers: getJsonCsrfHeaders(),
+    },
+  )
+}
+
+export async function deployVisionModel(modelPath: string): Promise<void> {
+  await apiClient.post(
+    "/vision/deploy",
     { model_path: modelPath },
     {
       headers: getJsonCsrfHeaders(),
