@@ -20,8 +20,7 @@ class Settings:
     
     # External API Keys (Bearer Tokens - NEVER expose to frontend)
     # These are used by backend to authenticate with external inference APIs
-    VERDA_API_KEY: str = os.getenv("VERDA_API_KEY")
-    VERDA_INFERENCE_KEY: str = os.getenv("VERDA_INFERENCE_KEY") or os.getenv("VERDA_API_KEY")
+    VERDA_INFERENCE_KEY: str = os.getenv("VERDA_INFERENCE_KEY")
     
     # Verda SDK credentials (for container deployments)
     VERDA_CLIENT_ID: str = os.getenv("VERDA_CLIENT_ID")

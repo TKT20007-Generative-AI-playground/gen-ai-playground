@@ -167,10 +167,10 @@ async def generate_image(
     # Start timing
     start_time = time.perf_counter()
     # Validate API key
-    if not settings.VERDA_API_KEY:
+    if not settings.VERDA_INFERENCE_KEY:
         raise HTTPException(
             status_code=500,
-            detail="VERDA_API_KEY not set in environment."
+            detail="VERDA_INFERENCE_KEY not set in environment."
         )
     
     # Select API URL based on model
@@ -179,7 +179,7 @@ async def generate_image(
     # Prepare request
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {settings.VERDA_API_KEY}"
+        "Authorization": f"Bearer {settings.VERDA_INFERENCE_KEY}"
     }
     parent_image_id = None
     user_base64_image = None
@@ -284,7 +284,7 @@ async def edit_image(
      # Prepare request
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {settings.VERDA_API_KEY}"
+        "Authorization": f"Bearer {settings.VERDA_INFERENCE_KEY}"
     }
 
     data = build_request_data(model, prompt, image_base64)

@@ -353,7 +353,7 @@ class TestGenerateImageWithAuth:
         }
         headers = {"Authorization": f"Bearer {auth_token}"}
         
-        with patch('app.config.settings.VERDA_API_KEY', "test-api-key"):
+        with patch('app.config.settings.VERDA_INFERENCE_KEY', "test-api-key"):
             response = client.post("/images/generate", json=image_request, headers=headers)
         
         assert response.status_code == 200
@@ -388,7 +388,7 @@ class TestGenerateImageWithAuth:
         mock_client_instance.post.return_value = mock_response
         mock_async_client_cls.return_value = mock_client_instance
         
-        with patch('app.config.settings.VERDA_API_KEY', "test-api-key"):
+        with patch('app.config.settings.VERDA_INFERENCE_KEY', "test-api-key"):
             # Generate image for user 1
             headers1 = {"Authorization": f"Bearer {auth_token}"}
             response1 = client.post("/images/generate", 

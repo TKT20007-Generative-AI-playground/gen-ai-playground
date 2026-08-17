@@ -95,14 +95,14 @@ environment:
    # Add other secrets as needed
 ```
 
-> **Important:** Secrets such as `VERDA_API_KEY`, `VERDA_CLIENT_ID`, `VERDA_CLIENT_SECRET`, and `HF_TOKEN` are not included in the default Compose environment section. To use these with Docker Compose, you must either:
+> **Important:** Secrets such as `VERDA_INFERENCE_KEY`, `VERDA_CLIENT_ID`, `VERDA_CLIENT_SECRET`, and `HF_TOKEN` are not included in the default Compose environment section. To use these with Docker Compose, you must either:
 > - Add them directly to the `environment:` section in your Compose file, **or**
 > - Create a `backend/.env.local`
 
 > Example `backend/.env.local` file:
 ```env
 # Verda integration (keep these secret!)
-VERDA_API_KEY="your-verda-api-key"
+VERDA_INFERENCE_KEY="your-verda-inference-key"
 VERDA_CLIENT_ID="your-verda-client-id"
 VERDA_CLIENT_SECRET="your-verda-client-secret"
 
@@ -126,7 +126,7 @@ When running the backend and frontend directly (not in Docker), you can use `.en
 MONGO_DB_URL="mongodb://mongodb:27017"
 
 # Verda integration (keep these secret!)
-VERDA_API_KEY="your-verda-api-key"
+VERDA_INFERENCE_KEY="your-verda-inference-key"
 VERDA_CLIENT_ID="your-verda-client-id"
 VERDA_CLIENT_SECRET="your-verda-client-secret"
 
@@ -188,7 +188,7 @@ npm run dev
 
 4. The application will be available via the route address defined by OpenShift.
 
-5. The required environment variables for the backend (such as ALLOWED_ORIGINS, VERDA_API_KEY, MONGO_DB_URL, INVITATION_CODE, JWT_SECRET_KEY, VERDA_CLIENT_SECRET, VERDA_CLIENT_ID, HF_TOKEN, ADMIN_USERNAME, ADMIN_PASSWORD, and JWT_REFRESH_SECRET_KEY) are defined in the example [gen-ai-playground/manifests/backend/deployment.yaml](gen-ai-playground/manifests/backend/deployment.yaml). Make sure to set these in your OpenShift environment, using secrets where appropriate for sensitive values.
+5. The required environment variables for the backend (such as ALLOWED_ORIGINS, VERDA_INFERENCE_KEY, MONGO_DB_URL, INVITATION_CODE, JWT_SECRET_KEY, VERDA_CLIENT_SECRET, VERDA_CLIENT_ID, HF_TOKEN, ADMIN_USERNAME, ADMIN_PASSWORD, and JWT_REFRESH_SECRET_KEY) are defined in the example [gen-ai-playground/manifests/backend/deployment.yaml](gen-ai-playground/manifests/backend/deployment.yaml). Make sure to set these in your OpenShift environment, using secrets where appropriate for sensitive values.
 
 ---
 
