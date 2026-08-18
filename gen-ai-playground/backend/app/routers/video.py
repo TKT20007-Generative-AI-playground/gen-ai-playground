@@ -50,7 +50,7 @@ VIDEO_MODEL_ALIASES = {
 
 
 def _inference_headers() -> dict[str, str]:
-    token = settings.VERDA_INFERENCE_KEY or settings.VERDA_API_KEY
+    token = settings.VERDA_INFERENCE_KEY
     if not token:
         return {}
     return {"Authorization": f"Bearer {token}"}

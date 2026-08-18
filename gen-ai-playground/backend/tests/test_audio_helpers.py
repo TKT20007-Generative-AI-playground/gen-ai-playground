@@ -31,19 +31,12 @@ class _DummyUpload:
 
 
 class TestAudioHelpers:
-    def test_inference_headers_prefers_inference_key(self, monkeypatch):
+    def test_inference_headers_uses_inference_key(self, monkeypatch):
         monkeypatch.setattr(audio_router.settings, "VERDA_INFERENCE_KEY", "inference-key", raising=False)
-        monkeypatch.setattr(audio_router.settings, "VERDA_API_KEY", "api-key", raising=False)
         assert audio_router._inference_headers() == {"Authorization": "Bearer inference-key"}
 
-    def test_inference_headers_uses_api_key_fallback(self, monkeypatch):
+    def test_inference_headers_empty_without_key(self, monkeypatch):
         monkeypatch.setattr(audio_router.settings, "VERDA_INFERENCE_KEY", None, raising=False)
-        monkeypatch.setattr(audio_router.settings, "VERDA_API_KEY", "api-key", raising=False)
-        assert audio_router._inference_headers() == {"Authorization": "Bearer api-key"}
-
-    def test_inference_headers_empty_without_keys(self, monkeypatch):
-        monkeypatch.setattr(audio_router.settings, "VERDA_INFERENCE_KEY", None, raising=False)
-        monkeypatch.setattr(audio_router.settings, "VERDA_API_KEY", None, raising=False)
         assert audio_router._inference_headers() == {}
 
     def test_audio_deployment_names_from_templates(self, monkeypatch):

@@ -25,7 +25,7 @@ services:
       - JWT_SECRET_KEY=dev-secret-key-for-local-development
       - JWT_REFRESH_SECRET_KEY=dev-refresh-secret-key-for-local-development
       - INVITATION_CODE=local-invitation-code
-      - VERDA_API_KEY=test-api-key
+      - VERDA_INFERENCE_KEY=test-api-key
     volumes:
       - ./backend:/app
     depends_on:

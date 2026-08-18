@@ -29,7 +29,7 @@ spec:
               value: "production"
             - name: ALLOWED_ORIGINS
               value: "https://gen-ai-frontend-route-ohtuprojekti-staging.apps.ocp-prod-0.k8s.it.helsinki.fi"
-            - name: VERDA_API_KEY
+            - name: VERDA_INFERENCE_KEY
               valueFrom:
                 secretKeyRef:
                   name: verda-api-secret
